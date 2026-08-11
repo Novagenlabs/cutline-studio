@@ -98,6 +98,36 @@ const engine2 = new CutlineEngine({ data: data2, width: W, height: H }, 1);
 const r4 = engine2.compute(params);
 check('opaque image traced via flood fill', r4.rings.length === 1 && !r4.usedAlpha, `rings ${r4.rings.length}`);
 
+console.log('— opaque JPEG-like gradient background —');
+// vertical gradient spanning ~60 RGB units (wider than the 32 global
+// tolerance) — needs the local-continuity rule to fill completely
+const data3 = new Uint8ClampedArray(W * H * 4);
+for (let y = 0; y < H; y++) {
+  const t = y / H;
+  for (let x = 0; x < W; x++) {
+    const i = (y * W + x) * 4;
+    data3[i] = Math.round(235 - 55 * t);
+    data3[i + 1] = Math.round(233 - 48 * t);
+    data3[i + 2] = Math.round(230 - 35 * t);
+    data3[i + 3] = 255;
+  }
+}
+for (let y = 120; y < 260; y++) {
+  for (let x = 140; x < 300; x++) {
+    const i = (y * W + x) * 4;
+    data3[i] = 40;
+    data3[i + 1] = 90;
+    data3[i + 2] = 60;
+  }
+}
+const engine3 = new CutlineEngine({ data: data3, width: W, height: H }, 1);
+const r5 = engine3.compute(params);
+const gradBboxOk =
+  r5.rings.length === 1 &&
+  r5.bbox.x > 100 && r5.bbox.x < 140 &&
+  r5.bbox.y > 80 && r5.bbox.y < 120;
+check('gradient background removed, subject traced', gradBboxOk, `rings ${r5.rings.length} bbox ${JSON.stringify(r5.bbox)}`);
+
 console.log('— shapes —');
 const rRect = engine.compute({ ...params, shape: 'rounded' });
 check('rounded rect is one ring', rRect.rings.length === 1 && rRect.beziers[0].length === 8);

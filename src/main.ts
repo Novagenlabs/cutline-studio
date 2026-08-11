@@ -3,7 +3,7 @@ import type { CutlineParams, CutlineResult, ShapeMode } from './pipeline';
 import { buildSvg } from './export/svg';
 import { buildPdf } from './export/pdf';
 import { buildDxf } from './export/dxf';
-import { buildPng } from './export/png';
+import { buildRaster } from './export/png';
 import { makeSampleImage } from './ui/sample';
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string) =>
@@ -83,7 +83,7 @@ function adoptImage(el: HTMLImageElement | HTMLCanvasElement, w: number, h: numb
   art.setAttribute('height', String(h));
   $('#dropzone').classList.add('hidden');
   $('#st-file').textContent = base;
-  for (const id of ['#btn-svg', '#btn-pdf', '#btn-dxf', '#btn-png']) {
+  for (const id of ['#btn-svg', '#btn-pdf', '#btn-dxf', '#btn-png', '#btn-jpg']) {
     ($(id) as HTMLButtonElement).disabled = false;
   }
   recompute();
@@ -380,15 +380,19 @@ $('#btn-dxf').addEventListener('click', () => {
   download(`${state.fileBase}-cut.dxf`, dxf, 'application/dxf');
 });
 
-$('#btn-png').addEventListener('click', async () => {
+async function exportRaster(format: 'png' | 'jpeg') {
   if (!state.result || !state.imageEl) return;
-  const blob = await buildPng({
+  const blob = await buildRaster({
     image: state.imageEl,
     srcW: state.srcW,
     srcH: state.srcH,
     svgPath: state.result.svgPath,
     cutBbox: state.result.bbox,
     halo: state.halo,
+    format,
   });
-  download(`${state.fileBase}-print.png`, blob);
-});
+  download(`${state.fileBase}-print.${format === 'jpeg' ? 'jpg' : 'png'}`, blob);
+}
+
+$('#btn-png').addEventListener('click', () => exportRaster('png'));
+$('#btn-jpg').addEventListener('click', () => exportRaster('jpeg'));

@@ -86,43 +86,62 @@ function floodFillBackground(
   const bgG = ((bestKey >> 4) & 0xf) * 17;
   const bgB = (bestKey & 0xf) * 17;
   const tolSq = tolerance * tolerance;
+  // Local neighbor-to-neighbor tolerance: lets the fill ride smooth gradients
+  // and JPEG mottle (small local deltas) while the sharp edge of the subject
+  // (large local delta) still stops it. Kept well below the global tolerance
+  // so it can't creep through an anti-aliased boundary pixel by pixel.
+  const localTol = Math.max(6, tolerance / 3);
+  const localTolSq = localTol * localTol;
 
-  const isBgColor = (x: number, y: number) => {
-    const i = (y * iw + x) * 4;
-    const dr = data[i] - bgR;
-    const dg = data[i + 1] - bgG;
-    const db = data[i + 2] - bgB;
+  const isBgColor = (i4: number) => {
+    const dr = data[i4] - bgR;
+    const dg = data[i4 + 1] - bgG;
+    const db = data[i4 + 2] - bgB;
     return dr * dr + dg * dg + db * db <= tolSq;
   };
+  const isNearNeighbor = (i4: number, j4: number) => {
+    const dr = data[i4] - data[j4];
+    const dg = data[i4 + 1] - data[j4 + 1];
+    const db = data[i4 + 2] - data[j4 + 2];
+    return dr * dr + dg * dg + db * db <= localTolSq;
+  };
 
-  // BFS over image pixels; reached = background. 0 = unvisited fg-candidate.
+  // BFS over image pixels; reached = background. A pixel joins the background
+  // if it matches the global background color, or if it's locally continuous
+  // with the background pixel it was reached from (gradient backgrounds).
   const reached = new Uint8Array(iw * ih);
   const queue = new Int32Array(iw * ih);
   let qh = 0;
   let qt = 0;
-  const push = (x: number, y: number) => {
+  const seed = (x: number, y: number) => {
     const i = y * iw + x;
-    if (!reached[i] && isBgColor(x, y)) {
+    if (!reached[i] && isBgColor(i * 4)) {
       reached[i] = 1;
       queue[qt++] = i;
     }
   };
   for (let x = 0; x < iw; x++) {
-    push(x, 0);
-    push(x, ih - 1);
+    seed(x, 0);
+    seed(x, ih - 1);
   }
   for (let y = 0; y < ih; y++) {
-    push(0, y);
-    push(iw - 1, y);
+    seed(0, y);
+    seed(iw - 1, y);
   }
   while (qh < qt) {
     const i = queue[qh++];
     const x = i % iw;
     const y = (i / iw) | 0;
-    if (x > 0) push(x - 1, y);
-    if (x < iw - 1) push(x + 1, y);
-    if (y > 0) push(x, y - 1);
-    if (y < ih - 1) push(x, y + 1);
+    const grow = (j: number) => {
+      if (!reached[j] && (isBgColor(j * 4) || isNearNeighbor(j * 4, i * 4))) {
+        reached[j] = 1;
+        queue[qt++] = j;
+      }
+    };
+    if (x > 0) grow(i - 1);
+    if (x < iw - 1) grow(i + 1);
+    if (y > 0) grow(i - iw);
+    if (y < ih - 1) grow(i + iw);
   }
   for (let y = 0; y < ih; y++) {
     const row = (y + pad) * maskW + pad;
