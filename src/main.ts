@@ -37,6 +37,20 @@ const state: AppState = {
   result: null,
 };
 
+/* ---------------- toast ---------------- */
+
+let toastTimer: number | null = null;
+function toast(msg: string, kind: 'error' | 'info' = 'info', ms = 5000) {
+  const el = $('#toast');
+  el.textContent = msg;
+  el.className = `toast ${kind}`;
+  el.hidden = false;
+  if (toastTimer !== null) clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => {
+    el.hidden = true;
+  }, ms);
+}
+
 /* ---------------- image loading ---------------- */
 
 function adoptImage(el: HTMLImageElement | HTMLCanvasElement, w: number, h: number, base: string) {
@@ -81,10 +95,24 @@ function loadFile(file: File) {
   const url = URL.createObjectURL(file);
   const img = new Image();
   img.onload = () => {
-    adoptImage(img, img.naturalWidth, img.naturalHeight, base);
+    try {
+      adoptImage(img, img.naturalWidth, img.naturalHeight, base);
+    } catch (err) {
+      toast(`Could not process "${file.name}": ${err instanceof Error ? err.message : err}`, 'error');
+    }
     URL.revokeObjectURL(url);
   };
-  img.onerror = () => URL.revokeObjectURL(url);
+  img.onerror = () => {
+    URL.revokeObjectURL(url);
+    const isHeic = /\.(heic|heif)$/i.test(file.name) || /heic|heif/.test(file.type);
+    toast(
+      isHeic
+        ? `"${file.name}" is HEIC — browsers can't decode it. Export it as PNG or JPG first (Preview: File → Export).`
+        : `Could not open "${file.name}" — not a decodable image (PNG, JPG, WebP, GIF work best).`,
+      'error',
+      8000
+    );
+  };
   img.src = url;
 }
 
@@ -116,6 +144,15 @@ function renderResult(r: CutlineResult, ms: number) {
   $('#st-dims').textContent =
     `${state.srcW}×${state.srcH}px · ${mm(state.srcW)}×${mm(state.srcH)}mm @ ${state.params.dpi}dpi`;
   $('#st-geom').textContent = `${r.rings.length} path${r.rings.length === 1 ? '' : 's'} · ${r.nodeCount} nodes`;
+  if (r.rings.length === 0) {
+    toast(
+      r.usedAlpha
+        ? 'No shape traced — every pixel is below the alpha threshold. Try lowering it.'
+        : 'No shape traced — the flood fill removed everything. Try raising background tolerance, or the artwork may match the background color.',
+      'error',
+      7000
+    );
+  }
   $('#st-time').textContent = `${ms.toFixed(0)} ms`;
   $('#out-size').textContent = `${mm(state.srcW)} × ${mm(state.srcH)} mm`;
   $('#hint-mask').textContent = r.usedAlpha
@@ -259,9 +296,13 @@ spotInput.addEventListener('change', () => {
 
 /* ---------------- file input / drag-drop / sample ---------------- */
 
-($('#file-input') as HTMLInputElement).addEventListener('change', (e) => {
-  const f = (e.target as HTMLInputElement).files?.[0];
+const fileInput = $('#file-input') as HTMLInputElement;
+$('#btn-open').addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => {
+  const f = fileInput.files?.[0];
   if (f) loadFile(f);
+  // reset so picking the same file again still fires `change`
+  fileInput.value = '';
 });
 
 $('#btn-sample').addEventListener('click', () => {

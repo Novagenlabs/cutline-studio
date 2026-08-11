@@ -27,7 +27,8 @@
         <p class="tagline">contour cut generator · spot-ready output</p>
         <div class="top-actions">
           <button id="btn-sample" class="btn ghost" type="button">Load sample</button>
-          <label class="btn solid" for="file-input">Open image<input id="file-input" type="file" accept="image/png,image/jpeg,image/webp" /></label>
+          <button id="btn-open" class="btn solid" type="button">Open image</button>
+          <input id="file-input" type="file" accept="image/*" hidden />
         </div>
       </header>
 
@@ -134,6 +135,7 @@
         <div class="stage-tools">
           <button id="btn-fit" class="btn ghost sm" type="button" title="Fit view">FIT</button>
         </div>
+        <div id="toast" class="toast" role="status" hidden></div>
       </main>
 
       <footer class="status">

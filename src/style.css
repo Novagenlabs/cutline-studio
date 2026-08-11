@@ -451,3 +451,25 @@ input[type='checkbox'] {
 .status #st-zoom {
   margin-left: auto;
 }
+
+/* ---------- toast ---------- */
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  z-index: 5;
+  max-width: 520px;
+  padding: 10px 16px;
+  font-size: 12px;
+  line-height: 1.5;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  color: var(--ink);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+}
+
+.toast.error {
+  border-left-color: #ff4d4d;
+}
