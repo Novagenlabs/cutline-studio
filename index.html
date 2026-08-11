@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cutline Studio</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✂️</text></svg>" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Spline+Sans+Mono:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <div class="brand">
+          <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 5 L21 19 M3 19 L21 5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" fill="none"/>
+            <circle cx="5.2" cy="5.2" r="2.6" fill="none" stroke="currentColor" stroke-width="1.8"/>
+            <circle cx="5.2" cy="18.8" r="2.6" fill="none" stroke="currentColor" stroke-width="1.8"/>
+          </svg>
+          <h1>CUTLINE<em>STUDIO</em></h1>
+        </div>
+        <p class="tagline">contour cut generator · spot-ready output</p>
+        <div class="top-actions">
+          <button id="btn-sample" class="btn ghost" type="button">Load sample</button>
+          <label class="btn solid" for="file-input">Open image<input id="file-input" type="file" accept="image/png,image/jpeg,image/webp" /></label>
+        </div>
+      </header>
+
+      <aside class="rail">
+        <section class="group">
+          <h2>Artwork</h2>
+          <div class="row">
+            <label for="in-dpi">Print DPI</label>
+            <input id="in-dpi" type="number" min="72" max="1200" step="1" value="300" />
+          </div>
+          <div class="row readout"><span>Physical size</span><output id="out-size">—</output></div>
+          <div class="row slider">
+            <label for="in-alpha">Alpha threshold <output id="out-alpha">128</output></label>
+            <input id="in-alpha" type="range" min="1" max="254" step="1" value="128" />
+          </div>
+          <div class="row slider">
+            <label for="in-bgtol">Background tolerance <output id="out-bgtol">32</output></label>
+            <input id="in-bgtol" type="range" min="4" max="120" step="1" value="32" />
+          </div>
+          <p class="hint" id="hint-mask">—</p>
+        </section>
+
+        <section class="group">
+          <h2>Cut path</h2>
+          <div class="row slider">
+            <label for="in-offset">Offset <output id="out-offset">3.0 mm</output></label>
+            <input id="in-offset" type="range" min="0" max="12" step="0.1" value="3" />
+          </div>
+          <div class="row slider">
+            <label for="in-smooth">Smoothness <output id="out-smooth">2</output></label>
+            <input id="in-smooth" type="range" min="0" max="3" step="1" value="2" />
+          </div>
+          <div class="row slider">
+            <label for="in-corner">Min corner radius <output id="out-corner">1.0 mm</output></label>
+            <input id="in-corner" type="range" min="0" max="3" step="0.1" value="1" />
+          </div>
+          <div class="row check">
+            <input id="in-holes" type="checkbox" />
+            <label for="in-holes">Cut interior holes (decals)</label>
+          </div>
+          <div class="row check">
+            <input id="in-halo" type="checkbox" checked />
+            <label for="in-halo">White halo border</label>
+          </div>
+        </section>
+
+        <section class="group">
+          <h2>Die shape</h2>
+          <div class="shape-picker" role="radiogroup" aria-label="Die shape">
+            <button type="button" class="shape active" data-shape="contour" title="Contour">
+              <svg viewBox="0 0 32 32"><path d="M16 4 L20 12 L28 13 L22 19 L24 27 L16 23 L8 27 L10 19 L4 13 L12 12 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+            </button>
+            <button type="button" class="shape" data-shape="rect" title="Rectangle">
+              <svg viewBox="0 0 32 32"><rect x="5" y="7" width="22" height="18" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+            </button>
+            <button type="button" class="shape" data-shape="rounded" title="Rounded rectangle">
+              <svg viewBox="0 0 32 32"><rect x="5" y="7" width="22" height="18" rx="6" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+            </button>
+            <button type="button" class="shape" data-shape="circle" title="Circle">
+              <svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="11" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+            </button>
+          </div>
+        </section>
+
+        <section class="group">
+          <h2>Output</h2>
+          <div class="row">
+            <label for="in-cutmode">Cut type</label>
+            <select id="in-cutmode">
+              <option value="kiss">Kiss cut · CutContour</option>
+              <option value="perf">Die cut · PerfCutContour</option>
+            </select>
+          </div>
+          <div class="row">
+            <label for="in-spot">Spot name</label>
+            <input id="in-spot" type="text" value="CutContour" spellcheck="false" />
+          </div>
+          <div class="export-grid">
+            <button id="btn-svg" class="btn export" type="button" disabled>SVG<span>layered</span></button>
+            <button id="btn-pdf" class="btn export" type="button" disabled>PDF<span>spot color</span></button>
+            <button id="btn-dxf" class="btn export" type="button" disabled>DXF<span>plotter</span></button>
+            <button id="btn-png" class="btn export" type="button" disabled>PNG<span>print-cut</span></button>
+          </div>
+        </section>
+      </aside>
+
+      <main class="stage" id="stage">
+        <div id="dropzone" class="dropzone">
+          <svg viewBox="0 0 24 24" class="drop-ico" aria-hidden="true">
+            <path d="M12 3 v12 m0 0 l-4.5 -4.5 M12 15 l4.5 -4.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+            <path d="M4 17 v2.4 a1.6 1.6 0 0 0 1.6 1.6 h12.8 a1.6 1.6 0 0 0 1.6 -1.6 V17" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+          </svg>
+          <p><strong>Drop a PNG here</strong> or open an image.</p>
+          <p class="sub">Transparent PNGs trace from alpha. Flat JPGs get automatic background removal by flood fill.</p>
+        </div>
+        <svg id="preview" aria-label="Cutline preview">
+          <g id="viewport">
+            <path id="halo-path" fill="#ffffff" fill-rule="evenodd" />
+            <image id="art" x="0" y="0" />
+            <path id="cut-shadow" fill="none" />
+            <path id="cut-path" fill="none" />
+          </g>
+        </svg>
+        <div class="stage-tools">
+          <button id="btn-fit" class="btn ghost sm" type="button" title="Fit view">FIT</button>
+        </div>
+      </main>
+
+      <footer class="status">
+        <span id="st-file">no file</span>
+        <span id="st-dims">—</span>
+        <span id="st-geom">—</span>
+        <span id="st-time">—</span>
+        <span id="st-zoom">100%</span>
+      </footer>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

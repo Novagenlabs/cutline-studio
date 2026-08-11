@@ -1,0 +1,26 @@
+{
+  "name": "cutline-studio",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "smoke": "tsx test/smoke.ts"
+  },
+  "dependencies": {
+    "clipper-lib": "^6.4.2",
+    "d3-contour": "^4.0.2",
+    "dxf-writer": "^1.18.4",
+    "fit-curve": "^0.2.0",
+    "pdf-lib": "^1.17.1",
+    "simplify-js": "^1.2.4"
+  },
+  "devDependencies": {
+    "@types/d3-contour": "^3.0.6",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.0"
+  }
+}
