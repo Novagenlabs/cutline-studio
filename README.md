@@ -18,10 +18,11 @@ Everything runs in the browser — no server, no uploads leave the machine.
 
 ## What it does
 
-Drop in a PNG (transparent) or JPG (flat background) and it:
+Drop in a PNG (transparent) or JPG (flat or gradient background) and it:
 
 1. **Extracts a mask** — alpha threshold, or edge flood-fill background removal for
-   opaque images (modal border-color estimate, tunable tolerance)
+   opaque images (modal border-color estimate, tunable global tolerance, plus a
+   local-continuity rule so gradients, vignettes, and JPEG mottle fill cleanly)
 2. **Cleans it** — 3×3 morphological open/close, drops sub-1mm² islands and pinholes
 3. **Offsets it** — exact euclidean distance transform (Felzenszwalb–Huttenlocher),
    thresholded at the offset distance. This is dilation by a true disk, so disjoint
@@ -46,7 +47,8 @@ extent. Interior holes are dropped by default (sticker behavior) or kept for dec
 | **PDF** | Roland VersaWorks, ONYX, Flexi, Caldera | Cutline stroked in a *true* `/Separation` spot color (default name `CutContour`, exact-match as RIPs require), 0.25pt, overprint on, magenta alternate. Hand-rolled colorspace — no JS PDF lib supports spot colors natively |
 | **SVG** | Cricut Design Space, laser cutters, editing | Artwork layer + stroke-only cutline layer, physical mm dimensions |
 | **DXF** | Silhouette Studio (free edition), plotters | Cut path only, R12 polylines, mm, named layer |
-| **PNG** | Print-then-cut | Flattened artwork with the white halo baked in |
+| **PNG** | Print-then-cut | Flattened artwork with the white halo baked in, transparent outside |
+| **JPG** | Print-shop proofs | Same, composited on white (JPEG has no alpha) |
 
 Kiss cut vs die cut switches the spot name (`CutContour` / `PerfCutContour`); the name
 is editable for other RIP conventions (`CutPath`, `Thru-cut`, …).
