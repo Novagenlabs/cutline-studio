@@ -9,7 +9,10 @@ import { makeSampleImage } from './ui/sample';
 const $ = <T extends HTMLElement = HTMLElement>(sel: string) =>
   document.querySelector(sel) as T;
 
-const WORK_CAP = 1600;
+// Cap the pipeline's working resolution by area, not edge length — tight
+// per-character cuts need all the resolution the source has, and the EDT
+// stages are O(n), so ~7MP stays interactive.
+const WORK_MAX_PIXELS = 7_000_000;
 
 interface AppState {
   params: CutlineParams;
@@ -65,7 +68,7 @@ function adoptImage(el: HTMLImageElement | HTMLCanvasElement, w: number, h: numb
   srcCanvas.getContext('2d')!.drawImage(el, 0, 0, w, h);
   state.imageDataUrl = srcCanvas.toDataURL('image/png');
 
-  const workScale = Math.min(1, WORK_CAP / Math.max(w, h));
+  const workScale = Math.min(1, Math.sqrt(WORK_MAX_PIXELS / (w * h)));
   const ww = Math.max(1, Math.round(w * workScale));
   const wh = Math.max(1, Math.round(h * workScale));
   const workCanvas = document.createElement('canvas');
@@ -388,16 +391,22 @@ $('#btn-dxf').addEventListener('click', () => {
 
 async function exportRaster(format: 'png' | 'jpeg') {
   if (!state.result || !state.imageEl) return;
-  const blob = await buildRaster({
-    image: state.imageEl,
-    srcW: state.srcW,
-    srcH: state.srcH,
-    svgPath: state.result.svgPath,
-    cutBbox: state.result.bbox,
-    halo: state.halo,
-    format,
-  });
-  download(`${state.fileBase}-print.${format === 'jpeg' ? 'jpg' : 'png'}`, blob);
+  try {
+    const blob = await buildRaster({
+      image: state.imageEl,
+      srcW: state.srcW,
+      srcH: state.srcH,
+      svgPath: state.result.svgPath,
+      cutBbox: state.result.bbox,
+      halo: state.halo,
+      format,
+    });
+    console.log(`exportRaster ${format}: ${blob.size} bytes`);
+    download(`${state.fileBase}-print.${format === 'jpeg' ? 'jpg' : 'png'}`, blob);
+  } catch (err) {
+    console.error('exportRaster failed', err);
+    toast(`${format.toUpperCase()} export failed: ${err instanceof Error ? err.message : err}`, 'error');
+  }
 }
 
 $('#btn-png').addEventListener('click', () => exportRaster('png'));

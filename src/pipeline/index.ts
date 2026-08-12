@@ -105,9 +105,12 @@ export class CutlineEngine {
     const cornerPx = params.minCornerRadiusMm * pxPerMm;
     const closedRings = minRadiusClose(traced, cornerPx);
 
-    // Smooth in work space, then map to source px.
+    // Smooth in work space, then map to source px. Tolerances are physical
+    // (mm) so fidelity doesn't depend on the working resolution — tight
+    // per-character cuts stay faithful to the glyph shapes.
     const chaikinIters = Math.round(Math.min(3, Math.max(0, params.smoothness)));
-    const fitErrWork = [0.6, 1.0, 1.5, 2.5][chaikinIters] ?? 1.5;
+    const rdpTolPx = Math.max(0.6, [0.05, 0.08, 0.12, 0.2][chaikinIters] * pxPerMm);
+    const fitErrWork = Math.max(0.5, [0.06, 0.1, 0.16, 0.3][chaikinIters] * pxPerMm);
     const toSrc = (p: Pt): Pt => ({
       x: (p.x - this.pad) / this.workScale,
       y: (p.y - this.pad) / this.workScale,
@@ -115,7 +118,7 @@ export class CutlineEngine {
 
     const polylines: Pt[][] = [];
     for (const ring of closedRings) {
-      const simplified = simplifyRing(ring, 1.25);
+      const simplified = simplifyRing(ring, rdpTolPx);
       if (!simplified) continue;
       const smoothed =
         chaikinIters > 0 ? chaikinClosed(simplified, chaikinIters) : simplified;
