@@ -303,6 +303,11 @@ bindSlider('#in-precision', '#out-precision', (v) => `±${v.toFixed(2)} mm`, (v)
   recompute(true);
 });
 
+($('#in-body') as HTMLInputElement).addEventListener('change', (e) => {
+  state.params.hugBody = (e.target as HTMLInputElement).checked;
+  recompute(true);
+});
+
 ($('#in-halo') as HTMLInputElement).addEventListener('change', (e) => {
   state.halo = (e.target as HTMLInputElement).checked;
   if (state.result) renderResult(state.result, 0);

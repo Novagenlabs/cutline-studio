@@ -24,7 +24,14 @@ export interface MaskResult {
  */
 export function extractMask(
   img: RasterImage,
-  opts: { alphaThreshold: number; bgTolerance: number; pad: number; denoiseSigma: number }
+  opts: {
+    alphaThreshold: number;
+    bgTolerance: number;
+    pad: number;
+    denoiseSigma: number;
+    /** Peel outside-connected white keylines/glows so the trace hugs the colored body. */
+    bodyMode: boolean;
+  }
 ): MaskResult {
   const { width: iw, height: ih, data } = img;
   const pad = Math.max(0, Math.round(opts.pad));
@@ -55,13 +62,81 @@ export function extractMask(
     mask.fill(0);
   }
 
+  const t = usedAlpha ? opts.alphaThreshold : 128;
+  if (opts.bodyMode) peelWhiteRim(img, field, w, h, pad, t);
   if (opts.denoiseSigma > 0.05) gaussianBlur(field, w, h, opts.denoiseSigma);
 
-  const t = usedAlpha ? opts.alphaThreshold : 128;
   for (let i = 0; i < field.length; i++) {
     if (field[i] >= t) mask[i] = 1;
   }
   return { mask, field, w, h, usedAlpha };
+}
+
+/**
+ * "Hug colored body" mode: flood-fill inward from the border across pixels
+ * that are either below the alpha threshold OR near-white, and zero the
+ * field there. This peels off white keylines/glows that wrap the artwork
+ * (they're connected to the outside through white), so the trace lands on
+ * the colored glyph body — while white regions *inside* the art, sealed off
+ * by colored pixels, stay untouched.
+ */
+function peelWhiteRim(
+  img: RasterImage,
+  field: Float32Array,
+  w: number,
+  h: number,
+  pad: number,
+  alphaThreshold: number
+): void {
+  const { width: iw, height: ih, data } = img;
+  const n = w * h;
+  const reached = new Uint8Array(n);
+  const queue = new Int32Array(n);
+  let qh = 0;
+  let qt = 0;
+
+  const qualifies = (i: number): boolean => {
+    if (field[i] < alphaThreshold) return true; // transparent / padding
+    const x = (i % w) - pad;
+    const y = ((i / w) | 0) - pad;
+    if (x < 0 || x >= iw || y < 0 || y >= ih) return true;
+    const p = (y * iw + x) * 4;
+    // near-white regardless of alpha: all channels high
+    return Math.min(data[p], data[p + 1], data[p + 2]) >= 190;
+  };
+
+  const seed = (i: number) => {
+    if (!reached[i] && qualifies(i)) {
+      reached[i] = 1;
+      queue[qt++] = i;
+    }
+  };
+  for (let x = 0; x < w; x++) {
+    seed(x);
+    seed((h - 1) * w + x);
+  }
+  for (let y = 0; y < h; y++) {
+    seed(y * w);
+    seed(y * w + w - 1);
+  }
+  while (qh < qt) {
+    const i = queue[qh++];
+    const x = i % w;
+    const y = (i / w) | 0;
+    const grow = (j: number) => {
+      if (!reached[j] && qualifies(j)) {
+        reached[j] = 1;
+        queue[qt++] = j;
+      }
+    };
+    if (x > 0) grow(i - 1);
+    if (x < w - 1) grow(i + 1);
+    if (y > 0) grow(i - w);
+    if (y < h - 1) grow(i + w);
+  }
+  for (let i = 0; i < n; i++) {
+    if (reached[i]) field[i] = 0;
+  }
 }
 
 /**

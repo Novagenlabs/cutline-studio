@@ -16,6 +16,8 @@ export interface CutlineParams {
   bgTolerance: number;
   /** Gaussian sigma (px) applied to the coverage field before tracing — JPEG noise / ragged fringe suppression. */
   denoisePx: number;
+  /** Trace the colored glyph body, peeling off outside-connected white keylines/glows. */
+  hugBody: boolean;
   /** Max deviation (mm) of the fitted cutline from the traced edge. Lower = more faithful, more nodes. */
   precisionMm: number;
   /** Outward offset of the cutline from the artwork edge, in mm. */
@@ -45,6 +47,7 @@ export const DEFAULT_PARAMS: CutlineParams = {
   alphaThreshold: 128,
   bgTolerance: 32,
   denoisePx: 0.4,
+  hugBody: false,
   precisionMm: 0.08,
   offsetMm: 3,
   bridgeMm: 0,

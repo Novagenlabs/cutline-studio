@@ -52,6 +52,7 @@ export class CutlineEngine {
       params.alphaThreshold,
       params.bgTolerance,
       params.denoisePx,
+      params.hugBody,
       params.minIslandMm2,
       params.dpi,
     ].join('|');
@@ -64,6 +65,7 @@ export class CutlineEngine {
         bgTolerance: params.bgTolerance,
         pad: this.pad,
         denoiseSigma: params.denoisePx,
+        bodyMode: params.hugBody,
       });
       this.usedAlpha = m.usedAlpha;
       this.fieldThreshold = m.usedAlpha ? params.alphaThreshold : 128;

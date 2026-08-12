@@ -145,6 +145,33 @@ const gradBboxOk =
   r5.bbox.y > 80 && r5.bbox.y < 120;
 check('gradient background removed, subject traced', gradBboxOk, `rings ${r5.rings.length} bbox ${JSON.stringify(r5.bbox)}`);
 
+console.log('— hug colored body (peel white rim) —');
+// colored square 150..250 wrapped by a white ring out to 130..270, on alpha
+const data4 = new Uint8ClampedArray(W * H * 4);
+for (let y = 80; y < 220; y++) {
+  for (let x = 130; x < 270; x++) {
+    const i = (y * W + x) * 4;
+    const inner = x >= 150 && x < 250 && y >= 100 && y < 200;
+    data4[i] = inner ? 200 : 255;
+    data4[i + 1] = inner ? 60 : 255;
+    data4[i + 2] = inner ? 90 : 255;
+    data4[i + 3] = 255;
+  }
+}
+const engineBody = new CutlineEngine({ data: data4, width: W, height: H }, 1);
+const rFull = engineBody.compute({ ...params, offsetMm: 0 });
+const rBody = engineBody.compute({ ...params, offsetMm: 0, hugBody: true });
+check(
+  'full trace includes white ring',
+  rFull.bbox.x < 135 && rFull.bbox.x > 125,
+  JSON.stringify(rFull.bbox)
+);
+check(
+  'body trace peels ring, hugs colored square',
+  Math.abs(rBody.bbox.x - 150) < 3 && Math.abs(rBody.bbox.w - 100) < 6,
+  JSON.stringify(rBody.bbox)
+);
+
 console.log('— shapes —');
 const rRect = engine.compute({ ...params, shape: 'rounded' });
 check('rounded rect is one ring', rRect.rings.length === 1 && rRect.beziers[0].length === 8);
