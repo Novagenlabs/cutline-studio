@@ -224,6 +224,26 @@ previewSvg.addEventListener('pointerup', () => {
 $('#btn-fit').addEventListener('click', fitView);
 window.addEventListener('resize', fitView);
 
+function zoomBy(factor: number) {
+  const box = previewSvg.getBoundingClientRect();
+  const cx = box.width / 2;
+  const cy = box.height / 2;
+  const k2 = Math.min(80, Math.max(0.05, view.k * factor));
+  view.tx = cx - ((cx - view.tx) * k2) / view.k;
+  view.ty = cy - ((cy - view.ty) * k2) / view.k;
+  view.k = k2;
+  applyView();
+}
+
+$('#btn-zoom-in').addEventListener('click', () => zoomBy(1.5));
+$('#btn-zoom-out').addEventListener('click', () => zoomBy(1 / 1.5));
+window.addEventListener('keydown', (e) => {
+  if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
+  if (e.key === '+' || e.key === '=') zoomBy(1.5);
+  else if (e.key === '-') zoomBy(1 / 1.5);
+  else if (e.key === '0') fitView();
+});
+
 /* ---------------- controls ---------------- */
 
 function bindSlider(

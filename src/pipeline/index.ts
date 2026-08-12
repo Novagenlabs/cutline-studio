@@ -1,12 +1,14 @@
 import { extractMask, filterIslands, reconcileField } from './mask';
 import { distanceTransform } from './edt';
-import { traceField } from './trace';
+import { traceField, signedArea } from './trace';
+import type { TracedRing } from './trace';
 import {
   beziersToSvgPath,
   bezierRingToPolyline,
   circleBezier,
   fitRingWithCorners,
   minRadiusClose,
+  offsetTracedRings,
   roundedRectBezier,
   simplifyRing,
 } from './geometry';
@@ -79,18 +81,23 @@ export class CutlineEngine {
       timings.edt = now() - t;
     }
 
-    const offsetPx = Math.max(0, params.offsetMm * pxPerMm);
+    const offsetPx = params.offsetMm * pxPerMm; // negative = inset into the art
     const bridgePx = Math.max(0, (params.bridgeMm / 2) * pxPerMm);
     const holeMinPx2 = Math.max(minIslandPx2, params.holeMinMm2 * pxPerMm * pxPerMm);
     const traceOpts = { keepHoles: params.keepHoles, minHoleAreaPx2: holeMinPx2 };
+    // Small offsets ride the subpixel field trace + exact geometric offset;
+    // beyond this the EDT (which merges regions for free) takes over.
+    const geomLimitPx = 2 * pxPerMm;
 
     let t = now();
-    let traced;
-    if (offsetPx < 0.75 && bridgePx < 0.25) {
+    let traced: TracedRing[];
+    if (bridgePx < 0.25 && offsetPx <= geomLimitPx) {
       // Tight cut: trace the continuous coverage field at the threshold —
       // the contour follows the anti-aliased edge with subpixel accuracy,
       // which binarize-then-EDT can't do (it quantizes to the pixel grid).
-      traced = traceField(
+      // The offset is then applied geometrically (Clipper, round joins) so
+      // it stays subpixel-exact and supports negative (inset) values.
+      const traced0 = traceField(
         this.field!,
         this.maskW,
         this.maskH,
@@ -98,8 +105,22 @@ export class CutlineEngine {
         'gte',
         traceOpts
       );
+      traced =
+        Math.abs(offsetPx) <= 0.02
+          ? traced0
+          : offsetTracedRings(traced0, offsetPx).map((points) => ({
+              points,
+              isHole: signedArea(points) < 0,
+            }));
     } else if (bridgePx < 0.25) {
-      traced = traceField(this.dist!, this.maskW, this.maskH, offsetPx, 'lte', traceOpts);
+      traced = traceField(
+        this.dist!,
+        this.maskW,
+        this.maskH,
+        Math.max(0, offsetPx),
+        'lte',
+        traceOpts
+      );
     } else {
       // Morphological closing of the offset region: dilate by the bridge
       // radius, then erode by the same amount. Gaps narrower than the bridge
@@ -110,7 +131,8 @@ export class CutlineEngine {
       const n = this.maskW * this.maskH;
       const region = new Uint8Array(n);
       const dist = this.dist!;
-      for (let i = 0; i < n; i++) region[i] = dist[i] <= offsetPx ? 1 : 0;
+      const offClamped = Math.max(0, offsetPx);
+      for (let i = 0; i < n; i++) region[i] = dist[i] <= offClamped ? 1 : 0;
       const dDilate = distanceTransform(region, this.maskW, this.maskH);
       for (let i = 0; i < n; i++) region[i] = dDilate[i] <= bridgePx ? 0 : 1; // complement of dilated
       const dErode = distanceTransform(region, this.maskW, this.maskH);

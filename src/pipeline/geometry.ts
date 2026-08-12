@@ -30,17 +30,8 @@ export function chaikinClosed(pts: Pt[], iterations: number): Pt[] {
   return cur;
 }
 
-/**
- * Morphological closing on polygons (offset +r then -r, round joins) via
- * Clipper. Fills any concave feature tighter than r to an r-radius arc —
- * the "minimum corner radius" guarantee drag-knife blades want. Convex
- * corners are already rounded to the offset distance by the EDT dilation.
- */
-export function minRadiusClose(rings: TracedRing[], radiusPx: number): Pt[][] {
-  const plain = rings.map((r) => r.points);
-  if (radiusPx <= 0.05 || plain.length === 0) return plain;
-
-  const paths = rings.map((r) => {
+function toClipperPaths(rings: TracedRing[]) {
+  return rings.map((r) => {
     let pts = r.points;
     // Clipper convention: positive-orientation = outer, negative = hole.
     const positive = signedArea(pts) > 0;
@@ -50,23 +41,53 @@ export function minRadiusClose(rings: TracedRing[], radiusPx: number): Pt[][] {
       Y: Math.round(p.y * CLIPPER_SCALE),
     }));
   });
+}
 
-  const arcTolerance = 0.2 * CLIPPER_SCALE;
-  const run = (input: unknown[], delta: number) => {
-    const co = new ClipperLib.ClipperOffset(2, arcTolerance);
-    co.AddPaths(input, ClipperLib.JoinType.jtRound, ClipperLib.EndType.etClosedPolygon);
-    const out = new ClipperLib.Paths();
-    co.Execute(out, delta);
-    return out as { X: number; Y: number }[][];
-  };
+function runClipperOffset(input: unknown[], delta: number) {
+  const co = new ClipperLib.ClipperOffset(2, 0.2 * CLIPPER_SCALE);
+  co.AddPaths(input, ClipperLib.JoinType.jtRound, ClipperLib.EndType.etClosedPolygon);
+  const out = new ClipperLib.Paths();
+  co.Execute(out, delta);
+  return out as { X: number; Y: number }[][];
+}
 
+const fromClipper = (paths: { X: number; Y: number }[][]): Pt[][] =>
+  paths
+    .map((p) => p.map((q) => ({ x: q.X / CLIPPER_SCALE, y: q.Y / CLIPPER_SCALE })))
+    .filter((p) => p.length >= 3);
+
+/**
+ * Geometric offset of traced subpixel contours (Minkowski with a disc,
+ * round joins). Because the input contour is subpixel-exact, small offsets
+ * stay subpixel-exact — unlike thresholding the integer-grid EDT. Negative
+ * delta insets the cut into the artwork. Overlapping results are unioned
+ * by Clipper automatically.
+ */
+export function offsetTracedRings(rings: TracedRing[], deltaPx: number): Pt[][] {
+  const plain = rings.map((r) => r.points);
+  if (Math.abs(deltaPx) <= 0.02 || plain.length === 0) return plain;
   try {
-    const grown = run(paths, radiusPx * CLIPPER_SCALE);
-    const closed = run(grown, -radiusPx * CLIPPER_SCALE);
+    const out = fromClipper(runClipperOffset(toClipperPaths(rings), deltaPx * CLIPPER_SCALE));
+    return out.length ? out : plain;
+  } catch {
+    return plain;
+  }
+}
+
+/**
+ * Morphological closing on polygons (offset +r then -r, round joins) via
+ * Clipper. Fills any concave feature tighter than r to an r-radius arc —
+ * the "minimum corner radius" guarantee drag-knife blades want. Convex
+ * corners are already rounded to the offset distance by the EDT dilation.
+ */
+export function minRadiusClose(rings: TracedRing[], radiusPx: number): Pt[][] {
+  const plain = rings.map((r) => r.points);
+  if (radiusPx <= 0.05 || plain.length === 0) return plain;
+  try {
+    const grown = runClipperOffset(toClipperPaths(rings), radiusPx * CLIPPER_SCALE);
+    const closed = runClipperOffset(grown, -radiusPx * CLIPPER_SCALE);
     if (!closed.length) return plain;
-    return closed
-      .map((p) => p.map((q) => ({ x: q.X / CLIPPER_SCALE, y: q.Y / CLIPPER_SCALE })))
-      .filter((p) => p.length >= 3);
+    return fromClipper(closed);
   } catch {
     return plain;
   }

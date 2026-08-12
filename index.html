@@ -59,7 +59,7 @@
           <h2>Cut path</h2>
           <div class="row slider">
             <label for="in-offset">Offset <output id="out-offset">3.0 mm</output></label>
-            <input id="in-offset" type="range" min="0" max="20" step="0.05" value="3" />
+            <input id="in-offset" type="range" min="-2" max="20" step="0.05" value="3" />
           </div>
           <div class="row slider">
             <label for="in-bridge">Bridge gaps <output id="out-bridge">off</output></label>
@@ -150,6 +150,8 @@
           </g>
         </svg>
         <div class="stage-tools">
+          <button id="btn-zoom-out" class="btn ghost sm" type="button" title="Zoom out (-)">−</button>
+          <button id="btn-zoom-in" class="btn ghost sm" type="button" title="Zoom in (+)">+</button>
           <button id="btn-fit" class="btn ghost sm" type="button" title="Fit view">FIT</button>
         </div>
         <div id="toast" class="toast" role="status" hidden></div>
