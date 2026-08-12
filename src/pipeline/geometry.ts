@@ -77,15 +77,112 @@ export function fitBezierRing(pts: Pt[], maxError: number): BezierRing {
   const flat = pts.map((p) => [p.x, p.y]);
   flat.push([pts[0].x, pts[0].y]);
   const segs = fitCurve(flat, maxError);
-  return segs.map(
-    (s) =>
-      [
-        { x: s[0][0], y: s[0][1] },
-        { x: s[1][0], y: s[1][1] },
-        { x: s[2][0], y: s[2][1] },
-        { x: s[3][0], y: s[3][1] },
-      ] as BezierSeg
-  );
+  return segs.map(toBezierSeg);
+}
+
+const toBezierSeg = (s: number[][]): BezierSeg => [
+  { x: s[0][0], y: s[0][1] },
+  { x: s[1][0], y: s[1][1] },
+  { x: s[2][0], y: s[2][1] },
+  { x: s[3][0], y: s[3][1] },
+];
+
+/**
+ * Turning-angle corner detection on a closed subpixel polyline: at each
+ * vertex compare the chords to points ±s arc-length away; a vertex is a
+ * corner if the turn exceeds `angleDeg` and is the local maximum within ±s
+ * (non-max suppression). Returns vertex indices, ascending.
+ */
+export function detectCorners(pts: Pt[], s: number, angleDeg: number): number[] {
+  const n = pts.length;
+  if (n < 8) return [];
+  const thetaMin = (angleDeg * Math.PI) / 180;
+
+  const ptAtArc = (start: number, dir: 1 | -1): Pt => {
+    let remaining = s;
+    let i = start;
+    for (let hops = 0; hops < n; hops++) {
+      const j = (i + dir + n) % n;
+      const d = Math.hypot(pts[j].x - pts[i].x, pts[j].y - pts[i].y);
+      if (d >= remaining) {
+        const t = remaining / (d || 1);
+        return {
+          x: pts[i].x + (pts[j].x - pts[i].x) * t,
+          y: pts[i].y + (pts[j].y - pts[i].y) * t,
+        };
+      }
+      remaining -= d;
+      i = j;
+    }
+    return pts[i];
+  };
+
+  const turn = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const b = ptAtArc(i, -1);
+    const f = ptAtArc(i, 1);
+    const v1x = pts[i].x - b.x;
+    const v1y = pts[i].y - b.y;
+    const v2x = f.x - pts[i].x;
+    const v2y = f.y - pts[i].y;
+    const dot = v1x * v2x + v1y * v2y;
+    const cross = v1x * v2y - v1y * v2x;
+    turn[i] = Math.abs(Math.atan2(cross, dot));
+  }
+
+  // non-max suppression within +-s arc length (approximated by vertex hops
+  // covering that arc; trace vertices are ~0.5-1.4px apart)
+  const hopWindow = Math.max(2, Math.round(s));
+  const corners: number[] = [];
+  for (let i = 0; i < n; i++) {
+    if (turn[i] < thetaMin) continue;
+    let isMax = true;
+    for (let d = 1; d <= hopWindow && isMax; d++) {
+      if (turn[(i + d) % n] > turn[i] || turn[(i - d + n) % n] > turn[i]) isMax = false;
+    }
+    if (isMax) corners.push(i);
+  }
+  return corners;
+}
+
+/**
+ * Fit a closed ring with corners preserved: split at detected corners and
+ * Schneider-fit each open run separately, so curves get smooth beziers while
+ * true corners stay pinned and sharp. RDP runs per segment (endpoints kept).
+ */
+export function fitRingWithCorners(
+  ring: Pt[],
+  rdpTol: number,
+  fitError: number,
+  cornerArcPx: number,
+  cornerAngleDeg: number
+): { beziers: BezierRing; polyline: Pt[] } {
+  const corners = detectCorners(ring, cornerArcPx, cornerAngleDeg);
+  if (corners.length < 2) {
+    const simplified = simplifyRing(ring, rdpTol) ?? ring;
+    return { beziers: fitBezierRing(simplified, fitError), polyline: simplified };
+  }
+
+  const n = ring.length;
+  const beziers: BezierRing = [];
+  const polyline: Pt[] = [];
+  for (let c = 0; c < corners.length; c++) {
+    const a = corners[c];
+    const b = corners[(c + 1) % corners.length];
+    const seg: Pt[] = [];
+    for (let i = a; ; i = (i + 1) % n) {
+      seg.push(ring[i]);
+      if (i === b) break;
+    }
+    if (seg.length < 2) continue;
+    const dec =
+      seg.length > 2 ? simplify(seg, rdpTol, true) : seg;
+    polyline.push(...dec.slice(0, dec.length - 1));
+    if (dec.length < 2) continue;
+    const segs = fitCurve(dec.map((p) => [p.x, p.y]), fitError);
+    for (const s of segs) beziers.push(toBezierSeg(s));
+  }
+  return { beziers, polyline: polyline.length >= 3 ? polyline : ring };
 }
 
 const fmt = (v: number) => (Math.round(v * 100) / 100).toString();

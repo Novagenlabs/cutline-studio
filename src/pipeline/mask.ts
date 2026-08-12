@@ -2,27 +2,36 @@ import type { RasterImage } from './types';
 
 export interface MaskResult {
   mask: Uint8Array;
+  /**
+   * Continuous coverage field 0-255 in the same padded grid: the raw alpha
+   * ramp for transparent images (optionally denoised), a blurred 0/255
+   * field for flood-filled opaque images. Tracing this at the threshold
+   * gives subpixel-accurate edges that binarization throws away.
+   */
+  field: Float32Array;
   w: number;
   h: number;
   usedAlpha: boolean;
 }
 
 /**
- * Extract a padded binary foreground mask from an image.
+ * Extract a padded coverage field + binary mask from an image.
  * Uses the alpha channel when present; otherwise estimates the background
  * color from the border ring and flood-fills it away from the edges.
  * `pad` transparent pixels are added on every side so the offset band never
- * clips at the image boundary.
+ * clips at the image boundary. `denoiseSigma` (px) gaussian-blurs the field
+ * before thresholding — suppresses JPEG mottle and ragged low-alpha fringes.
  */
 export function extractMask(
   img: RasterImage,
-  opts: { alphaThreshold: number; bgTolerance: number; pad: number }
+  opts: { alphaThreshold: number; bgTolerance: number; pad: number; denoiseSigma: number }
 ): MaskResult {
   const { width: iw, height: ih, data } = img;
   const pad = Math.max(0, Math.round(opts.pad));
   const w = iw + pad * 2;
   const h = ih + pad * 2;
   const mask = new Uint8Array(w * h);
+  const field = new Float32Array(w * h);
 
   let usedAlpha = false;
   for (let i = 3; i < data.length; i += 4) {
@@ -33,18 +42,72 @@ export function extractMask(
   }
 
   if (usedAlpha) {
-    const t = opts.alphaThreshold;
     for (let y = 0; y < ih; y++) {
       const row = (y + pad) * w + pad;
       const src = y * iw;
       for (let x = 0; x < iw; x++) {
-        if (data[(src + x) * 4 + 3] >= t) mask[row + x] = 1;
+        field[row + x] = data[(src + x) * 4 + 3];
       }
     }
   } else {
     floodFillBackground(img, mask, w, pad, opts.bgTolerance);
+    for (let i = 0; i < mask.length; i++) field[i] = mask[i] ? 255 : 0;
+    mask.fill(0);
   }
-  return { mask, w, h, usedAlpha };
+
+  if (opts.denoiseSigma > 0.05) gaussianBlur(field, w, h, opts.denoiseSigma);
+
+  const t = usedAlpha ? opts.alphaThreshold : 128;
+  for (let i = 0; i < field.length; i++) {
+    if (field[i] >= t) mask[i] = 1;
+  }
+  return { mask, field, w, h, usedAlpha };
+}
+
+/**
+ * Separable gaussian blur approximated by three box passes
+ * (Kovesi's box sizes), in place. Sigma in px.
+ */
+export function gaussianBlur(f: Float32Array, w: number, h: number, sigma: number): void {
+  const wIdeal = Math.sqrt((12 * sigma * sigma) / 3 + 1);
+  let wl = Math.floor(wIdeal);
+  if (wl % 2 === 0) wl--;
+  const wu = wl + 2;
+  const mIdeal = (12 * sigma * sigma - 3 * wl * wl - 12 * wl - 9) / (-4 * wl - 4);
+  const m = Math.round(mIdeal);
+  const tmp = new Float32Array(f.length);
+  for (let pass = 0; pass < 3; pass++) {
+    const r = ((pass < m ? wl : wu) - 1) / 2;
+    if (r < 1) continue;
+    boxBlurH(f, tmp, w, h, r);
+    boxBlurV(tmp, f, w, h, r);
+  }
+}
+
+function boxBlurH(src: Float32Array, dst: Float32Array, w: number, h: number, r: number): void {
+  const inv = 1 / (2 * r + 1);
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    let acc = src[row] * (r + 1);
+    for (let x = 0; x < r; x++) acc += src[row + Math.min(x, w - 1)];
+    for (let x = 0; x < w; x++) {
+      acc += src[row + Math.min(x + r, w - 1)] - src[row + Math.max(x - r - 1, 0)];
+      dst[row + x] = acc * inv;
+    }
+  }
+}
+
+function boxBlurV(src: Float32Array, dst: Float32Array, w: number, h: number, r: number): void {
+  const inv = 1 / (2 * r + 1);
+  for (let x = 0; x < w; x++) {
+    let acc = src[x] * (r + 1);
+    for (let y = 0; y < r; y++) acc += src[Math.min(y, h - 1) * w + x];
+    for (let y = 0; y < h; y++) {
+      acc +=
+        src[Math.min(y + r, h - 1) * w + x] - src[Math.max(y - r - 1, 0) * w + x];
+      dst[y * w + x] = acc * inv;
+    }
+  }
 }
 
 /** Modal border color (4-bit quantized vote over a 2px ring) then BFS from all border pixels. */
@@ -152,55 +215,21 @@ function floodFillBackground(
   }
 }
 
-/** 3x3 morphological open (kill specks) then close (seal pinholes), in place. */
-export function morphOpenClose(mask: Uint8Array, w: number, h: number): void {
-  const tmp = new Uint8Array(w * h);
-  erode3(mask, tmp, w, h);
-  dilate3(tmp, mask, w, h);
-  dilate3(mask, tmp, w, h);
-  erode3(tmp, mask, w, h);
-}
-
-function erode3(src: Uint8Array, dst: Uint8Array, w: number, h: number): void {
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const i = y * w + x;
-      if (!src[i]) {
-        dst[i] = 0;
-        continue;
-      }
-      let on = 1;
-      for (let dy = -1; dy <= 1 && on; dy++) {
-        const yy = y + dy;
-        if (yy < 0 || yy >= h) {
-          on = 0;
-          break;
-        }
-        for (let dx = -1; dx <= 1; dx++) {
-          const xx = x + dx;
-          if (xx < 0 || xx >= w || !src[yy * w + xx]) {
-            on = 0;
-            break;
-          }
-        }
-      }
-      dst[i] = on;
-    }
-  }
-}
-
-function dilate3(src: Uint8Array, dst: Uint8Array, w: number, h: number): void {
-  dst.fill(0);
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      if (!src[y * w + x]) continue;
-      const y0 = Math.max(0, y - 1);
-      const y1 = Math.min(h - 1, y + 1);
-      const x0 = Math.max(0, x - 1);
-      const x1 = Math.min(w - 1, x + 1);
-      for (let yy = y0; yy <= y1; yy++) {
-        for (let xx = x0; xx <= x1; xx++) dst[yy * w + xx] = 1;
-      }
+/**
+ * After island/hole filtering changed the binary mask, nudge the continuous
+ * field across the threshold at exactly those pixels so a field trace agrees
+ * with the mask — edge pixels the filter didn't touch keep their subpixel ramp.
+ */
+export function reconcileField(
+  field: Float32Array,
+  mask: Uint8Array,
+  threshold: number
+): void {
+  for (let i = 0; i < field.length; i++) {
+    if (mask[i]) {
+      if (field[i] < threshold) field[i] = threshold + 0.5;
+    } else if (field[i] >= threshold) {
+      field[i] = threshold - 0.5;
     }
   }
 }

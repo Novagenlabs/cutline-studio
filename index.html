@@ -48,6 +48,10 @@
             <label for="in-bgtol">Background tolerance <output id="out-bgtol">32</output></label>
             <input id="in-bgtol" type="range" min="4" max="120" step="1" value="32" />
           </div>
+          <div class="row slider">
+            <label for="in-denoise">Edge denoise <output id="out-denoise">0.4 px</output></label>
+            <input id="in-denoise" type="range" min="0" max="2" step="0.1" value="0.4" />
+          </div>
           <p class="hint" id="hint-mask">—</p>
         </section>
 
@@ -55,7 +59,7 @@
           <h2>Cut path</h2>
           <div class="row slider">
             <label for="in-offset">Offset <output id="out-offset">3.0 mm</output></label>
-            <input id="in-offset" type="range" min="0" max="20" step="0.1" value="3" />
+            <input id="in-offset" type="range" min="0" max="20" step="0.05" value="3" />
           </div>
           <div class="row slider">
             <label for="in-bridge">Bridge gaps <output id="out-bridge">off</output></label>
@@ -64,6 +68,10 @@
           <div class="row slider">
             <label for="in-smooth">Smoothness <output id="out-smooth">2</output></label>
             <input id="in-smooth" type="range" min="0" max="3" step="1" value="2" />
+          </div>
+          <div class="row slider">
+            <label for="in-precision">Precision <output id="out-precision">±0.08 mm</output></label>
+            <input id="in-precision" type="range" min="0.02" max="0.3" step="0.01" value="0.08" />
           </div>
           <div class="row slider">
             <label for="in-corner">Min corner radius <output id="out-corner">1.0 mm</output></label>

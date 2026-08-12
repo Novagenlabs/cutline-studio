@@ -14,6 +14,10 @@ export interface CutlineParams {
   alphaThreshold: number;
   /** RGB euclidean tolerance for background flood-fill on opaque images. */
   bgTolerance: number;
+  /** Gaussian sigma (px) applied to the coverage field before tracing — JPEG noise / ragged fringe suppression. */
+  denoisePx: number;
+  /** Max deviation (mm) of the fitted cutline from the traced edge. Lower = more faithful, more nodes. */
+  precisionMm: number;
   /** Outward offset of the cutline from the artwork edge, in mm. */
   offsetMm: number;
   /**
@@ -40,6 +44,8 @@ export interface CutlineParams {
 export const DEFAULT_PARAMS: CutlineParams = {
   alphaThreshold: 128,
   bgTolerance: 32,
+  denoisePx: 0.4,
+  precisionMm: 0.08,
   offsetMm: 3,
   bridgeMm: 0,
   holeMinMm2: 1,

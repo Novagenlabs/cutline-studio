@@ -263,6 +263,12 @@ bindSlider('#in-alpha', '#out-alpha', (v) => String(v), (v) => {
 bindSlider('#in-bgtol', '#out-bgtol', (v) => String(v), (v) => {
   state.params.bgTolerance = v;
 });
+bindSlider('#in-denoise', '#out-denoise', (v) => `${v.toFixed(1)} px`, (v) => {
+  state.params.denoisePx = v;
+});
+bindSlider('#in-precision', '#out-precision', (v) => `±${v.toFixed(2)} mm`, (v) => {
+  state.params.precisionMm = v;
+});
 
 ($('#in-dpi') as HTMLInputElement).addEventListener('change', (e) => {
   const v = parseInt((e.target as HTMLInputElement).value, 10);
