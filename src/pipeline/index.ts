@@ -1,11 +1,13 @@
-import { extractMask, filterIslands, reconcileField } from './mask';
+import { extractMask, filterIslands, legacyMorphOpenClose, reconcileField } from './mask';
 import { distanceTransform } from './edt';
 import { traceField, signedArea } from './trace';
 import type { TracedRing } from './trace';
 import {
   beziersToSvgPath,
   bezierRingToPolyline,
+  chaikinClosed,
   circleBezier,
+  fitBezierRing,
   fitRingWithCorners,
   minRadiusClose,
   offsetTracedRings,
@@ -55,26 +57,70 @@ export class CutlineEngine {
       params.hugBody,
       params.minIslandMm2,
       params.dpi,
+      JSON.stringify(params.regions ?? []),
     ].join('|');
 
     if (!this.mask || maskKey !== this.maskKey) {
       let t = now();
       this.pad = Math.ceil(PAD_MM * pxPerMm);
-      const m = extractMask(this.img, {
+      const base = extractMask(this.img, {
         alphaThreshold: params.alphaThreshold,
         bgTolerance: params.bgTolerance,
         pad: this.pad,
         denoiseSigma: params.denoisePx,
         bodyMode: params.hugBody,
       });
-      this.usedAlpha = m.usedAlpha;
-      this.fieldThreshold = m.usedAlpha ? params.alphaThreshold : 128;
-      filterIslands(m.mask, m.w, m.h, minIslandPx2, minIslandPx2);
-      reconcileField(m.field, m.mask, this.fieldThreshold);
-      this.mask = m.mask;
-      this.field = m.field;
-      this.maskW = m.w;
-      this.maskH = m.h;
+      this.usedAlpha = base.usedAlpha;
+
+      // Normalize to a zero-iso field (value - local threshold) so regions
+      // with different thresholds composite into one traceable field.
+      const field = base.field;
+      const thrBase = base.usedAlpha ? params.alphaThreshold : 128;
+      for (let i = 0; i < field.length; i++) field[i] -= thrBase;
+
+      // Region overrides: recompute the field with the region's parameters
+      // and blend it in over the rectangle with a 4px feather so the traced
+      // contour crosses the boundary without a seam.
+      for (const r of params.regions ?? []) {
+        if (r.alphaThreshold == null && r.denoisePx == null && r.hugBody == null) continue;
+        const o = extractMask(this.img, {
+          alphaThreshold: r.alphaThreshold ?? params.alphaThreshold,
+          bgTolerance: params.bgTolerance,
+          pad: this.pad,
+          denoiseSigma: r.denoisePx ?? params.denoisePx,
+          bodyMode: r.hugBody ?? params.hugBody,
+        });
+        const thrO = o.usedAlpha ? (r.alphaThreshold ?? params.alphaThreshold) : 128;
+        const of = o.field;
+        const ws = this.workScale;
+        const x0 = r.x * ws + this.pad;
+        const y0 = r.y * ws + this.pad;
+        const x1 = (r.x + r.w) * ws + this.pad;
+        const y1 = (r.y + r.h) * ws + this.pad;
+        const F = 4;
+        const yA = Math.max(0, Math.floor(y0));
+        const yB = Math.min(base.h - 1, Math.ceil(y1));
+        const xA = Math.max(0, Math.floor(x0));
+        const xB = Math.min(base.w - 1, Math.ceil(x1));
+        for (let y = yA; y <= yB; y++) {
+          for (let x = xA; x <= xB; x++) {
+            const wgt = Math.min((x - x0) / F, (x1 - x) / F, (y - y0) / F, (y1 - y) / F, 1);
+            if (wgt <= 0) continue;
+            const i = y * base.w + x;
+            field[i] = field[i] * (1 - wgt) + (of[i] - thrO) * wgt;
+          }
+        }
+      }
+
+      const mask = new Uint8Array(field.length);
+      for (let i = 0; i < field.length; i++) mask[i] = field[i] >= 0 ? 1 : 0;
+      filterIslands(mask, base.w, base.h, minIslandPx2, minIslandPx2);
+      reconcileField(field, mask, 0);
+      this.fieldThreshold = 0;
+      this.mask = mask;
+      this.field = field;
+      this.maskW = base.w;
+      this.maskH = base.h;
       this.maskKey = maskKey;
       timings.mask = now() - t;
 
@@ -193,6 +239,62 @@ export class CutlineEngine {
       nodeCount,
       usedAlpha: this.usedAlpha,
       timings,
+    };
+  }
+
+  private v1Key = '';
+  private v1Dist: Float32Array | null = null;
+  private v1W = 0;
+  private v1H = 0;
+  private v1Pad = 0;
+
+  /**
+   * Faithful replica of the first-commit pipeline, for A/B comparison:
+   * binary alpha threshold -> 3x3 morph open/close -> island filter ->
+   * EDT threshold trace -> RDP 1.25px -> Chaikin x2 -> whole-ring bezier
+   * fit at 1.5px. No subpixel field, no corner pinning, no body mode.
+   */
+  computeV1(params: CutlineParams): { svgPath: string; ringCount: number; nodeCount: number } {
+    const pxPerMm = (params.dpi / 25.4) * this.workScale;
+    const minIslandPx2 = Math.max(16, params.minIslandMm2 * pxPerMm * pxPerMm);
+    const key = [params.alphaThreshold, params.bgTolerance, params.dpi].join('|');
+    if (!this.v1Dist || key !== this.v1Key) {
+      const pad = Math.ceil(PAD_MM * pxPerMm);
+      const m = extractMask(this.img, {
+        alphaThreshold: params.alphaThreshold,
+        bgTolerance: params.bgTolerance,
+        pad,
+        denoiseSigma: 0,
+        bodyMode: false,
+      });
+      legacyMorphOpenClose(m.mask, m.w, m.h);
+      filterIslands(m.mask, m.w, m.h, minIslandPx2, minIslandPx2);
+      this.v1Dist = distanceTransform(m.mask, m.w, m.h);
+      this.v1W = m.w;
+      this.v1H = m.h;
+      this.v1Pad = pad;
+      this.v1Key = key;
+    }
+    const offsetPx = Math.max(0, params.offsetMm * pxPerMm);
+    const traced = traceField(this.v1Dist, this.v1W, this.v1H, offsetPx, 'lte', {
+      keepHoles: params.keepHoles,
+      minHoleAreaPx2: minIslandPx2,
+    });
+    const toSrc = (p: Pt): Pt => ({
+      x: (p.x - this.v1Pad) / this.workScale,
+      y: (p.y - this.v1Pad) / this.workScale,
+    });
+    const beziers: BezierRing[] = [];
+    for (const ring of traced) {
+      const simplified = simplifyRing(ring.points, 1.25);
+      if (!simplified) continue;
+      const smoothed = chaikinClosed(simplified, 2).map(toSrc);
+      beziers.push(fitBezierRing(smoothed, 1.5 / this.workScale));
+    }
+    return {
+      svgPath: beziersToSvgPath(beziers),
+      ringCount: beziers.length,
+      nodeCount: beziers.reduce((a, r) => a + r.length, 0),
     };
   }
 

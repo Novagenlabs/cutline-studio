@@ -1,5 +1,5 @@
 import { CutlineEngine, DEFAULT_PARAMS } from './pipeline';
-import type { CutlineParams, CutlineResult, ShapeMode } from './pipeline';
+import type { CutlineParams, CutlineResult, RegionOverride, ShapeMode } from './pipeline';
 import { buildSvg } from './export/svg';
 import { buildPdf } from './export/pdf';
 import { buildDxf } from './export/dxf';
@@ -25,10 +25,13 @@ interface AppState {
   imageDataUrl: string;
   engine: CutlineEngine | null;
   result: CutlineResult | null;
+  /** -1 = editing global params; otherwise index into params.regions. */
+  activeRegion: number;
+  compareV1: boolean;
 }
 
 const state: AppState = {
-  params: { ...DEFAULT_PARAMS },
+  params: { ...DEFAULT_PARAMS, regions: [] },
   halo: true,
   spotName: 'CutContour',
   fileBase: 'cutline',
@@ -38,7 +41,12 @@ const state: AppState = {
   imageDataUrl: '',
   engine: null,
   result: null,
+  activeRegion: -1,
+  compareV1: false,
 };
+
+const activeRegion = (): RegionOverride | null =>
+  state.activeRegion >= 0 ? state.params.regions[state.activeRegion] ?? null : null;
 
 /* ---------------- toast ---------------- */
 
@@ -79,6 +87,10 @@ function adoptImage(el: HTMLImageElement | HTMLCanvasElement, w: number, h: numb
   const workData = wctx.getImageData(0, 0, ww, wh);
 
   state.engine = new CutlineEngine(workData, ww / w);
+  state.params.regions = [];
+  state.activeRegion = -1;
+  renderRegions();
+  syncRegionControls();
 
   const art = $('#art') as unknown as SVGImageElement;
   art.setAttribute('href', state.imageDataUrl);
@@ -132,6 +144,14 @@ function recompute(immediate = false) {
       const result = state.engine!.compute(state.params);
       state.result = result;
       renderResult(result, performance.now() - t0);
+      const v1El = $('#cut-v1') as unknown as SVGPathElement;
+      if (state.compareV1) {
+        const v1 = state.engine!.computeV1(state.params);
+        v1El.setAttribute('d', v1.svgPath);
+        $('#st-geom').textContent += ` · v1: ${v1.ringCount} paths, ${v1.nodeCount} nodes`;
+      } else {
+        v1El.setAttribute('d', '');
+      }
     },
     immediate ? 0 : 60
   );
@@ -204,22 +224,140 @@ previewSvg.addEventListener('wheel', (e) => {
   applyView();
 }, { passive: false });
 
+function screenToImg(e: PointerEvent): { x: number; y: number } {
+  const rect = previewSvg.getBoundingClientRect();
+  return {
+    x: (e.clientX - rect.left - view.tx) / view.k,
+    y: (e.clientY - rect.top - view.ty) / view.k,
+  };
+}
+
 let panFrom: { x: number; y: number; tx: number; ty: number } | null = null;
+let marqueeArmed = false;
+let marqueeFrom: { x: number; y: number } | null = null;
+const marqueeEl = $('#marquee') as unknown as SVGRectElement;
+
 previewSvg.addEventListener('pointerdown', (e) => {
-  panFrom = { x: e.clientX, y: e.clientY, tx: view.tx, ty: view.ty };
   previewSvg.setPointerCapture(e.pointerId);
+  if (marqueeArmed) {
+    marqueeFrom = screenToImg(e);
+    return;
+  }
+  panFrom = { x: e.clientX, y: e.clientY, tx: view.tx, ty: view.ty };
   previewSvg.classList.add('panning');
 });
 previewSvg.addEventListener('pointermove', (e) => {
+  if (marqueeFrom) {
+    const p = screenToImg(e);
+    marqueeEl.setAttribute('x', String(Math.min(marqueeFrom.x, p.x)));
+    marqueeEl.setAttribute('y', String(Math.min(marqueeFrom.y, p.y)));
+    marqueeEl.setAttribute('width', String(Math.abs(p.x - marqueeFrom.x)));
+    marqueeEl.setAttribute('height', String(Math.abs(p.y - marqueeFrom.y)));
+    marqueeEl.removeAttribute('hidden');
+    return;
+  }
   if (!panFrom) return;
   view.tx = panFrom.tx + (e.clientX - panFrom.x);
   view.ty = panFrom.ty + (e.clientY - panFrom.y);
   applyView();
 });
-previewSvg.addEventListener('pointerup', () => {
+previewSvg.addEventListener('pointerup', (e) => {
+  if (marqueeFrom) {
+    const p = screenToImg(e);
+    const x0 = Math.max(0, Math.min(marqueeFrom.x, p.x));
+    const y0 = Math.max(0, Math.min(marqueeFrom.y, p.y));
+    const x1 = Math.min(state.srcW, Math.max(marqueeFrom.x, p.x));
+    const y1 = Math.min(state.srcH, Math.max(marqueeFrom.y, p.y));
+    marqueeFrom = null;
+    marqueeEl.setAttribute('hidden', '');
+    setMarqueeArmed(false);
+    if (x1 - x0 > 8 && y1 - y0 > 8) {
+      state.params.regions.push({
+        x: Math.round(x0),
+        y: Math.round(y0),
+        w: Math.round(x1 - x0),
+        h: Math.round(y1 - y0),
+      });
+      state.activeRegion = state.params.regions.length - 1;
+      renderRegions();
+      syncRegionControls();
+      recompute(true);
+    }
+    return;
+  }
   panFrom = null;
   previewSvg.classList.remove('panning');
 });
+
+function setMarqueeArmed(on: boolean) {
+  marqueeArmed = on;
+  previewSvg.classList.toggle('marquee-mode', on);
+  $('#btn-region').classList.toggle('armed', on);
+  $('#region-hint').textContent = on ? 'drag a box on the art' : '';
+}
+
+$('#btn-region').addEventListener('click', () => setMarqueeArmed(!marqueeArmed));
+
+function renderRegions() {
+  const chips = $('#region-chips');
+  chips.innerHTML = '';
+  const mk = (label: string, idx: number) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `chip${state.activeRegion === idx ? ' active' : ''}`;
+    b.textContent = label;
+    if (idx >= 0) {
+      const x = document.createElement('span');
+      x.className = 'x';
+      x.textContent = '✕';
+      x.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        state.params.regions.splice(idx, 1);
+        state.activeRegion = -1;
+        renderRegions();
+        syncRegionControls();
+        recompute(true);
+      });
+      b.appendChild(x);
+    }
+    b.addEventListener('click', () => {
+      state.activeRegion = idx;
+      renderRegions();
+      syncRegionControls();
+    });
+    chips.appendChild(b);
+  };
+  if (state.params.regions.length) mk('All', -1);
+  state.params.regions.forEach((_, i) => mk(`R${i + 1} `, i));
+
+  const g = $('#region-rects');
+  g.innerHTML = '';
+  state.params.regions.forEach((r, i) => {
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('class', `region-rect${state.activeRegion === i ? ' active' : ''}`);
+    rect.setAttribute('x', String(r.x));
+    rect.setAttribute('y', String(r.y));
+    rect.setAttribute('width', String(r.w));
+    rect.setAttribute('height', String(r.h));
+    g.appendChild(rect);
+  });
+}
+
+/** Reflect the active target's (global or region) values in the artwork controls. */
+function syncRegionControls() {
+  const r = activeRegion();
+  const thr = r?.alphaThreshold ?? state.params.alphaThreshold;
+  const den = r?.denoisePx ?? state.params.denoisePx;
+  const body = r?.hugBody ?? state.params.hugBody;
+  ($('#in-alpha') as HTMLInputElement).value = String(thr);
+  $('#out-alpha').textContent = String(thr);
+  ($('#in-denoise') as HTMLInputElement).value = String(den);
+  $('#out-denoise').textContent = `${den.toFixed(1)} px`;
+  ($('#in-body') as HTMLInputElement).checked = body;
+  $('#region-hint').textContent = r
+    ? `R${state.activeRegion + 1}: threshold / denoise / hug-body apply to this region only`
+    : '';
+}
 
 $('#btn-fit').addEventListener('click', fitView);
 window.addEventListener('resize', fitView);
@@ -278,13 +416,17 @@ bindSlider('#in-corner', '#out-corner', (v) => `${v.toFixed(1)} mm`, (v) => {
   state.params.minCornerRadiusMm = v;
 });
 bindSlider('#in-alpha', '#out-alpha', (v) => String(v), (v) => {
-  state.params.alphaThreshold = v;
+  const r = activeRegion();
+  if (r) r.alphaThreshold = v;
+  else state.params.alphaThreshold = v;
 });
 bindSlider('#in-bgtol', '#out-bgtol', (v) => String(v), (v) => {
   state.params.bgTolerance = v;
 });
 bindSlider('#in-denoise', '#out-denoise', (v) => `${v.toFixed(1)} px`, (v) => {
-  state.params.denoisePx = v;
+  const r = activeRegion();
+  if (r) r.denoisePx = v;
+  else state.params.denoisePx = v;
 });
 bindSlider('#in-precision', '#out-precision', (v) => `±${v.toFixed(2)} mm`, (v) => {
   state.params.precisionMm = v;
@@ -304,7 +446,15 @@ bindSlider('#in-precision', '#out-precision', (v) => `±${v.toFixed(2)} mm`, (v)
 });
 
 ($('#in-body') as HTMLInputElement).addEventListener('change', (e) => {
-  state.params.hugBody = (e.target as HTMLInputElement).checked;
+  const checked = (e.target as HTMLInputElement).checked;
+  const r = activeRegion();
+  if (r) r.hugBody = checked;
+  else state.params.hugBody = checked;
+  recompute(true);
+});
+
+($('#in-v1') as HTMLInputElement).addEventListener('change', (e) => {
+  state.compareV1 = (e.target as HTMLInputElement).checked;
   recompute(true);
 });
 

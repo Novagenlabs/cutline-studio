@@ -9,6 +9,17 @@ export type BezierRing = BezierSeg[];
 
 export type ShapeMode = 'contour' | 'rect' | 'rounded' | 'circle';
 
+/** Local parameter overrides applied inside a rectangle (source px). */
+export interface RegionOverride {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  alphaThreshold?: number;
+  denoisePx?: number;
+  hugBody?: boolean;
+}
+
 export interface CutlineParams {
   /** Alpha cutoff 0-255 for images with transparency. */
   alphaThreshold: number;
@@ -41,6 +52,8 @@ export interface CutlineParams {
   /** Islands smaller than this (mm^2) are treated as noise and dropped. */
   minIslandMm2: number;
   shape: ShapeMode;
+  /** Per-rectangle overrides of threshold/denoise/body mode, feather-blended into the global field. */
+  regions: RegionOverride[];
 }
 
 export const DEFAULT_PARAMS: CutlineParams = {
@@ -58,6 +71,7 @@ export const DEFAULT_PARAMS: CutlineParams = {
   keepHoles: false,
   minIslandMm2: 1,
   shape: 'contour',
+  regions: [],
 };
 
 export interface CutlineResult {

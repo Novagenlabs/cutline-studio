@@ -328,6 +328,50 @@ function floodFillBackground(
 }
 
 /**
+ * v1-engine replica: 3x3 morphological open then close, in place.
+ * Kept only for the A/B comparison mode — the current pipeline replaced it
+ * with continuous-field denoising because it eats a pixel of edge detail.
+ */
+export function legacyMorphOpenClose(mask: Uint8Array, w: number, h: number): void {
+  const tmp = new Uint8Array(w * h);
+  const erode = (src: Uint8Array, dst: Uint8Array) => {
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = y * w + x;
+        let on = src[i];
+        for (let dy = -1; dy <= 1 && on; dy++) {
+          for (let dx = -1; dx <= 1 && on; dx++) {
+            const yy = y + dy;
+            const xx = x + dx;
+            if (yy < 0 || yy >= h || xx < 0 || xx >= w || !src[yy * w + xx]) on = 0;
+          }
+        }
+        dst[i] = on;
+      }
+    }
+  };
+  const dilate = (src: Uint8Array, dst: Uint8Array) => {
+    dst.fill(0);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        if (!src[y * w + x]) continue;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const yy = y + dy;
+            const xx = x + dx;
+            if (yy >= 0 && yy < h && xx >= 0 && xx < w) dst[yy * w + xx] = 1;
+          }
+        }
+      }
+    }
+  };
+  erode(mask, tmp);
+  dilate(tmp, mask);
+  dilate(mask, tmp);
+  erode(tmp, mask);
+}
+
+/**
  * After island/hole filtering changed the binary mask, nudge the continuous
  * field across the threshold at exactly those pixels so a field trace agrees
  * with the mask — edge pixels the filter didn't touch keep their subpixel ramp.

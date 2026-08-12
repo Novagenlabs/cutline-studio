@@ -25,17 +25,17 @@ function check(name: string, cond: boolean, detail = '') {
 const W = 400;
 const H = 300;
 const data = new Uint8ClampedArray(W * H * 4);
-function setPx(x: number, y: number) {
+function setPx(x: number, y: number, alpha = 255) {
   const i = (y * W + x) * 4;
   data[i] = 200;
   data[i + 1] = 60;
   data[i + 2] = 90;
-  data[i + 3] = 255;
+  data[i + 3] = alpha;
 }
 for (let y = 0; y < H; y++) {
   for (let x = 0; x < W; x++) {
     const dCirc = Math.hypot(x - 120, y - 150);
-    if (dCirc <= 60) setPx(x, y);
+    if (dCirc <= 60) setPx(x, y, 200); // semi-transparent: region-threshold testable
     if (x >= 280 && x <= 340 && y >= 60 && y <= 120) setPx(x, y);
     const dDonut = Math.hypot(x - 300, y - 220);
     if (dDonut <= 45 && dDonut >= 20) setPx(x, y);
@@ -171,6 +171,23 @@ check(
   Math.abs(rBody.bbox.x - 150) < 3 && Math.abs(rBody.bbox.w - 100) < 6,
   JSON.stringify(rBody.bbox)
 );
+
+console.log('— region overrides + v1 engine —');
+// Region over the circle with a very high threshold: circle vanishes there,
+// square + donut unaffected -> ring count drops by one.
+const rRegion = engine.compute({
+  ...params,
+  offsetMm: 1,
+  regions: [{ x: 30, y: 60, w: 180, h: 180, alphaThreshold: 230 }],
+});
+const rNoRegion = engine.compute({ ...params, offsetMm: 1, regions: [] });
+check(
+  'region override changes only its area',
+  rRegion.rings.length === rNoRegion.rings.length - 1,
+  `${rNoRegion.rings.length} -> ${rRegion.rings.length}`
+);
+const v1 = engine.computeV1({ ...params, offsetMm: 3 });
+check('v1 engine produces a comparable path', v1.ringCount >= 2 && v1.svgPath.includes('C'), `v1 rings ${v1.ringCount}`);
 
 console.log('— shapes —');
 const rRect = engine.compute({ ...params, shape: 'rounded' });

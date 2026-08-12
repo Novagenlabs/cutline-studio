@@ -56,6 +56,11 @@
             <input id="in-body" type="checkbox" />
             <label for="in-body">Hug colored body (peel white outline)</label>
           </div>
+          <div class="row">
+            <button id="btn-region" class="btn ghost sm" type="button">⊞ Fix a region</button>
+            <span class="hint" id="region-hint"></span>
+          </div>
+          <div class="chips" id="region-chips"></div>
           <p class="hint" id="hint-mask">—</p>
         </section>
 
@@ -92,6 +97,10 @@
           <div class="row check">
             <input id="in-halo" type="checkbox" checked />
             <label for="in-halo">White halo border</label>
+          </div>
+          <div class="row check">
+            <input id="in-v1" type="checkbox" />
+            <label for="in-v1">Compare v1 engine (cyan)</label>
           </div>
         </section>
 
@@ -149,8 +158,11 @@
           <g id="viewport">
             <path id="halo-path" fill="#ffffff" fill-rule="evenodd" />
             <image id="art" x="0" y="0" />
+            <path id="cut-v1" fill="none" />
             <path id="cut-shadow" fill="none" />
             <path id="cut-path" fill="none" />
+            <g id="region-rects"></g>
+            <rect id="marquee" fill="none" hidden />
           </g>
         </svg>
         <div class="stage-tools">

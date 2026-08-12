@@ -473,3 +473,75 @@ input[type='checkbox'] {
 .toast.error {
   border-left-color: #ff4d4d;
 }
+
+/* ---------- region fix ---------- */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.chip {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 4px 9px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chip.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.chip .x {
+  opacity: 0.6;
+}
+
+.chip .x:hover {
+  opacity: 1;
+  color: #ff4d4d;
+}
+
+#preview.marquee-mode {
+  cursor: crosshair;
+}
+
+#marquee {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.region-rect {
+  fill: none;
+  stroke: rgba(236, 0, 140, 0.45);
+  stroke-width: 1;
+  stroke-dasharray: 5 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.region-rect.active {
+  stroke: var(--accent);
+  stroke-width: 1.6;
+}
+
+#cut-v1 {
+  stroke: #19d3f0;
+  stroke-width: 1.4;
+  stroke-dasharray: 3 5;
+  vector-effect: non-scaling-stroke;
+}
+
+#btn-region.armed {
+  border-color: var(--accent);
+  color: var(--accent);
+}
