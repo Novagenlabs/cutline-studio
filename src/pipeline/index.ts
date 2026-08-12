@@ -1,6 +1,6 @@
 import { extractMask, filterIslands, morphOpenClose } from './mask';
 import { distanceTransform } from './edt';
-import { traceOffset } from './trace';
+import { traceField } from './trace';
 import {
   beziersToSvgPath,
   bezierRingToPolyline,
@@ -15,8 +15,8 @@ import type { BezierRing, CutlineParams, CutlineResult, Pt, RasterImage } from '
 
 export * from './types';
 
-/** Head-room around the artwork so the offset band never clips (mm). */
-const PAD_MM = 16;
+/** Head-room around the artwork so offset + bridge dilation never clips (mm). */
+const PAD_MM = 32;
 const now = () =>
   typeof performance !== 'undefined' ? performance.now() : Date.now();
 
@@ -75,11 +75,30 @@ export class CutlineEngine {
     }
 
     const offsetPx = Math.max(0, params.offsetMm * pxPerMm);
+    const bridgePx = Math.max(0, (params.bridgeMm / 2) * pxPerMm);
+    const holeMinPx2 = Math.max(minIslandPx2, params.holeMinMm2 * pxPerMm * pxPerMm);
+    const traceOpts = { keepHoles: params.keepHoles, minHoleAreaPx2: holeMinPx2 };
+
     let t = now();
-    const traced = traceOffset(this.dist!, this.maskW, this.maskH, offsetPx, {
-      keepHoles: params.keepHoles,
-      minHoleAreaPx2: minIslandPx2,
-    });
+    let traced;
+    if (bridgePx < 0.25) {
+      traced = traceField(this.dist!, this.maskW, this.maskH, offsetPx, 'lte', traceOpts);
+    } else {
+      // Morphological closing of the offset region: dilate by the bridge
+      // radius, then erode by the same amount. Gaps narrower than the bridge
+      // merge; scalloped concavities of that scale are smoothed over; the
+      // border width stays at `offset`. Both steps are EDT thresholds, and
+      // the final erosion is traced on the distance field for a subpixel
+      // result.
+      const n = this.maskW * this.maskH;
+      const region = new Uint8Array(n);
+      const dist = this.dist!;
+      for (let i = 0; i < n; i++) region[i] = dist[i] <= offsetPx ? 1 : 0;
+      const dDilate = distanceTransform(region, this.maskW, this.maskH);
+      for (let i = 0; i < n; i++) region[i] = dDilate[i] <= bridgePx ? 0 : 1; // complement of dilated
+      const dErode = distanceTransform(region, this.maskW, this.maskH);
+      traced = traceField(dErode, this.maskW, this.maskH, bridgePx, 'gte', traceOpts);
+    }
     timings.trace = now() - t;
 
     t = now();

@@ -242,6 +242,12 @@ function bindSlider(
 bindSlider('#in-offset', '#out-offset', (v) => `${v.toFixed(1)} mm`, (v) => {
   state.params.offsetMm = v;
 });
+bindSlider('#in-bridge', '#out-bridge', (v) => (v === 0 ? 'off' : `${v.toFixed(1)} mm`), (v) => {
+  state.params.bridgeMm = v;
+});
+bindSlider('#in-holemin', '#out-holemin', (v) => `${v.toFixed(0)} mm²`, (v) => {
+  state.params.holeMinMm2 = v;
+});
 bindSlider('#in-smooth', '#out-smooth', (v) => String(v), (v) => {
   state.params.smoothness = v;
 });

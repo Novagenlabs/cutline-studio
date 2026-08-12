@@ -16,6 +16,14 @@ export interface CutlineParams {
   bgTolerance: number;
   /** Outward offset of the cutline from the artwork edge, in mm. */
   offsetMm: number;
+  /**
+   * Morphological closing radius control: gaps up to this width between
+   * offset regions are bridged into one piece, and scalloped concavities
+   * of similar scale are smoothed over — without inflating the border.
+   */
+  bridgeMm: number;
+  /** Interior holes smaller than this (mm^2) are filled (white) instead of cut. */
+  holeMinMm2: number;
   /** Print resolution used to map px <-> mm. */
   dpi: number;
   /** 0 = raw trace, 3 = very smooth. Controls Chaikin iterations + bezier fit error. */
@@ -33,6 +41,8 @@ export const DEFAULT_PARAMS: CutlineParams = {
   alphaThreshold: 128,
   bgTolerance: 32,
   offsetMm: 3,
+  bridgeMm: 0,
+  holeMinMm2: 1,
   dpi: 300,
   smoothness: 2,
   minCornerRadiusMm: 1,

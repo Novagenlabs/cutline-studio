@@ -7,27 +7,36 @@ export interface TracedRing {
 }
 
 /**
- * Marching-squares trace of the iso-contour `dist <= d` on the distance
- * field. d3-contour interpolates crossings, so the result is subpixel-smooth.
+ * Marching-squares trace of an iso-contour on a distance field.
+ * `sense: 'lte'` traces the region `field <= iso` (offset band around the
+ * art); `sense: 'gte'` traces `field >= iso` (erosion of a dilated region).
+ * d3-contour interpolates crossings, so the result is subpixel-smooth.
  * Rings come back GeoJSON-style: exterior first, holes after, closed
  * (first == last point) — we strip the duplicate.
  */
-export function traceOffset(
-  dist: Float32Array,
+export function traceField(
+  field: Float32Array,
   w: number,
   h: number,
-  d: number,
+  iso: number,
+  sense: 'lte' | 'gte',
   opts: { keepHoles: boolean; minHoleAreaPx2: number }
 ): TracedRing[] {
-  // d3-contour marks cells where value >= threshold, so negate the field.
-  const neg = new Float64Array(dist.length);
-  for (let i = 0; i < dist.length; i++) neg[i] = -dist[i];
+  // d3-contour marks cells where value >= threshold; negate for 'lte'.
+  let values: ArrayLike<number> = field;
+  let threshold = iso;
+  if (sense === 'lte') {
+    const neg = new Float64Array(field.length);
+    for (let i = 0; i < field.length; i++) neg[i] = -field[i];
+    values = neg;
+    threshold = -iso;
+  }
 
   const gen = contours()
     .size([w, h])
     .smooth(true)
-    .thresholds([-d]);
-  const multi = gen(neg as unknown as number[])[0];
+    .thresholds([threshold]);
+  const multi = gen(values as unknown as number[])[0];
   const rings: TracedRing[] = [];
   if (!multi) return rings;
 

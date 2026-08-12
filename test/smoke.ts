@@ -72,6 +72,23 @@ console.log('— larger offset merges islands —');
 const r3 = engine.compute({ ...params, offsetMm: 12 });
 check('merge reduces ring count', r3.rings.length < r1.rings.length, `${r1.rings.length} -> ${r3.rings.length}`);
 
+console.log('— bridge merges without inflating border —');
+// At 3mm offset the three shapes stay separate; bridging 30mm merges them
+// into one ring while the border stays ~3mm (bbox must NOT grow like r3's).
+const rb = engine.compute({ ...params, bridgeMm: 30 });
+check('bridge yields a single ring', rb.rings.length === 1, `got ${rb.rings.length}`);
+check(
+  'bridge keeps border tight',
+  Math.abs(rb.bbox.x - r1.bbox.x) < 4 && rb.bbox.x > r3.bbox.x + 4,
+  `x: r1=${r1.bbox.x.toFixed(1)} rb=${rb.bbox.x.toFixed(1)} r3=${r3.bbox.x.toFixed(1)}`
+);
+
+console.log('— hole min-size control —');
+// keepHoles + huge fill threshold: the donut hole (r=20px ≈ 1250px² ≈ 81mm²
+// at 100dpi) gets filled when the threshold is above its area.
+const rh = engine.compute({ ...params, keepHoles: true, minCornerRadiusMm: 0, holeMinMm2: 100 });
+check('large fill threshold fills the donut hole', !ringNear(rh, 300, 220, 20), `rings ${rh.rings.length}`);
+
 console.log('— offset slider reuses cached EDT —');
 const t0 = performance.now();
 engine.compute({ ...params, offsetMm: 5 });

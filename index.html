@@ -55,7 +55,11 @@
           <h2>Cut path</h2>
           <div class="row slider">
             <label for="in-offset">Offset <output id="out-offset">3.0 mm</output></label>
-            <input id="in-offset" type="range" min="0" max="12" step="0.1" value="3" />
+            <input id="in-offset" type="range" min="0" max="20" step="0.1" value="3" />
+          </div>
+          <div class="row slider">
+            <label for="in-bridge">Bridge gaps <output id="out-bridge">off</output></label>
+            <input id="in-bridge" type="range" min="0" max="20" step="0.5" value="0" />
           </div>
           <div class="row slider">
             <label for="in-smooth">Smoothness <output id="out-smooth">2</output></label>
@@ -68,6 +72,10 @@
           <div class="row check">
             <input id="in-holes" type="checkbox" />
             <label for="in-holes">Cut interior holes (decals)</label>
+          </div>
+          <div class="row slider">
+            <label for="in-holemin">Fill counters under <output id="out-holemin">1 mm²</output></label>
+            <input id="in-holemin" type="range" min="0" max="80" step="1" value="1" />
           </div>
           <div class="row check">
             <input id="in-halo" type="checkbox" checked />
