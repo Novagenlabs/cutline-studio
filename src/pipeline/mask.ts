@@ -73,12 +73,19 @@ export function extractMask(
 }
 
 /**
- * "Hug colored body" mode: flood-fill inward from the border across pixels
- * that are either below the alpha threshold OR near-white, and zero the
- * field there. This peels off white keylines/glows that wrap the artwork
- * (they're connected to the outside through white), so the trace lands on
- * the colored glyph body — while white regions *inside* the art, sealed off
- * by colored pixels, stay untouched.
+ * "Hug colored body" mode. Two stages:
+ *
+ * 1. Flood-fill inward from the border across pixels that are below the
+ *    alpha threshold OR near-white — the white keyline/glow rim that wraps
+ *    the artwork. Whites sealed *inside* the art are unreachable and stay.
+ * 2. In the reached rim plus a 2px ring around it (the anti-aliased blend
+ *    fringe), replace the field with a CONTINUOUS body-coverage estimate:
+ *    (alpha) x (distance from white) = alpha x (1 - min(r,g,b)/255).
+ *    Blend pixels (letter color mixed with white) get fractional values,
+ *    so the subpixel tracer lands mid-blend — on the perceived glyph edge —
+ *    instead of a hard in/out decision that leaves a 1-2px white fringe.
+ *    (Equivalent to "make the art black-on-white first", generalized to
+ *    colored bodies against a white rim.)
  */
 function peelWhiteRim(
   img: RasterImage,
@@ -134,8 +141,38 @@ function peelWhiteRim(
     if (y > 0) grow(i - w);
     if (y < h - 1) grow(i + w);
   }
+
+  // Expand the rim by 2px (4-neighbor dilation) to take in the anti-aliased
+  // blend fringe between the white rim and the colored body.
+  const zone = new Uint8Array(reached);
+  for (let pass = 0; pass < 2; pass++) {
+    const prev = new Uint8Array(zone);
+    for (let i = 0; i < n; i++) {
+      if (prev[i]) continue;
+      const x = i % w;
+      const y = (i / w) | 0;
+      if (
+        (x > 0 && prev[i - 1]) ||
+        (x < w - 1 && prev[i + 1]) ||
+        (y > 0 && prev[i - w]) ||
+        (y < h - 1 && prev[i + w])
+      ) {
+        zone[i] = 1;
+      }
+    }
+  }
+
   for (let i = 0; i < n; i++) {
-    if (reached[i]) field[i] = 0;
+    if (!zone[i]) continue;
+    const x = (i % w) - pad;
+    const y = ((i / w) | 0) - pad;
+    if (x < 0 || x >= iw || y < 0 || y >= ih) {
+      field[i] = 0;
+      continue;
+    }
+    const p = (y * iw + x) * 4;
+    const whiteness = Math.min(data[p], data[p + 1], data[p + 2]) / 255;
+    field[i] = (field[i] / 255) * (1 - whiteness) * 255;
   }
 }
 
