@@ -5,6 +5,7 @@
  */
 import { CutlineEngine, DEFAULT_PARAMS } from '../src/pipeline';
 import type { CutlineParams, RasterImage } from '../src/pipeline';
+import { matteToImage } from '../src/ai/matte';
 import { buildPdf } from '../src/export/pdf';
 import { buildDxf } from '../src/export/dxf';
 import { buildSvg } from '../src/export/svg';
@@ -188,6 +189,27 @@ check(
 );
 const v1 = engine.computeV1({ ...params, offsetMm: 3 });
 check('v1 engine produces a comparable path', v1.ringCount >= 2 && v1.svgPath.includes('C'), `v1 rings ${v1.ringCount}`);
+
+console.log('— AI matte splice —');
+// A synthetic soft-edged matte replaces the alpha channel entirely: the
+// engine should trace the matte's square, not the original shapes.
+const matte = new Float32Array(W * H);
+for (let y = 0; y < H; y++) {
+  for (let x = 0; x < W; x++) {
+    const dx = Math.max(0, Math.abs(x - 200) - 48);
+    const dy = Math.max(0, Math.abs(y - 150) - 48);
+    matte[y * W + x] = 255 * Math.max(0, 1 - Math.hypot(dx, dy) / 4); // 4px soft ramp
+  }
+}
+const aiImg = matteToImage(img, matte);
+const engineAi = new CutlineEngine(aiImg, 1);
+const rAi = engineAi.compute({ ...params, offsetMm: 0, minCornerRadiusMm: 0 });
+check(
+  'matte drives the trace (one ring at the matte square)',
+  rAi.rings.length === 1 && Math.abs(rAi.bbox.w - 100) < 8 && Math.abs(rAi.bbox.x - 150) < 4,
+  `rings ${rAi.rings.length} bbox ${JSON.stringify(rAi.bbox)}`
+);
+check('matte splice preserves RGB', aiImg.data[(150 * W + 120) * 4] === 200);
 
 console.log('— shapes —');
 const rRect = engine.compute({ ...params, shape: 'rounded' });

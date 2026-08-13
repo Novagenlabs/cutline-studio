@@ -1,5 +1,6 @@
 import { CutlineEngine, DEFAULT_PARAMS } from './pipeline';
-import type { CutlineParams, CutlineResult, RegionOverride, ShapeMode } from './pipeline';
+import type { CutlineParams, CutlineResult, RasterImage, RegionOverride, ShapeMode } from './pipeline';
+import { computeAiMatte, matteToImage } from './ai/matte';
 import { buildSvg } from './export/svg';
 import { buildPdf } from './export/pdf';
 import { buildDxf } from './export/dxf';
@@ -28,6 +29,11 @@ interface AppState {
   /** -1 = editing global params; otherwise index into params.regions. */
   activeRegion: number;
   compareV1: boolean;
+  /** Downscaled working image (kept for building the AI-matted variant). */
+  workImg: RasterImage | null;
+  workScale: number;
+  aiEngine: CutlineEngine | null;
+  useAi: boolean;
 }
 
 const state: AppState = {
@@ -43,6 +49,10 @@ const state: AppState = {
   result: null,
   activeRegion: -1,
   compareV1: false,
+  workImg: null,
+  workScale: 1,
+  aiEngine: null,
+  useAi: false,
 };
 
 const activeRegion = (): RegionOverride | null =>
@@ -87,6 +97,13 @@ function adoptImage(el: HTMLImageElement | HTMLCanvasElement, w: number, h: numb
   const workData = wctx.getImageData(0, 0, ww, wh);
 
   state.engine = new CutlineEngine(workData, ww / w);
+  state.workImg = workData;
+  state.workScale = ww / w;
+  state.aiEngine = null;
+  state.useAi = false;
+  const aiCheck = $('#in-ai') as HTMLInputElement;
+  aiCheck.checked = false;
+  aiCheck.disabled = false;
   state.params.regions = [];
   state.activeRegion = -1;
   renderRegions();
@@ -135,18 +152,20 @@ function loadFile(file: File) {
 
 let pending: number | null = null;
 function recompute(immediate = false) {
-  if (!state.engine) return;
+  // AI mode traces the neural matte; v1 comparison always uses the original.
+  const engine = state.useAi && state.aiEngine ? state.aiEngine : state.engine;
+  if (!engine) return;
   if (pending !== null) clearTimeout(pending);
   pending = window.setTimeout(
     () => {
       pending = null;
       const t0 = performance.now();
-      const result = state.engine!.compute(state.params);
+      const result = engine.compute(state.params);
       state.result = result;
       renderResult(result, performance.now() - t0);
       const v1El = $('#cut-v1') as unknown as SVGPathElement;
-      if (state.compareV1) {
-        const v1 = state.engine!.computeV1(state.params);
+      if (state.compareV1 && state.engine) {
+        const v1 = state.engine.computeV1(state.params);
         v1El.setAttribute('d', v1.svgPath);
         $('#st-geom').textContent += ` · v1: ${v1.ringCount} paths, ${v1.nodeCount} nodes`;
       } else {
@@ -178,9 +197,12 @@ function renderResult(r: CutlineResult, ms: number) {
   }
   $('#st-time').textContent = `${ms.toFixed(0)} ms`;
   $('#out-size').textContent = `${mm(state.srcW)} × ${mm(state.srcH)} mm`;
-  $('#hint-mask').textContent = r.usedAlpha
-    ? 'Tracing the alpha channel. Raise the threshold to hug the solid body, lower it to include soft shadows.'
-    : 'No transparency found — background removed by flood fill from the edges. Tune with background tolerance.';
+  $('#hint-mask').textContent =
+    state.useAi && state.aiEngine
+      ? 'Tracing the AI matte. The threshold slider moves the cut along the neural edge; regions still work.'
+      : r.usedAlpha
+        ? 'Tracing the alpha channel. Raise the threshold to hug the solid body, lower it to include soft shadows.'
+        : 'No transparency found — background removed by flood fill from the edges. Tune with background tolerance.';
 }
 
 /* ---------------- view (zoom / pan) ---------------- */
@@ -451,6 +473,41 @@ bindSlider('#in-precision', '#out-precision', (v) => `±${v.toFixed(2)} mm`, (v)
   if (r) r.hugBody = checked;
   else state.params.hugBody = checked;
   recompute(true);
+});
+
+const aiCheckbox = $('#in-ai') as HTMLInputElement;
+aiCheckbox.addEventListener('change', async () => {
+  state.useAi = aiCheckbox.checked;
+  if (!state.useAi || state.aiEngine) {
+    recompute(true);
+    return;
+  }
+  if (!state.workImg) {
+    state.useAi = false;
+    aiCheckbox.checked = false;
+    toast('Open an image first.', 'error');
+    return;
+  }
+  aiCheckbox.disabled = true;
+  const hint = $('#hint-ai');
+  try {
+    const matte = await computeAiMatte(state.workImg, (msg) => {
+      hint.textContent = msg;
+      toast(msg, 'info', 60000);
+    });
+    state.aiEngine = new CutlineEngine(matteToImage(state.workImg, matte), state.workScale);
+    hint.textContent = 'AI matte active — threshold, denoise and regions now shape the neural edge.';
+    toast('AI matte ready.', 'info', 4000);
+    recompute(true);
+  } catch (err) {
+    console.error('AI matting failed', err);
+    state.useAi = false;
+    aiCheckbox.checked = false;
+    hint.textContent = 'AI matting failed on this device/browser — the classic pipeline still works.';
+    toast(`AI matting failed: ${err instanceof Error ? err.message : err}`, 'error', 9000);
+  } finally {
+    aiCheckbox.disabled = false;
+  }
 });
 
 ($('#in-v1') as HTMLInputElement).addEventListener('change', (e) => {
