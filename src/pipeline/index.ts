@@ -239,8 +239,20 @@ export class CutlineEngine {
     const s = Math.round(Math.min(3, Math.max(0, params.smoothness)));
     const cornerAngleDeg = [45, 60, 75, 88][s];
     const fitMult = [0.7, 1, 1.7, 2.6][s];
-    const rdpTolPx = Math.max(0.35, params.precisionMm * pxPerMm * 0.6);
-    const fitErrPx = Math.max(0.35, params.precisionMm * 1.3 * pxPerMm) * fitMult;
+    // `precisionMm` is a promise about how far the cut may stray from the
+    // traced edge, so in v3 it bounds the fit directly. v2 inflated it by the
+    // smoothness multiplier and floored it at 0.35px, which meant the default
+    // 0.08mm setting actually permitted 2.09px of deviation — 26x what it
+    // claimed, and the largest single source of error on real artwork.
+    // Smoothness still relaxes the corner gate (fewer pinned corners, more
+    // flowing curves); it just no longer buys that smoothness with fidelity
+    // the caller did not agree to give up.
+    const rdpTolPx = v3
+      ? Math.max(0.02, params.precisionMm * pxPerMm * 0.6)
+      : Math.max(0.35, params.precisionMm * pxPerMm * 0.6);
+    const fitErrPx = v3
+      ? Math.max(0.02, params.precisionMm * pxPerMm)
+      : Math.max(0.35, params.precisionMm * 1.3 * pxPerMm) * fitMult;
     const toSrc = (p: Pt): Pt => ({
       x: (p.x - this.pad) / this.workScale,
       y: (p.y - this.pad) / this.workScale,

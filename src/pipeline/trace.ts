@@ -13,6 +13,15 @@ export interface TracedRing {
  * d3-contour interpolates crossings, so the result is subpixel-smooth.
  * Rings come back GeoJSON-style: exterior first, holes after, closed
  * (first == last point) — we strip the duplicate.
+ *
+ * On coordinates: d3-contour places grid sample `i` at output coordinate
+ * `i + 0.5`, treating each sample as the centre of a unit cell. That matches
+ * this pipeline, because a field sample IS a pixel and a pixel's coverage is
+ * centred half a pixel in from its corner — so the output is already in pixel
+ * space and needs no correction. (Shifting by -0.5 to "fix" d3's convention
+ * biases every contour half a pixel up and left; the mistake hides on
+ * symmetric shapes, whose widths stay right while the whole path moves, and
+ * shows up as a displaced centroid on an asymmetric one.)
  */
 export function traceField(
   field: Float32Array,
