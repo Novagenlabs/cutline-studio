@@ -18,6 +18,10 @@ import {
 import type { BezierRing, CutlineParams, CutlineResult, Pt, RasterImage } from './types';
 
 export * from './types';
+export { groupRings, suggestGapPx } from './group';
+export type { RingGroup } from './group';
+
+import { groupRings, suggestGapPx } from './group';
 
 /** Head-room around the artwork so offset + bridge dilation never clips (mm). */
 const PAD_MM = 32;
@@ -249,6 +253,50 @@ export class CutlineEngine {
       usedAlpha: this.usedAlpha,
       timings,
     };
+  }
+
+  /**
+   * Segment the artwork into elements — an icon, a line of display type, a
+   * strapline — so each can carry its own cut settings. Boxes come back in
+   * SOURCE pixels, ready to seed a region override.
+   *
+   * `gapScale` scales the auto-detected joining distance: below 1 splits more
+   * eagerly, above 1 merges neighbouring elements.
+   */
+  detectGroups(params: CutlineParams, gapScale = 1): Array<{
+    bbox: { x: number; y: number; w: number; h: number };
+    ringCount: number;
+    strokeWidthMm: number;
+  }> {
+    const pxPerMm = (params.dpi / 25.4) * this.workScale;
+    const pad = Math.ceil(PAD_MM * pxPerMm);
+    const base = extractMask(this.img, {
+      alphaThreshold: params.alphaThreshold,
+      bgTolerance: params.bgTolerance,
+      pad,
+      denoiseSigma: params.denoisePx,
+      bodyMode: params.hugBody,
+    });
+    const field = base.field;
+    const thr = base.usedAlpha ? params.alphaThreshold : 128;
+    for (let i = 0; i < field.length; i++) field[i] -= thr;
+    const minIslandPx2 = Math.max(16, params.minIslandMm2 * pxPerMm * pxPerMm);
+    const traced = traceField(field, base.w, base.h, 0, 'gte', {
+      keepHoles: true,
+      minHoleAreaPx2: minIslandPx2,
+    });
+    const gap = suggestGapPx(traced) * gapScale;
+    if (gap <= 0) return [];
+    return groupRings(traced, gap).map((g) => ({
+      bbox: {
+        x: (g.bbox.x - pad) / this.workScale,
+        y: (g.bbox.y - pad) / this.workScale,
+        w: g.bbox.w / this.workScale,
+        h: g.bbox.h / this.workScale,
+      },
+      ringCount: g.members.length,
+      strokeWidthMm: g.strokeWidth / pxPerMm,
+    }));
   }
 
   private v1Key = '';

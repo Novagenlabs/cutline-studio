@@ -320,6 +320,46 @@ function setMarqueeArmed(on: boolean) {
 
 $('#btn-region').addEventListener('click', () => setMarqueeArmed(!marqueeArmed));
 
+/**
+ * Segment the artwork into its elements and seed one region per element, so
+ * each can be tuned on its own. Artwork that mixes a heavy mark with fine
+ * type has no single set of values that suits all of it.
+ */
+$('#btn-detect').addEventListener('click', () => {
+  const engine = state.useAi && state.aiEngine ? state.aiEngine : state.engine;
+  if (!engine) {
+    toast('Load an image first.', 'error');
+    return;
+  }
+  const groups = engine.detectGroups(state.params);
+  if (groups.length < 2) {
+    toast(
+      groups.length === 1
+        ? 'This artwork reads as a single element — nothing to split.'
+        : 'No elements detected.',
+      'error'
+    );
+    return;
+  }
+  // Inset by a hair so neighbouring boxes never share an edge, which would
+  // make the feather blend of one region bleed into the next.
+  state.params.regions = groups.map((g) => ({
+    x: Math.round(g.bbox.x),
+    y: Math.round(g.bbox.y),
+    w: Math.round(g.bbox.w),
+    h: Math.round(g.bbox.h),
+  }));
+  state.activeRegion = 0;
+  renderRegions();
+  syncRegionControls();
+  recompute(true);
+  toast(
+    `${groups.length} elements detected — pick one to tune it on its own.`,
+    'info',
+    5000
+  );
+});
+
 function renderRegions() {
   const chips = $('#region-chips');
   chips.innerHTML = '';
