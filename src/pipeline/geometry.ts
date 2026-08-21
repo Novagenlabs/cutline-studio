@@ -75,6 +75,59 @@ export function offsetTracedRings(rings: TracedRing[], deltaPx: number): Pt[][] 
 }
 
 /**
+ * Offset groups of contours by differing distances and union the results.
+ *
+ * Artwork whose parts sit at different scales wants different borders: a
+ * heavy mark can carry 3mm while a fine strapline needs 0.5mm or its letters
+ * disappear into one another. Offsetting each group on its own raises the
+ * question of what happens where two grown bands overlap — the answer here
+ * is a union, which is both the geometrically honest result (the cut is the
+ * boundary of the union of everything being cut around) and the one a
+ * plotter can actually follow, since overlapping closed paths would
+ * otherwise cut through each other's interiors.
+ *
+ * Each group is offset independently, so a group's own shape is unaffected
+ * by its neighbours; only the final boundary merges where they touch.
+ */
+export function offsetGroupsUnion(
+  groups: Array<{ rings: TracedRing[]; deltaPx: number }>
+): Pt[][] {
+  type ClipperPaths = { X: number; Y: number }[][];
+  const solutions: ClipperPaths[] = [];
+  for (const g of groups) {
+    if (!g.rings.length) continue;
+    const paths = toClipperPaths(g.rings);
+    if (Math.abs(g.deltaPx) <= 0.02) {
+      solutions.push(paths);
+      continue;
+    }
+    try {
+      const out = runClipperOffset(paths, g.deltaPx * CLIPPER_SCALE);
+      solutions.push(out.length ? out : paths);
+    } catch {
+      solutions.push(paths);
+    }
+  }
+  if (!solutions.length) return [];
+  if (solutions.length === 1) return fromClipper(solutions[0]);
+
+  try {
+    const clipper = new ClipperLib.Clipper();
+    for (const s of solutions) clipper.AddPaths(s, ClipperLib.PolyType.ptSubject, true);
+    const out = new ClipperLib.Paths() as ClipperPaths;
+    clipper.Execute(
+      ClipperLib.ClipType.ctUnion,
+      out,
+      ClipperLib.PolyFillType.pftNonZero,
+      ClipperLib.PolyFillType.pftNonZero
+    );
+    return out.length ? fromClipper(out) : solutions.flatMap((s) => fromClipper(s));
+  } catch {
+    return solutions.flatMap((s) => fromClipper(s));
+  }
+}
+
+/**
  * Morphological closing on polygons (offset +r then -r, round joins) via
  * Clipper. Fills any concave feature tighter than r to an r-radius arc —
  * the "minimum corner radius" guarantee drag-knife blades want. Convex

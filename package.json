@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "smoke": "tsx test/smoke.ts",
     "verify:v3": "tsx test/verify-v3.ts",
-    "verify:group": "tsx test/verify-group.ts"
+    "verify:group": "tsx test/verify-group.ts",
+    "verify:offset": "tsx test/verify-offset.ts"
   },
   "dependencies": {
     "clipper-lib": "^6.4.2",

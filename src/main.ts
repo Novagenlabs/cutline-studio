@@ -331,6 +331,10 @@ $('#btn-detect').addEventListener('click', () => {
     toast('Load an image first.', 'error');
     return;
   }
+  if (state.params.engineVersion !== 'v3') {
+    toast('Per-element cutting needs the v3 engine — switch Engine to v3.', 'error', 5000);
+    return;
+  }
   const groups = engine.detectGroups(state.params);
   if (groups.length < 2) {
     toast(
@@ -343,11 +347,14 @@ $('#btn-detect').addEventListener('click', () => {
   }
   // Inset by a hair so neighbouring boxes never share an edge, which would
   // make the feather blend of one region bleed into the next.
+  // Seed each element with the current global offset so selecting one and
+  // dragging the slider adjusts from what is already on screen.
   state.params.regions = groups.map((g) => ({
     x: Math.round(g.bbox.x),
     y: Math.round(g.bbox.y),
     w: Math.round(g.bbox.w),
     h: Math.round(g.bbox.h),
+    offsetMm: state.params.offsetMm,
   }));
   state.activeRegion = 0;
   renderRegions();
@@ -416,8 +423,11 @@ function syncRegionControls() {
   ($('#in-denoise') as HTMLInputElement).value = String(den);
   $('#out-denoise').textContent = `${den.toFixed(1)} px`;
   ($('#in-body') as HTMLInputElement).checked = body;
+  const off = r?.offsetMm ?? state.params.offsetMm;
+  ($('#in-offset') as HTMLInputElement).value = String(off);
+  $('#out-offset').textContent = `${off.toFixed(1)} mm`;
   $('#region-hint').textContent = r
-    ? `R${state.activeRegion + 1}: threshold / denoise / hug-body apply to this region only`
+    ? `R${state.activeRegion + 1}: threshold / denoise / hug-body / offset apply to this region only`
     : '';
 }
 
@@ -463,7 +473,12 @@ function bindSlider(
 }
 
 bindSlider('#in-offset', '#out-offset', (v) => `${v.toFixed(1)} mm`, (v) => {
-  state.params.offsetMm = v;
+  // With an element selected the offset applies to that element alone, so a
+  // heavy mark and a fine strapline can each carry the border their scale
+  // wants. v3 only — v2 has no per-element geometry path.
+  const r = activeRegion();
+  if (r && state.params.engineVersion === 'v3') r.offsetMm = v;
+  else state.params.offsetMm = v;
 });
 bindSlider('#in-bridge', '#out-bridge', (v) => (v === 0 ? 'off' : `${v.toFixed(1)} mm`), (v) => {
   state.params.bridgeMm = v;

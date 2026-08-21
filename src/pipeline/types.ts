@@ -31,6 +31,16 @@ export interface RegionOverride {
   alphaThreshold?: number;
   denoisePx?: number;
   hugBody?: boolean;
+  /**
+   * Outward offset for artwork inside this rectangle (mm), overriding the
+   * global one. Unlike the mask-stage overrides above this acts on geometry:
+   * the contours are grouped, each group offset by its own distance, and the
+   * results unioned — so a heavy mark and a fine strapline can carry the
+   * borders their scales actually want. v3 engine only.
+   */
+  offsetMm?: number;
+  /** Minimum concave corner radius for this region (mm). v3 engine only. */
+  minCornerRadiusMm?: number;
 }
 
 export interface CutlineParams {

@@ -11,6 +11,7 @@ import {
   fitRingWithCorners,
   minRadiusClose,
   minRadiusClosePerContour,
+  offsetGroupsUnion,
   offsetTracedRings,
   roundedRectBezier,
   simplifyRing,
@@ -150,7 +151,31 @@ export class CutlineEngine {
 
     let t = now();
     let traced: TracedRing[];
-    if (bridgePx < 0.25 && offsetPx <= geomLimitPx) {
+    // Per-element offsets: any region carrying its own offsetMm takes the
+    // geometric path, because differing distances can only be applied to
+    // contours individually and then reconciled.
+    const perElement =
+      v3 && (params.regions ?? []).some((r) => r.offsetMm != null) && bridgePx < 0.25;
+
+    if (perElement) {
+      const traced0 = traceField(
+        this.field!,
+        this.maskW,
+        this.maskH,
+        this.fieldThreshold,
+        'gte',
+        traceOpts
+      );
+      const points = offsetPerElement(
+        traced0,
+        params,
+        pxPerMm,
+        this.pad,
+        this.workScale,
+        offsetPx
+      );
+      traced = points.map((pts) => ({ points: pts, isHole: signedArea(pts) < 0 }));
+    } else if (bridgePx < 0.25 && offsetPx <= geomLimitPx) {
       // Tight cut: trace the continuous coverage field at the threshold —
       // the contour follows the anti-aliased edge with subpixel accuracy,
       // which binarize-then-EDT can't do (it quantizes to the pixel grid).
@@ -383,6 +408,65 @@ export class CutlineEngine {
         return [];
     }
   }
+}
+
+/**
+ * Apply a per-region offset to each traced contour.
+ *
+ * A contour belongs to the region whose rectangle contains its centroid;
+ * anything outside every region keeps the global offset. Contours are then
+ * bucketed by the distance they are to be grown by, each bucket is offset on
+ * its own, and the results are unioned — so elements that grow into one
+ * another produce a single sane boundary rather than overlapping paths a
+ * plotter would cut through.
+ *
+ * Centroid containment (rather than full enclosure) keeps a glyph that pokes
+ * a pixel outside its box with the rest of its line, which is what the box
+ * being a hint rather than a hard clip requires.
+ */
+function offsetPerElement(
+  traced: TracedRing[],
+  params: CutlineParams,
+  pxPerMm: number,
+  pad: number,
+  workScale: number,
+  globalOffsetPx: number
+): Pt[][] {
+  const regions = (params.regions ?? []).filter((r) => r.offsetMm != null);
+  // Work-space rectangles, matching the mask padding/scale.
+  const boxes = regions.map((r) => ({
+    x0: r.x * workScale + pad,
+    y0: r.y * workScale + pad,
+    x1: (r.x + r.w) * workScale + pad,
+    y1: (r.y + r.h) * workScale + pad,
+    deltaPx: (r.offsetMm as number) * pxPerMm,
+  }));
+
+  const buckets = new Map<number, TracedRing[]>();
+  for (const ring of traced) {
+    let cx = 0;
+    let cy = 0;
+    for (const p of ring.points) {
+      cx += p.x;
+      cy += p.y;
+    }
+    cx /= ring.points.length;
+    cy /= ring.points.length;
+
+    let delta = globalOffsetPx;
+    // Last matching region wins, so a later box can refine an earlier one.
+    for (const b of boxes) {
+      if (cx >= b.x0 && cx <= b.x1 && cy >= b.y0 && cy <= b.y1) delta = b.deltaPx;
+    }
+    const key = Math.round(delta * 1000) / 1000;
+    const list = buckets.get(key);
+    if (list) list.push(ring);
+    else buckets.set(key, [ring]);
+  }
+
+  return offsetGroupsUnion(
+    [...buckets.entries()].map(([deltaPx, rings]) => ({ rings, deltaPx }))
+  );
 }
 
 function boundsOf(rings: Pt[][]): { x: number; y: number; w: number; h: number } {
