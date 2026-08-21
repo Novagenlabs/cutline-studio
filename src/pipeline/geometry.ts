@@ -93,6 +93,103 @@ export function minRadiusClose(rings: TracedRing[], radiusPx: number): Pt[][] {
   }
 }
 
+/**
+ * Per-contour minimum-corner-radius closing (v3).
+ *
+ * The whole-set version above dilates every ring into one Clipper solution,
+ * so closing by r welds any two contours whose gap is under 2r — at the
+ * default 1mm radius that fuses letters spaced under 2mm, which is most
+ * text below ~72pt, and fills counters (the bowls of o/e/a) of the same
+ * scale. Closing exists only to guarantee a blade-clearance radius on
+ * *concave* corners, which is a property of a single contour; it was never
+ * meant to merge separate pieces of art.
+ *
+ * Closing each exterior contour with its own holes independently keeps that
+ * guarantee while leaving distinct glyphs distinct. Holes travel with the
+ * exterior that contains them so an inset counter is still closed against
+ * its own outline.
+ */
+export function minRadiusClosePerContour(rings: TracedRing[], radiusPx: number): Pt[][] {
+  const plain = rings.map((r) => r.points);
+  if (radiusPx <= 0.05 || plain.length === 0) return plain;
+
+  const outers = rings.filter((r) => !r.isHole);
+  const holes = rings.filter((r) => r.isHole);
+  // No exterior rings (shouldn't happen) — fall back to the global behavior.
+  if (!outers.length) return minRadiusClose(rings, radiusPx);
+
+  const out: Pt[][] = [];
+  for (const outer of outers) {
+    // Group holes by the exterior contour that contains them, so a counter
+    // is closed against its own glyph rather than against the whole word.
+    const owned = holes.filter((hole) => hole.points.length > 0 && pointInRing(hole.points[0], outer.points));
+    const group = owned.length ? [outer, ...owned] : [outer];
+
+    // Clamp the closing radius to the contour's own scale. Closing by r
+    // erases any feature narrower than 2r, so on a glyph whose counter or
+    // stem is thinner than that, an unclamped radius pinches the counter
+    // shut or splits it in two — which showed up as ring counts drifting
+    // both below and above the true contour count. A quarter of the
+    // smallest feature in the group keeps the blade-clearance guarantee
+    // wherever there is room for it, and backs off where there isn't.
+    let limit = ringScale(outer.points);
+    for (const h of owned) limit = Math.min(limit, ringScale(h.points));
+    const r = Math.min(radiusPx, Math.max(0, limit / 4));
+    if (r <= 0.05) {
+      out.push(...group.map((g) => g.points));
+      continue;
+    }
+
+    try {
+      const grown = runClipperOffset(toClipperPaths(group), r * CLIPPER_SCALE);
+      const closed = runClipperOffset(grown, -r * CLIPPER_SCALE);
+      if (closed.length) out.push(...fromClipper(closed));
+      else out.push(...group.map((g) => g.points));
+    } catch {
+      out.push(...group.map((g) => g.points));
+    }
+  }
+  // Any hole not contained by an exterior ring passes through untouched.
+  for (const hole of holes) {
+    if (!outers.some((o) => hole.points.length > 0 && pointInRing(hole.points[0], o.points))) {
+      out.push(hole.points);
+    }
+  }
+  return out.length ? out : plain;
+}
+
+/**
+ * Characteristic width of a ring: 2 * area / perimeter, i.e. the diameter of
+ * the disc with the same area-to-perimeter ratio. For a long thin stroke this
+ * is the stroke width, which is the dimension a closing radius can destroy.
+ */
+function ringScale(pts: Pt[]): number {
+  if (pts.length < 3) return 0;
+  let area = 0;
+  let perim = 0;
+  for (let i = 0, n = pts.length; i < n; i++) {
+    const p = pts[i];
+    const q = pts[(i + 1) % n];
+    area += p.x * q.y - q.x * p.y;
+    perim += Math.hypot(q.x - p.x, q.y - p.y);
+  }
+  if (perim <= 0) return 0;
+  return (2 * Math.abs(area / 2)) / perim;
+}
+
+/** Even-odd point-in-polygon test. */
+function pointInRing(p: Pt, ring: Pt[]): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const a = ring[i];
+    const b = ring[j];
+    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
 /** Schneider cubic fit of a closed ring. */
 export function fitBezierRing(pts: Pt[], maxError: number): BezierRing {
   const flat = pts.map((p) => [p.x, p.y]);

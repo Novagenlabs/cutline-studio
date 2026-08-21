@@ -10,6 +10,7 @@ import {
   fitBezierRing,
   fitRingWithCorners,
   minRadiusClose,
+  minRadiusClosePerContour,
   offsetTracedRings,
   roundedRectBezier,
   simplifyRing,
@@ -133,9 +134,15 @@ export class CutlineEngine {
     const bridgePx = Math.max(0, (params.bridgeMm / 2) * pxPerMm);
     const holeMinPx2 = Math.max(minIslandPx2, params.holeMinMm2 * pxPerMm * pxPerMm);
     const traceOpts = { keepHoles: params.keepHoles, minHoleAreaPx2: holeMinPx2 };
+    const v3 = params.engineVersion === 'v3';
     // Small offsets ride the subpixel field trace + exact geometric offset;
     // beyond this the EDT (which merges regions for free) takes over.
-    const geomLimitPx = 2 * pxPerMm;
+    // v3 keeps the exact geometric path at every offset: Clipper's round-join
+    // offset is a true Minkowski sum, so it merges touching bands the same way
+    // the EDT does, but without quantizing the result to the integer pixel
+    // grid — which is what produced a ~0.9px asymmetric error the moment the
+    // offset crossed this threshold.
+    const geomLimitPx = v3 ? Infinity : 2 * pxPerMm;
 
     let t = now();
     let traced: TracedRing[];
@@ -190,7 +197,9 @@ export class CutlineEngine {
 
     t = now();
     const cornerPx = params.minCornerRadiusMm * pxPerMm;
-    const closedRings = minRadiusClose(traced, cornerPx);
+    const closedRings = v3
+      ? minRadiusClosePerContour(traced, cornerPx)
+      : minRadiusClose(traced, cornerPx);
 
     // Fit in work space, then map to source px. Tolerances are physical (mm)
     // so fidelity doesn't depend on the working resolution. Corners are

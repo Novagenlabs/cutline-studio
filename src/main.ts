@@ -510,6 +510,11 @@ aiCheckbox.addEventListener('change', async () => {
   }
 });
 
+($('#in-engine') as HTMLSelectElement).addEventListener('change', (e) => {
+  state.params.engineVersion = (e.target as HTMLSelectElement).value as 'v2' | 'v3';
+  recompute(true);
+});
+
 ($('#in-v1') as HTMLInputElement).addEventListener('change', (e) => {
   state.compareV1 = (e.target as HTMLInputElement).checked;
   recompute(true);

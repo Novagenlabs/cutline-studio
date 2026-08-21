@@ -9,6 +9,19 @@ export type BezierRing = BezierSeg[];
 
 export type ShapeMode = 'contour' | 'rect' | 'rounded' | 'circle';
 
+/**
+ * Cutline engine version.
+ *
+ * - `v2` — the shipped engine, unchanged. Kept so existing jobs re-run
+ *   byte-identically.
+ * - `v3` — text-accurate engine. Closes the minimum corner radius per
+ *   contour instead of across the whole artwork (so letters spaced under
+ *   2x the radius are no longer welded together and counters survive), and
+ *   extends the subpixel geometric offset to all offset distances instead
+ *   of handing large offsets to the pixel-quantized EDT.
+ */
+export type EngineVersion = 'v2' | 'v3';
+
 /** Local parameter overrides applied inside a rectangle (source px). */
 export interface RegionOverride {
   x: number;
@@ -54,6 +67,8 @@ export interface CutlineParams {
   shape: ShapeMode;
   /** Per-rectangle overrides of threshold/denoise/body mode, feather-blended into the global field. */
   regions: RegionOverride[];
+  /** Which engine to trace with. Defaults to the original `v2` behavior. */
+  engineVersion: EngineVersion;
 }
 
 export const DEFAULT_PARAMS: CutlineParams = {
@@ -72,6 +87,7 @@ export const DEFAULT_PARAMS: CutlineParams = {
   minIslandMm2: 1,
   shape: 'contour',
   regions: [],
+  engineVersion: 'v2',
 };
 
 export interface CutlineResult {
