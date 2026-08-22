@@ -1,0 +1,185 @@
+// Cutline Studio — accounts, credits, and download ledger.
+//
+// The credit balance is NOT a mutable counter. It is the sum of an immutable
+// ledger of entries, because a counter that is read, decided on, and written
+// back is exactly the shape that double-spends under concurrent requests, and
+// because a paid product needs to be able to answer "why does this user have
+// this balance" months later. Grants are positive, spends negative.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------- auth (Auth.js)
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+
+  accounts     Account[]
+  sessions     Session[]
+  ledger       CreditEntry[]
+  downloads    Download[]
+  purchases    Purchase[]
+  exportTokens ExportToken[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ---------------------------------------------------------------- credits
+
+enum CreditReason {
+  SIGNUP_GRANT
+  PURCHASE
+  DOWNLOAD
+  REFUND
+  ADMIN_ADJUSTMENT
+}
+
+/// One immutable movement of credits. Balance = SUM(amount) for a user.
+model CreditEntry {
+  id        String       @id @default(cuid())
+  userId    String
+  /// Positive = granted, negative = spent. Never updated after insert.
+  amount    Int
+  reason    CreditReason
+  /// Free-text context for support ("Stripe cs_123", "signup").
+  note      String?
+  createdAt DateTime     @default(now())
+
+  /// Set for DOWNLOAD entries so a spend is traceable to what it bought.
+  downloadId String?   @unique
+  download   Download? @relation(fields: [downloadId], references: [id])
+
+  purchaseId String?
+  purchase   Purchase? @relation(fields: [purchaseId], references: [id])
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+enum PurchaseStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+model Purchase {
+  id        String         @id @default(cuid())
+  userId    String
+  credits   Int
+  /// Minor units (cents) in `currency`, recorded as charged.
+  amount    Int
+  currency  String         @default("cad")
+  status    PurchaseStatus @default(PENDING)
+  /// Stripe Checkout session id. Unique so a replayed webhook cannot
+  /// grant the same credits twice.
+  stripeSessionId String?  @unique
+  stripePaymentIntentId String?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entries CreditEntry[]
+
+  @@index([userId, createdAt])
+}
+
+// ---------------------------------------------------------------- downloads
+
+enum ExportFormat {
+  SVG
+  PDF
+  DXF
+  PNG
+}
+
+/// A completed, paid export. One row per credit spent, which makes the
+/// download count a query rather than a counter that can drift.
+model Download {
+  id        String       @id @default(cuid())
+  userId    String
+  format    ExportFormat
+  /// Bytes delivered, for support and abuse investigation.
+  bytes     Int
+  /// SHA-256 of the delivered file, so a support claim of "I never got it"
+  /// or "the file was wrong" can be checked against what was actually sent.
+  sha256    String
+  /// Name shown to the user, for their download history.
+  filename  String
+  ip        String?
+  userAgent String?      @db.Text
+  createdAt DateTime     @default(now())
+
+  user  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entry CreditEntry?
+
+  @@index([userId, createdAt])
+}
+
+/// Single-use authorisation to run one export.
+///
+/// Issued before the (slow) render and redeemed inside the same transaction
+/// that writes the Download and the negative CreditEntry. Without this, a
+/// client could fire N concurrent export requests that each read the same
+/// balance before any of them wrote a spend.
+model ExportToken {
+  id        String       @id @default(cuid())
+  userId    String
+  format    ExportFormat
+  /// Hash of the export request payload. Binding the token to the exact
+  /// request stops a token issued for a cheap export being redeemed for a
+  /// different one.
+  requestHash String
+  redeemedAt  DateTime?
+  expiresAt   DateTime
+  createdAt   DateTime   @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
