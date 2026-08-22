@@ -12,13 +12,14 @@ export type ShapeMode = 'contour' | 'rect' | 'rounded' | 'circle';
 /**
  * Cutline engine version.
  *
- * - `v2` — the shipped engine, unchanged. Kept so existing jobs re-run
- *   byte-identically.
- * - `v3` — text-accurate engine. Closes the minimum corner radius per
- *   contour instead of across the whole artwork (so letters spaced under
- *   2x the radius are no longer welded together and counters survive), and
- *   extends the subpixel geometric offset to all offset distances instead
- *   of handing large offsets to the pixel-quantized EDT.
+ * - `v3` — the default. Closes the minimum corner radius per contour instead
+ *   of across the whole artwork (so letters spaced under 2x the radius are no
+ *   longer welded together and counters survive), keeps the subpixel geometric
+ *   offset at all offset distances instead of handing large offsets to the
+ *   pixel-quantized EDT, honours `precisionMm` as a real bound on the fit, and
+ *   supports per-element offsets via `RegionOverride.offsetMm`.
+ * - `v2` — the previous engine, kept so a job cut on it can be reproduced
+ *   exactly. Selectable from the Engine control; nothing in v3 removes it.
  */
 export type EngineVersion = 'v2' | 'v3';
 
@@ -97,7 +98,7 @@ export const DEFAULT_PARAMS: CutlineParams = {
   minIslandMm2: 1,
   shape: 'contour',
   regions: [],
-  engineVersion: 'v2',
+  engineVersion: 'v3',
 };
 
 export interface CutlineResult {

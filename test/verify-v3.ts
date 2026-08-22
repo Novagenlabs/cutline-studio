@@ -53,12 +53,18 @@ const check = (ok: boolean, msg: string) => { console.log(`  ${ok ? 'ok ' : 'FAI
     check(v3.rings.length === 7, `${fontPx}px v3 resolves all 7 contours`);
   }
 
-  console.log('\n--- FIX 1: v2 output is unchanged (regression guard) ---');
+  console.log('\n--- v3 is the default, and v2 is still reachable ---');
   {
     const img = await renderText('Hello', 120);
-    const a = new CutlineEngine(img, 1).compute({ ...base, offsetMm: 0, engineVersion: 'v2' });
-    const b = new CutlineEngine(img, 1).compute({ ...base, offsetMm: 0 }); // default
-    check(a.svgPath === b.svgPath, 'default params still produce v2 output byte-identically');
+    const dflt = new CutlineEngine(img, 1).compute({ ...base, offsetMm: 0 }); // no engineVersion
+    const v3 = new CutlineEngine(img, 1).compute({ ...base, offsetMm: 0, engineVersion: 'v3' });
+    const v2 = new CutlineEngine(img, 1).compute({ ...base, offsetMm: 0, engineVersion: 'v2' });
+    check(DEFAULT_PARAMS.engineVersion === 'v3', 'DEFAULT_PARAMS selects v3');
+    check(dflt.svgPath === v3.svgPath, 'default params produce v3 output byte-identically');
+    // v2 must remain available and behave as it always did, so a job cut on
+    // the old engine can still be reproduced exactly.
+    check(v2.svgPath !== v3.svgPath, 'v2 is still a distinct engine, not an alias');
+    check(v2.rings.length === 2, 'v2 still welds "Hello" at 120px as it always did');
   }
 
   console.log('\n--- FIX 2: offset accuracy across the old 2mm cutoff ---');
