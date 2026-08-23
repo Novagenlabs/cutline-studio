@@ -1,6 +1,6 @@
 # Cutline Studio
 
-A fully client-side web app that auto-generates **cutlines / cut contours** from artwork —
+A web app that auto-generates **cutlines / cut contours** from artwork —
 the job you'd otherwise do by hand in Adobe Illustrator (Image Trace → Offset Path →
 Simplify → spot-color stroke) or CorelDRAW (Boundary → Contour → Break Apart).
 Built for print-and-cut workflows: stickers, vinyl decals, kiss-cut sheets, DTF transfers.
@@ -9,12 +9,25 @@ Built for print-and-cut workflows: stickers, vinyl decals, kiss-cut sheets, DTF 
 
 ```sh
 npm install
-npm run dev      # http://localhost:5173
-npm run smoke    # headless pipeline test (node, no browser)
-npm run build    # production build to dist/
+cp .env.example .env   # DATABASE_URL, AUTH_SECRET, Google + Stripe keys
+npx prisma db push
+npm run dev            # http://localhost:3000
+npm run smoke          # headless pipeline test (node, no browser)
+npm test               # server suites (needs DATABASE_URL)
 ```
 
-Everything runs in the browser — no server, no uploads leave the machine.
+One app. Next serves the cutter at `/`, the account at `/account`, and the
+API at `/api/*`.
+
+**Tracing runs in your browser** — artwork is not uploaded to preview a
+cutline, and the preview is instant because nothing round-trips. **Cut files
+are generated on the server** after a credit is charged: a file the browser
+can build is a file the browser already has, so the only way to actually gate
+a download is to not build it there. SVG and DXF need geometry alone, so for
+those the artwork still never leaves your machine; PDF and PNG must embed the
+raster, so it is sent at that moment and held only in memory.
+
+See BACKEND.md for the credit ledger and payment design.
 
 ## What it does
 

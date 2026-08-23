@@ -14,11 +14,11 @@ const check = (ok: boolean, msg: string) => { console.log(`  ${ok ? 'ok ' : 'FAI
 async function loadFixtures(names: string[]): Promise<Record<string, RasterImage>> {
   const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ['--no-sandbox'] });
   const page = await browser.newPage();
-  await page.goto('http://localhost:5173/', { waitUntil: 'networkidle2' });
+  await page.goto('http://localhost:3000/', { waitUntil: 'networkidle2' });
   const out: Record<string, RasterImage> = {};
   for (const n of names) {
     const d = (await page.evaluate(`(async () => {
-      const r = await fetch('/test/fixtures/${n}.png');
+      const r = await fetch('/test-fixtures/${n}.png');
       const bmp = await createImageBitmap(await r.blob());
       const c = document.createElement('canvas');
       c.width = bmp.width; c.height = bmp.height;

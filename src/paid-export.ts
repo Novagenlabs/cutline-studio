@@ -38,8 +38,8 @@ export class ExportError extends Error {
   }
 }
 
-/** Where the account/API server lives. Same origin unless configured. */
-const API = (import.meta.env?.VITE_API_URL as string | undefined) ?? '';
+// One app, one origin: the API is served by the same server as this page.
+const API = '';
 
 const EXT: Record<PaidFormat, string> = { SVG: 'svg', PDF: 'pdf', DXF: 'dxf', PNG: 'png' };
 

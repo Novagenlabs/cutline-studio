@@ -53,7 +53,7 @@ describe('server PNG framing matches the client', () => {
 
   it('the transcription still matches the real client source', () => {
     // Guard against this test drifting from the file it claims to mirror.
-    const src = readFileSync(join(__dirname, '../../src/export/png.ts'), 'utf8');
+    const src = readFileSync(join(__dirname, '../src/export/png.ts'), 'utf8');
     expect(src).toContain('const pad = 4;');
     expect(src).toContain('Math.floor(Math.min(0, opts.cutBbox.x)) - pad');
     expect(src).toContain('Math.ceil(Math.max(opts.srcW, opts.cutBbox.x + opts.cutBbox.w)) + pad');

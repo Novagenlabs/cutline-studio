@@ -1,32 +1,51 @@
 {
   "name": "cutline-studio",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
+    "dev": "npm run build:cutter && next dev",
+    "build": "npm run build:cutter && prisma generate && next build",
+    "start": "next start",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio",
     "smoke": "tsx test/smoke.ts",
+    "test": "vitest run",
     "verify:v3": "tsx test/verify-v3.ts",
     "verify:group": "tsx test/verify-group.ts",
     "verify:offset": "tsx test/verify-offset.ts",
-    "verify:edge": "tsx test/verify-edge.ts"
+    "verify:edge": "tsx test/verify-edge.ts",
+    "build:cutter": "esbuild src/main.ts --bundle --format=esm --outfile=public/cutline/app.js --target=es2022"
   },
   "dependencies": {
+    "@auth/prisma-adapter": "^2.11.1",
+    "@napi-rs/canvas": "^1.0.7",
+    "@prisma/client": "^6.19.1",
     "clipper-lib": "^6.4.2",
     "d3-contour": "^4.0.2",
     "dxf-writer": "^1.18.4",
     "fit-curve": "^0.2.0",
+    "next": "16.1.1",
+    "next-auth": "^5.0.0-beta.30",
+    "nodemailer": "^8.0.11",
     "onnxruntime-web": "1.27.0",
     "pdf-lib": "^1.17.1",
-    "simplify-js": "^1.2.4"
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "simplify-js": "^1.2.4",
+    "stripe": "^19.2.0",
+    "zod": "^4.3.5"
   },
   "devDependencies": {
     "@types/d3-contour": "^3.0.6",
+    "@types/node": "^26.2.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "prisma": "^6.19.1",
     "puppeteer-core": "^25.6.0",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3",
-    "vite": "^6.0.0"
+    "vitest": "^3.2.4",
+    "esbuild": "^0.25.0"
   }
 }

@@ -636,12 +636,8 @@ window.addEventListener('drop', (e) => {
 
 /* ---------------- account ---------------- */
 
-/**
- * Where the account lives. Same origin in production; in development the
- * cutter runs on Vite (5173) and the account server on Next (3000), so the
- * two are configured separately rather than assumed to be together.
- */
-const ACCOUNT_URL = (import.meta.env?.VITE_ACCOUNT_URL as string | undefined) ?? '/account';
+/** The account page, served by this same app. */
+const ACCOUNT_URL = '/account';
 
 function renderBalance() {
   const el = $<HTMLAnchorElement>('#st-credits');

@@ -11,7 +11,7 @@ import { renderExport, type RenderInput } from '../src/lib/render';
 
 describe('render timing', () => {
   it('measures each format on realistic artwork', async () => {
-    const logo = readFileSync(new URL('../../test/fixtures/feelathome.png', import.meta.url));
+    const logo = readFileSync(new URL('./fixtures/feelathome.png', import.meta.url));
     const dataUrl = `data:image/png;base64,${logo.toString('base64')}`;
 
     // ~32 contours, matching the Feel at Home logo at flush cut.

@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { auth, signIn, signOut } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getBalance, getDownloadCount, SIGNUP_GRANT } from '@/lib/credits';
-import { PACKS } from './api/stripe/checkout/route';
+import { PACKS } from '../api/stripe/checkout/route';
 
 export const dynamic = 'force-dynamic';
 
