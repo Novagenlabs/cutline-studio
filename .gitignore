@@ -1,2 +1,7 @@
 node_modules
 dist
+
+# Secrets — never commit. Neon URLs and Stripe keys live here.
+.env
+.env.*
+!.env.example
