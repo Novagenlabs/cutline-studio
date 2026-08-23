@@ -9,18 +9,22 @@ already used in novacrm.
 **Scaffold, not deployed.** The credit ledger, export authorisation, Stripe
 checkout and webhook, and the export route are written. What is NOT done:
 
-- `src/lib/raster-server.ts` (PNG via `@napi-rs/canvas`) is imported but not written
-- the shared `@cutline/pipeline` package alias does not exist yet — today the
-  export builders live in the client's `src/export/`, and they must be moved to
-  a package both sides import so the server and preview can never disagree
-- no `next.config`, sign-in pages, or account UI (a `package.json` scoped to
-  the ledger tests exists; the Next app itself is not wired up)
+- no `next.config`, sign-in pages, or account UI — the Next app itself is not
+  wired up, so the API routes are written but have never served a request
 - the client still exports locally (see "Client changes still required")
+- Stripe has never been exercised against real keys; only the ledger logic
+  behind the webhook is tested
 
-The ledger tests HAVE now been run, against a real Neon Postgres: 20/20
-passing, stable across repeated runs. That covers double-spend, the
-concurrent-redemption race, overdraw across parallel exports, expired and
-cross-user tokens, and Stripe webhook replay.
+Done and verified (35 tests passing):
+
+- the credit ledger, against a real Neon Postgres — double-spend, the
+  concurrent-redemption race, overdraw across parallel exports, expired and
+  cross-user tokens, Stripe webhook replay, spend-to-file traceability
+- server-side rendering of all four formats through the SHARED client
+  builders, so a paid file cannot differ from the approved preview
+- PNG framing pinned to the client's arithmetic by test, since that one piece
+  is necessarily duplicated (a Node canvas cannot be driven through the DOM
+  canvas API)
 
 ## Setup
 

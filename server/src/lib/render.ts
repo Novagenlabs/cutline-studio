@@ -1,28 +1,34 @@
 import { buildSvg } from '@cutline/pipeline/export/svg';
 import { buildDxf } from '@cutline/pipeline/export/dxf';
 import { buildPdf } from '@cutline/pipeline/export/pdf';
+import type { BezierRing, Pt } from '@cutline/pipeline/pipeline/types';
 import { provenanceComment } from './watermark';
 
 /**
  * Server-side rendering of the paid artifact.
  *
- * These are the SAME builders the browser uses for its preview, imported from
- * the shared pipeline rather than reimplemented — two implementations of the
- * same cut geometry would eventually disagree, and a customer receiving a file
- * that differs from the preview they approved is the worst possible bug in a
- * print-and-cut product.
+ * These are the SAME builders the browser uses, imported from the shared
+ * package rather than reimplemented. Two implementations of one cut geometry
+ * would eventually disagree, and a customer receiving a file that differs
+ * from the preview they approved is the worst possible bug in a print-and-cut
+ * product.
  *
- * Nothing here touches the filesystem. The artwork arrives in the request,
- * lives in memory for the duration of the render, and is gone when the
- * response is written.
+ * Nothing here touches the filesystem. Artwork arrives in the request, lives
+ * in memory for the render, and is gone when the response is written.
  */
 
 export interface RenderInput {
   format: 'SVG' | 'PDF' | 'DXF' | 'PNG';
-  beziers: number[][][][];
-  widthMm: number;
-  heightMm: number;
+  /** Cut geometry in SOURCE PIXELS, matching what the builders expect. */
+  rings: Pt[][];
+  beziers: BezierRing[];
+  svgPath: string;
+  cutBbox: { x: number; y: number; w: number; h: number };
+  srcW: number;
+  srcH: number;
   dpi: number;
+  spotName: string;
+  halo: boolean;
   imageDataUrl?: string;
 }
 
@@ -30,62 +36,61 @@ export async function renderExport(
   input: RenderInput,
   downloadId?: string
 ): Promise<{ bytes: Uint8Array; mime: string; ext: string }> {
-  const beziers = toBezierRings(input.beziers);
   const note = downloadId ? provenanceComment(downloadId) : undefined;
 
   switch (input.format) {
     case 'SVG': {
       const svg = buildSvg({
-        beziers,
-        widthMm: input.widthMm,
-        heightMm: input.heightMm,
+        srcW: input.srcW,
+        srcH: input.srcH,
         dpi: input.dpi,
+        svgPath: input.svgPath,
+        cutBbox: input.cutBbox,
+        imageDataUrl: input.imageDataUrl,
+        halo: input.halo,
+        spotName: input.spotName,
       });
       // Provenance rides in a comment: invisible to a cutter, present if the
-      // file later needs to be traced back to the account that bought it.
-      const withNote = note ? svg.replace(/^(<\?xml[^>]*>\s*)?/, (m) => `${m}<!-- ${note} -->\n`) : svg;
-      return { bytes: new TextEncoder().encode(withNote), mime: 'image/svg+xml', ext: 'svg' };
+      // file later needs tracing back to the account that bought it.
+      const out = note ? svg.replace(/^(<\?xml[^>]*>\s*)?/, (m) => `${m}<!-- ${note} -->\n`) : svg;
+      return { bytes: new TextEncoder().encode(out), mime: 'image/svg+xml', ext: 'svg' };
     }
+
     case 'DXF': {
       const dxf = buildDxf({
-        beziers,
-        widthMm: input.widthMm,
-        heightMm: input.heightMm,
+        rings: input.rings,
+        srcH: input.srcH,
         dpi: input.dpi,
+        layerName: input.spotName,
       });
-      return { bytes: new TextEncoder().encode(dxf), mime: 'application/dxf', ext: 'dxf' };
+      // DXF comments are `999` group codes, which every reader skips.
+      const out = note ? `999\n${note}\n${dxf}` : dxf;
+      return { bytes: new TextEncoder().encode(out), mime: 'application/dxf', ext: 'dxf' };
     }
+
     case 'PDF': {
       if (!input.imageDataUrl) throw new Error('PDF export needs the artwork');
       const bytes = await buildPdf({
-        beziers,
-        widthMm: input.widthMm,
-        heightMm: input.heightMm,
+        srcW: input.srcW,
+        srcH: input.srcH,
         dpi: input.dpi,
-        imageBytes: dataUrlToBytes(input.imageDataUrl),
-      } as Parameters<typeof buildPdf>[0]);
+        beziers: input.beziers,
+        cutBbox: input.cutBbox,
+        pngBytes: dataUrlToBytes(input.imageDataUrl),
+        spotName: input.spotName,
+      });
       return { bytes, mime: 'application/pdf', ext: 'pdf' };
     }
+
     case 'PNG': {
       if (!input.imageDataUrl) throw new Error('PNG export needs the artwork');
-      // The raster builder needs a canvas; on the server that comes from
-      // @napi-rs/canvas, which implements the same 2D API the browser path
-      // uses, so drawWatermark and the raster builder are shared unchanged.
+      // The raster builder needs a canvas and an <img>; on the server those
+      // come from @napi-rs/canvas, which implements the same 2D API.
       const { renderRasterServer } = await import('./raster-server');
       const bytes = await renderRasterServer(input);
       return { bytes, mime: 'image/png', ext: 'png' };
     }
   }
-}
-
-/** The wire format is plain arrays; the builders want {x,y} points. */
-function toBezierRings(rings: number[][][][]) {
-  return rings.map((ring) =>
-    ring.map((seg) => seg.map(([x, y]) => ({ x, y })) as [
-      { x: number; y: number }, { x: number; y: number },
-      { x: number; y: number }, { x: number; y: number }
-    ])
-  );
 }
 
 function dataUrlToBytes(dataUrl: string): Uint8Array {
