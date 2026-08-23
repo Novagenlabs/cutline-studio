@@ -5,8 +5,8 @@ dist
 .next
 next-env.d.ts
 
-# Built by `npm run build:cutter` from src/main.ts
-public/cutline/app.js
+# Built by `npm run build:cutter` from index.html + src/
+public/cutline/
 
 # Secrets — never commit. Neon URLs and Stripe keys live here.
 .env
