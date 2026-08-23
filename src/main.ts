@@ -1,11 +1,10 @@
 import { CutlineEngine, DEFAULT_PARAMS } from './pipeline';
 import type { CutlineParams, CutlineResult, RasterImage, RegionOverride, ShapeMode } from './pipeline';
 import { computeAiMatte, matteToImage } from './ai/matte';
-import { buildSvg } from './export/svg';
-import { buildPdf } from './export/pdf';
-import { buildDxf } from './export/dxf';
 import { buildRaster } from './export/png';
 import { makeSampleImage } from './ui/sample';
+import { requestExport, fetchBalance, ExportError } from './paid-export';
+import type { PaidFormat } from './paid-export';
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string) =>
   document.querySelector(sel) as T;
@@ -34,6 +33,8 @@ interface AppState {
   workScale: number;
   aiEngine: CutlineEngine | null;
   useAi: boolean;
+  /** Credits left, or null when signed out / the account server is unreachable. */
+  balance: number | null;
 }
 
 const state: AppState = {
@@ -53,6 +54,7 @@ const state: AppState = {
   workScale: 1,
   aiEngine: null,
   useAi: false,
+  balance: null,
 };
 
 const activeRegion = (): RegionOverride | null =>
@@ -632,62 +634,110 @@ window.addEventListener('drop', (e) => {
   if (f && f.type.startsWith('image/')) loadFile(f);
 });
 
-/* ---------------- exports ---------------- */
+/* ---------------- account ---------------- */
 
-function download(name: string, data: Blob | string, mime = 'application/octet-stream') {
-  const blob = typeof data === 'string' ? new Blob([data], { type: mime }) : data;
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 4000);
+/**
+ * Where the account lives. Same origin in production; in development the
+ * cutter runs on Vite (5173) and the account server on Next (3000), so the
+ * two are configured separately rather than assumed to be together.
+ */
+const ACCOUNT_URL = (import.meta.env?.VITE_ACCOUNT_URL as string | undefined) ?? '/account';
+
+function renderBalance() {
+  const el = $<HTMLAnchorElement>('#st-credits');
+  if (!el) return;
+  el.href = ACCOUNT_URL;
+  el.target = '_blank';
+  el.rel = 'noopener';
+  if (state.balance === null) {
+    el.textContent = 'not signed in';
+    el.title = 'Sign in to download cut files';
+  } else {
+    el.textContent = `${state.balance} credit${state.balance === 1 ? '' : 's'}`;
+    el.title = state.balance === 0 ? 'Buy credits to download' : 'Credits remaining';
+  }
 }
 
-$('#btn-svg').addEventListener('click', () => {
-  if (!state.result) return;
-  const svg = buildSvg({
-    srcW: state.srcW,
-    srcH: state.srcH,
-    dpi: state.params.dpi,
-    svgPath: state.result.svgPath,
-    cutBbox: state.result.bbox,
-    imageDataUrl: state.imageDataUrl,
-    halo: state.halo,
-    spotName: state.spotName,
-  });
-  download(`${state.fileBase}-cut.svg`, svg, 'image/svg+xml');
+// Advisory only — the export route re-checks the balance when it charges, so
+// a stale number here cannot buy anything.
+void fetchBalance().then((b) => {
+  state.balance = b;
+  renderBalance();
 });
 
-$('#btn-pdf').addEventListener('click', async () => {
-  if (!state.result) return;
-  const pngBytes = new Uint8Array(
-    await (await (await fetch(state.imageDataUrl)).blob()).arrayBuffer()
-  );
-  const bytes = await buildPdf({
-    srcW: state.srcW,
-    srcH: state.srcH,
-    dpi: state.params.dpi,
-    beziers: state.result.beziers,
-    cutBbox: state.result.bbox,
-    pngBytes,
-    spotName: state.spotName,
-  });
-  download(`${state.fileBase}-cut.pdf`, new Blob([bytes as BlobPart], { type: 'application/pdf' }));
-});
+/* ---------------- exports ---------------- */
 
-$('#btn-dxf').addEventListener('click', () => {
+/**
+ * Cut files come from the server.
+ *
+ * The preview is computed here and stays here — that is what makes the app
+ * fast and keeps artwork on the customer's machine. The deliverable is not:
+ * it is generated server-side after a credit is charged, because a file the
+ * browser can build is a file the browser already has, and a credit check in
+ * front of that only stops the people who were never going to bypass it.
+ */
+async function paidExport(format: PaidFormat) {
   if (!state.result) return;
-  const dxf = buildDxf({
-    rings: state.result.rings,
-    srcH: state.srcH,
-    dpi: state.params.dpi,
-    layerName: state.spotName,
-  });
-  download(`${state.fileBase}-cut.dxf`, dxf, 'application/dxf');
-});
+  const btn = $(`#btn-${format.toLowerCase()}`) as HTMLButtonElement;
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'preparing...';
+  try {
+    const { filename, creditsRemaining } = await requestExport(format, {
+      result: state.result,
+      srcW: state.srcW,
+      srcH: state.srcH,
+      dpi: state.params.dpi,
+      spotName: state.spotName,
+      halo: state.halo,
+      fileBase: state.fileBase,
+      imageDataUrl: state.imageDataUrl,
+    });
+    state.balance = creditsRemaining;
+    renderBalance();
+    toast(
+      creditsRemaining === null
+        ? `${filename} downloaded.`
+        : `${filename} downloaded - ${creditsRemaining} credit${creditsRemaining === 1 ? '' : 's'} left`,
+      'info',
+      5000
+    );
+  } catch (err) {
+    if (err instanceof ExportError) {
+      // Each failure implies a different next step, so they get different
+      // words rather than one generic "export failed".
+      if (err.kind === 'auth') {
+        toast('Sign in to download - opening your account.', 'error', 6000);
+        window.open(ACCOUNT_URL, '_blank', 'noopener');
+      } else if (err.kind === 'credits') {
+        toast('Out of credits - buy more to keep downloading.', 'error', 7000);
+        window.open(ACCOUNT_URL, '_blank', 'noopener');
+      } else if (err.kind === 'rate') {
+        toast('Too many exports just now. Try again in a moment.', 'error', 6000);
+      } else {
+        toast(err.message, 'error', 6000);
+      }
+    } else {
+      toast(`Export failed: ${err instanceof Error ? err.message : err}`, 'error', 6000);
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = label;
+  }
+}
 
-async function exportRaster(format: 'png' | 'jpeg') {
+$('#btn-svg').addEventListener('click', () => paidExport('SVG'));
+$('#btn-pdf').addEventListener('click', () => paidExport('PDF'));
+$('#btn-dxf').addEventListener('click', () => paidExport('DXF'));
+$('#btn-png').addEventListener('click', () => paidExport('PNG'));
+
+/**
+ * JPEG stays local and free. It has no alpha channel, so it cannot carry a
+ * cutline at all — it is a flattened proof to email a print shop, not
+ * something a cutter can use. Charging for it would be charging for a
+ * screenshot.
+ */
+async function exportJpegLocal() {
   if (!state.result || !state.imageEl) return;
   try {
     const blob = await buildRaster({
@@ -697,15 +747,17 @@ async function exportRaster(format: 'png' | 'jpeg') {
       svgPath: state.result.svgPath,
       cutBbox: state.result.bbox,
       halo: state.halo,
-      format,
+      format: 'jpeg',
     });
-    console.log(`exportRaster ${format}: ${blob.size} bytes`);
-    download(`${state.fileBase}-print.${format === 'jpeg' ? 'jpg' : 'png'}`, blob);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${state.fileBase}-proof.jpg`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
   } catch (err) {
-    console.error('exportRaster failed', err);
-    toast(`${format.toUpperCase()} export failed: ${err instanceof Error ? err.message : err}`, 'error');
+    toast(`JPEG proof failed: ${err instanceof Error ? err.message : err}`, 'error');
   }
 }
 
-$('#btn-png').addEventListener('click', () => exportRaster('png'));
-$('#btn-jpg').addEventListener('click', () => exportRaster('jpeg'));
+$('#btn-jpg').addEventListener('click', exportJpegLocal);
