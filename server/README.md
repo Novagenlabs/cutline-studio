@@ -13,20 +13,26 @@ checkout and webhook, and the export route are written. What is NOT done:
 - the shared `@cutline/pipeline` package alias does not exist yet — today the
   export builders live in the client's `src/export/`, and they must be moved to
   a package both sides import so the server and preview can never disagree
-- no `package.json`, `next.config`, sign-in pages, or account UI
+- no `next.config`, sign-in pages, or account UI (a `package.json` scoped to
+  the ledger tests exists; the Next app itself is not wired up)
 - the client still exports locally (see "Client changes still required")
-- **the database tests have never been run** — there is no Postgres on this
-  machine. `test/credits.test.ts` is written against a real database on purpose;
-  run it before trusting any claim below.
+
+The ledger tests HAVE now been run, against a real Neon Postgres: 20/20
+passing, stable across repeated runs. That covers double-spend, the
+concurrent-redemption race, overdraw across parallel exports, expired and
+cross-user tokens, and Stripe webhook replay.
 
 ## Setup
 
 ```sh
-createdb cutline
-export DATABASE_URL=postgresql://localhost/cutline
+cp .env.example .env    # fill in DATABASE_URL (Neon pooled URL is fine)
+npm install
 npx prisma db push
-npx vitest run          # requires DATABASE_URL
+npm test                # 20 tests, ~75s against a hosted database
 ```
+
+Note `npm test` needs `DATABASE_URL` exported or present in the environment —
+Prisma reads `.env` relative to the working directory, so run it from `server/`.
 
 Environment: `DATABASE_URL`, `AUTH_SECRET`, `APP_URL`, `STRIPE_SECRET_KEY`,
 `STRIPE_WEBHOOK_SECRET`, plus Google OAuth or SMTP for sign-in.

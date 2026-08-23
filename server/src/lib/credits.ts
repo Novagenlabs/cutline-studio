@@ -7,6 +7,30 @@ export const COST_PER_DOWNLOAD = 1;
 /** How long an issued export authorisation stays valid. */
 const TOKEN_TTL_MS = 5 * 60 * 1000;
 
+/**
+ * Transaction settings for every money-touching operation.
+ *
+ * Serializable is the isolation these need: the balance is read and then
+ * written inside the same transaction, and anything weaker allows two
+ * concurrent spends to both observe the pre-spend balance and both commit.
+ *
+ * The timeouts are raised well above Prisma's defaults (5s timeout, 2s
+ * maxWait) because those are sized for a database on the same machine. A
+ * hosted Postgres is tens to hundreds of ms away and these transactions make
+ * several round trips, so the default expires mid-transaction under entirely
+ * normal conditions — which surfaces as "Transaction not found ... refers to
+ * an old closed transaction", an error that reads like a connection fault
+ * rather than a timeout. Retrying a serialization conflict is safe here
+ * (the token claim makes redemption idempotent), but a transaction killed by
+ * the clock is not something the caller can distinguish, so the budget has to
+ * be generous enough that it never happens in normal operation.
+ */
+const TX_OPTS = {
+  isolationLevel: 'Serializable',
+  timeout: 20_000,
+  maxWait: 10_000,
+} as const;
+
 export class InsufficientCredits extends Error {
   constructor(readonly balance: number) {
     super('Insufficient credits');
@@ -166,7 +190,7 @@ export async function redeemExportToken(
 
       return { downloadId: download.id, balance: balance - COST_PER_DOWNLOAD };
     },
-    { isolationLevel: 'Serializable' }
+    TX_OPTS
   );
 }
 
@@ -216,7 +240,7 @@ export async function creditPurchase(
       });
       return { granted: true };
     },
-    { isolationLevel: 'Serializable' }
+    TX_OPTS
   );
 }
 
