@@ -4,6 +4,8 @@ import { computeAiMatte, matteToImage } from './ai/matte';
 import { buildRaster } from './export/png';
 import { makeSampleImage } from './ui/sample';
 import { requestExport, fetchBalance, ExportError } from './paid-export';
+import { PRESETS, matchPreset } from './presets';
+import type { PresetId } from './presets';
 import type { PaidFormat } from './paid-export';
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string) =>
@@ -521,6 +523,7 @@ bindSlider('#in-precision', '#out-precision', (v) => `±${v.toFixed(2)} mm`, (v)
 
 ($('#in-holes') as HTMLInputElement).addEventListener('change', (e) => {
   state.params.keepHoles = (e.target as HTMLInputElement).checked;
+  ($('#in-holes-simple') as HTMLInputElement).checked = state.params.keepHoles;
   recompute(true);
 });
 
@@ -632,6 +635,91 @@ window.addEventListener('drop', (e) => {
   app.classList.remove('dragover');
   const f = e.dataTransfer?.files?.[0];
   if (f && f.type.startsWith('image/')) loadFile(f);
+});
+
+/* ---------------- simple / advanced ---------------- */
+
+/**
+ * Simple mode picks a cut style; advanced exposes every control.
+ *
+ * The rail is not duplicated — advanced shows the same sections simple hides,
+ * so there is one source of truth for every parameter and no chance of the
+ * two modes disagreeing about what the cut currently is.
+ */
+function setMode(mode: 'simple' | 'advanced') {
+  const simple = mode === 'simple';
+  document.body.classList.toggle('mode-simple', simple);
+  $('#tab-simple').classList.toggle('active', simple);
+  $('#tab-advanced').classList.toggle('active', !simple);
+  $('#tab-simple').setAttribute('aria-selected', String(simple));
+  $('#tab-advanced').setAttribute('aria-selected', String(!simple));
+  if (simple) syncPresetSelection();
+}
+
+function applyPreset(id: PresetId) {
+  const preset = PRESETS[id];
+  Object.assign(state.params, preset.params);
+  // The advanced sliders must show what the preset chose, or switching tabs
+  // would present stale values that no longer describe the cut.
+  syncCutControls();
+  syncPresetSelection();
+  recompute(true);
+}
+
+/** Reflect params in the advanced Cut path controls. */
+function syncCutControls() {
+  const p = state.params;
+  const set = (sel: string, out: string, v: number, fmt: (n: number) => string) => {
+    const el = $(sel) as HTMLInputElement | null;
+    if (el) el.value = String(v);
+    const o = $(out);
+    if (o) o.textContent = fmt(v);
+  };
+  set('#in-offset', '#out-offset', p.offsetMm, (v) => `${v.toFixed(1)} mm`);
+  set('#in-corner', '#out-corner', p.minCornerRadiusMm, (v) => `${v.toFixed(1)} mm`);
+  set('#in-precision', '#out-precision', p.precisionMm, (v) => `±${v.toFixed(2)} mm`);
+  set('#in-smooth', '#out-smooth', p.smoothness, (v) => String(v));
+  set('#in-bridge', '#out-bridge', p.bridgeMm, (v) => (v === 0 ? 'off' : `${v.toFixed(1)} mm`));
+}
+
+/**
+ * Highlight the preset that matches the current parameters, or none.
+ *
+ * Leaving every button unlit after an advanced tweak is deliberate: a lit
+ * button would be claiming to describe a cut it no longer describes.
+ */
+function syncPresetSelection() {
+  const active = matchPreset(state.params);
+  for (const btn of document.querySelectorAll<HTMLButtonElement>('.preset')) {
+    btn.classList.toggle('active', btn.dataset.preset === active);
+  }
+  const hint = $('#preset-hint');
+  if (hint) {
+    hint.textContent = active
+      ? PRESETS[active].hint
+      : 'Custom settings from the Advanced tab.';
+  }
+  const holes = $('#in-holes-simple') as HTMLInputElement | null;
+  if (holes) holes.checked = state.params.keepHoles;
+}
+
+// Simple is the default: it is the mode that answers the question most
+// people arrive with, and Advanced is one click away.
+setMode('simple');
+applyPreset('sticker');
+
+$('#tab-simple').addEventListener('click', () => setMode('simple'));
+$('#tab-advanced').addEventListener('click', () => setMode('advanced'));
+
+for (const btn of document.querySelectorAll<HTMLButtonElement>('.preset')) {
+  btn.addEventListener('click', () => applyPreset(btn.dataset.preset as PresetId));
+}
+
+// The two "cut interior holes" checkboxes are one setting shown twice.
+$('#in-holes-simple').addEventListener('change', (e) => {
+  state.params.keepHoles = (e.target as HTMLInputElement).checked;
+  ($('#in-holes') as HTMLInputElement).checked = state.params.keepHoles;
+  recompute(true);
 });
 
 /* ---------------- account ---------------- */

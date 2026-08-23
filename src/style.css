@@ -545,3 +545,88 @@ input[type='checkbox'] {
   border-color: var(--accent);
   color: var(--accent);
 }
+
+/* ---------------- simple / advanced ---------------- */
+
+.mode-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 10px 12px 0;
+  background: var(--panel);
+}
+
+.mode-tab {
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.mode-tab.active {
+  color: var(--accent);
+  background: var(--panel);
+  border-color: var(--accent);
+}
+
+/* Advanced controls are hidden, not duplicated, so both modes read the same
+   state and cannot disagree about what the cut currently is. */
+body.mode-simple .rail > .group:not(#panel-simple):not(.always-on) {
+  display: none;
+}
+
+body:not(.mode-simple) #panel-simple {
+  display: none;
+}
+
+.preset-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.preset {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.preset:hover {
+  border-color: var(--accent);
+}
+
+.preset.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.preset-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.preset-sub {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+#preset-hint {
+  margin-top: 10px;
+  line-height: 1.5;
+}

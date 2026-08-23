@@ -33,6 +33,38 @@
       </header>
 
       <aside class="rail">
+        <div class="mode-tabs" role="tablist" aria-label="Control mode">
+          <button id="tab-simple" class="mode-tab active" type="button" role="tab" aria-selected="true">Simple</button>
+          <button id="tab-advanced" class="mode-tab" type="button" role="tab" aria-selected="false">Advanced</button>
+        </div>
+
+        <section class="group" id="panel-simple">
+          <h2>Cut style</h2>
+          <div class="preset-grid" role="radiogroup" aria-label="Cut style">
+            <button type="button" class="preset active" data-preset="tight">
+              <span class="preset-name">Tight</span>
+              <span class="preset-sub">right on the edge</span>
+            </button>
+            <button type="button" class="preset" data-preset="close">
+              <span class="preset-name">Close</span>
+              <span class="preset-sub">1 mm border</span>
+            </button>
+            <button type="button" class="preset" data-preset="sticker">
+              <span class="preset-name">Sticker</span>
+              <span class="preset-sub">3 mm border</span>
+            </button>
+            <button type="button" class="preset" data-preset="loose">
+              <span class="preset-name">Loose</span>
+              <span class="preset-sub">6 mm border</span>
+            </button>
+          </div>
+          <div class="row check">
+            <input id="in-holes-simple" type="checkbox" />
+            <label for="in-holes-simple">Cut interior holes (decals)</label>
+          </div>
+          <p class="hint" id="preset-hint"></p>
+        </section>
+
         <section class="group">
           <h2>Artwork</h2>
           <div class="row">
@@ -135,7 +167,7 @@
           </div>
         </section>
 
-        <section class="group">
+        <section class="group always-on">
           <h2>Output</h2>
           <div class="row">
             <label for="in-cutmode">Cut type</label>
