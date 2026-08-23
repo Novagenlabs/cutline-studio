@@ -1,20 +1,33 @@
-import NextAuth from 'next-auth';
+import NextAuth, { type NextAuthConfig } from 'next-auth';
 import { PrismaAdapter } from '@auth/prisma-adapter';
-import EmailProvider from 'next-auth/providers/nodemailer';
 import Google from 'next-auth/providers/google';
 import { db } from './db';
 import { SIGNUP_GRANT, grantCredits } from './credits';
 
+/**
+ * Providers are assembled from what is actually configured.
+ *
+ * The email provider pulls in `nodemailer`, which is an optional peer of
+ * Auth.js — importing it unconditionally makes the whole app fail to compile
+ * on any deployment that only wants Google sign-in, which is exactly what
+ * happened the first time this was run. Requiring an SMTP dependency to use
+ * OAuth is the wrong coupling.
+ */
+const providers: NextAuthConfig['providers'] = [Google];
+
+if (process.env.EMAIL_SERVER && process.env.EMAIL_FROM) {
+  // Loaded lazily so `nodemailer` is only resolved when email sign-in is
+  // actually configured.
+  const { default: Nodemailer } = await import('next-auth/providers/nodemailer');
+  providers.push(
+    Nodemailer({ server: process.env.EMAIL_SERVER, from: process.env.EMAIL_FROM })
+  );
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(db),
   session: { strategy: 'database' },
-  providers: [
-    Google,
-    EmailProvider({
-      server: process.env.EMAIL_SERVER,
-      from: process.env.EMAIL_FROM,
-    }),
-  ],
+  providers,
   callbacks: {
     session({ session, user }) {
       if (session.user) session.user.id = user.id;

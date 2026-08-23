@@ -1,6 +1,10 @@
 node_modules
 dist
 
+# Next.js build output
+.next
+next-env.d.ts
+
 # Secrets — never commit. Neon URLs and Stripe keys live here.
 .env
 .env.*

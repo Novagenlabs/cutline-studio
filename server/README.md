@@ -9,11 +9,11 @@ already used in novacrm.
 **Scaffold, not deployed.** The credit ledger, export authorisation, Stripe
 checkout and webhook, and the export route are written. What is NOT done:
 
-- no `next.config`, sign-in pages, or account UI — the Next app itself is not
-  wired up, so the API routes are written but have never served a request
 - the client still exports locally (see "Client changes still required")
 - Stripe has never been exercised against real keys; only the ledger logic
   behind the webhook is tested
+- Google OAuth needs real credentials to sign in through the UI; the e2e test
+  inserts a Session row directly instead
 
 Done and verified (35 tests passing):
 
@@ -25,6 +25,21 @@ Done and verified (35 tests passing):
 - PNG framing pinned to the client's arithmetic by test, since that one piece
   is necessarily duplicated (a Node canvas cannot be driven through the DOM
   canvas API)
+- the paywall end to end over HTTP against the running app: no session gets
+  401, no credits gets 402 with no file, a credited user gets the file and is
+  charged exactly one, and the balance never goes negative
+
+## Do exports need a job queue?
+
+No. Measured on the Feel at Home logo (3166x940, 32 contours): SVG 0ms, DXF
+0ms, PNG 63ms, PDF 128ms warm. That fits inside an ordinary HTTP request. A
+queue would add a job table, a worker, polling or websockets, and a "your file
+is ready" flow to make a 130ms operation asynchronous.
+
+Revisit it if any of these change: very large artwork pushing PDF/PNG past a
+few seconds, a platform request timeout shorter than a render, or a batch
+feature that exports many files at once. The first sign will be the p95 of the
+export route, so measure that before building anything.
 
 ## Setup
 

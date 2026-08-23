@@ -3,7 +3,11 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "strict": true,
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
@@ -12,20 +16,41 @@
     "isolatedModules": true,
     "resolveJsonModule": true,
     "noEmit": true,
-    "jsx": "preserve",
+    "jsx": "react-jsx",
     "paths": {
-      "@/*": ["./src/*"],
+      "@/*": [
+        "./src/*"
+      ],
       // The shared pipeline is the CLIENT's source, imported directly rather
       // than copied. A copy would drift, and the whole point of rendering
       // server-side from the same builders is that the paid file cannot
       // differ from the preview the customer approved.
-      "@cutline/pipeline/*": ["../src/*"]
-    }
+      "@cutline/pipeline/*": [
+        "../src/*"
+      ]
+    },
+    "allowJs": true,
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
   },
   // vendor.d.ts carries the ambient declarations for the client's untyped
   // dependencies (clipper-lib, fit-curve, simplify-js); without it the shared
   // pipeline sources fail to typecheck here even though they are fine in the
   // client build.
-  "include": ["src", "test", "../src/export", "../src/pipeline", "../src/vendor.d.ts"],
-  "exclude": ["node_modules"]
+  "include": [
+    "src",
+    "test",
+    "../src/export",
+    "../src/pipeline",
+    "../src/vendor.d.ts",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }
