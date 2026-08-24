@@ -885,3 +885,33 @@ body:not(.mode-simple) #panel-simple {
   border-left: 2px solid var(--line);
   padding-left: 10px;
 }
+
+/* ---------- credit packs ---------- */
+
+.pack-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.pack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+  padding: 12px 8px;
+  font: inherit;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.pack:hover:not(:disabled) { border-color: var(--accent); }
+.pack:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.pack-credits { font-size: 18px; font-weight: 700; }
+.pack-price { font-size: 13px; }
+.pack-per { font-size: 10px; color: var(--muted); }

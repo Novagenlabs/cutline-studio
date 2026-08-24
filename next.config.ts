@@ -32,6 +32,12 @@ const config: NextConfig = {
       { source: '/models/:path*', headers: isolation },
       { source: '/ort/:path*', headers: isolation },
       { source: '/', headers: isolation },
+      // The sign-in popup must land in the SAME browsing-context group as the
+      // studio that opened it, or COOP: same-origin severs window.opener and
+      // the popup cannot report back. Without this the opener only learns
+      // anything by polling for the window to close — which never happens
+      // when the browser refuses to close it.
+      { source: '/signin-done', headers: isolation },
     ];
   },
   async rewrites() {

@@ -227,6 +227,25 @@
 
         <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
 
+        <dialog id="credits-sheet" class="sheet">
+          <div class="sheet-body">
+            <h3>Credits</h3>
+            <p class="sheet-text">
+              <strong id="credits-balance">—</strong> left ·
+              <span id="credits-downloads">—</span> downloaded. One credit per
+              cut file.
+            </p>
+            <div id="credits-packs" class="pack-grid"></div>
+            <p class="sheet-text sheet-note" id="credits-note">
+              Payment is handled by Stripe. You will come straight back here.
+            </p>
+            <div class="sheet-actions">
+              <button id="credits-close" class="btn ghost" type="button">Close</button>
+              <button id="credits-signout" class="btn ghost" type="button" hidden>Sign out</button>
+            </div>
+          </div>
+        </dialog>
+
         <dialog id="signin-sheet" class="sheet">
           <div class="sheet-body">
             <h3>Sign in to download</h3>

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getBalance, getDownloadCount, SIGNUP_GRANT } from '@/lib/credits';
+import { PACKS } from '@/lib/packs';
 
 /**
  * Who am I, and what can I spend?
@@ -17,7 +18,10 @@ export async function GET() {
   if (!session?.user?.id) {
     // The grant is reported so the sign-in prompt can state the real offer
     // without the browser bundle importing server code to learn it.
-    return NextResponse.json({ signedIn: false, signupGrant: SIGNUP_GRANT }, { headers: NO_STORE });
+    return NextResponse.json(
+      { signedIn: false, signupGrant: SIGNUP_GRANT, packs: PACKS },
+      { headers: NO_STORE }
+    );
   }
 
   const [balance, downloads] = await Promise.all([
@@ -26,7 +30,7 @@ export async function GET() {
   ]);
 
   return NextResponse.json(
-    { signedIn: true, email: session.user.email, balance, downloads },
+    { signedIn: true, email: session.user.email, balance, downloads, packs: PACKS },
     { headers: NO_STORE }
   );
 }

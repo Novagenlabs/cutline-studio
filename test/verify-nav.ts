@@ -62,13 +62,24 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   ).catch(() => {});
   check(String(await p.evaluate(`document.querySelector('#st-credits').textContent`)).includes('20'),
     'the studio pill shows the balance');
-  await p.evaluate(`document.querySelector('#st-credits').removeAttribute('target')`);
+  // The pill now opens the credits dialog rather than navigating — buying
+  // credits was the only reason to leave, and leaving discards the artwork.
+  // Covered in detail by verify-credits.ts.
   await p.evaluate(`document.querySelector('#st-credits').click()`);
-  await wait(2500);
-  check(new URL(p.url()).pathname === '/account', 'the pill opens the account page');
+  await p.waitForFunction(
+    "document.getElementById('credits-sheet').open === true",
+    { timeout: 15000 }
+  ).catch(() => {});
+  check(await p.evaluate(`document.getElementById('credits-sheet').open`) === true,
+    'the pill opens the credits dialog');
+  check(new URL(p.url()).pathname === '/', 'without leaving the studio');
+
+  // /account still exists as a real page for anyone who navigates to it
+  // directly, and must still lead back.
+  await p.goto(`${BASE}/account`, { waitUntil: 'networkidle2' });
   await p.evaluate(`document.querySelector('main a[href="/"]').click()`);
   await wait(2500);
-  check(new URL(p.url()).pathname === '/', 'and the back link returns to the studio');
+  check(new URL(p.url()).pathname === '/', 'and the account page still links back');
 
   await db.creditEntry.deleteMany({ where: { userId: u.id } });
   await db.session.deleteMany({ where: { userId: u.id } });

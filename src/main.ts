@@ -9,6 +9,7 @@ import { toast } from './ui/toast';
 import { confirmSpend } from './ui/confirm';
 import { jobStart, jobStage, jobEnd } from './ui/job';
 import { promptSignIn } from './ui/signin';
+import { openCredits } from './ui/credits';
 import type { PresetId } from './presets';
 import type { PaidFormat } from './paid-export';
 
@@ -723,7 +724,10 @@ const ACCOUNT_URL = '/account';
 function renderBalance() {
   const el = $<HTMLAnchorElement>('#st-credits');
   if (!el) return;
+  // Kept as a real href so it still works without JS and can be opened in a
+  // new tab deliberately; the click handler below prefers the dialog.
   el.href = ACCOUNT_URL;
+  el.removeAttribute('target');
   const count = el.querySelector('.credit-count');
   const label = el.querySelector('.credit-label');
   if (state.balance === null) {
@@ -748,6 +752,30 @@ function renderBalance() {
 void fetchBalance().then((b) => {
   state.balance = b;
   renderBalance();
+});
+
+/**
+ * The credit pill opens a dialog rather than a page.
+ *
+ * Buying credits was the only reason to visit the account, and leaving the
+ * studio to do it throws away the loaded artwork and every setting. The
+ * dialog keeps that work on screen.
+ */
+$('#st-credits').addEventListener('click', (e) => {
+  // Let deliberate new-tab clicks through to the real page.
+  if ((e as MouseEvent).metaKey || (e as MouseEvent).ctrlKey || (e as MouseEvent).shiftKey) return;
+  e.preventDefault();
+  void openCredits(() => {
+    // Signing out from the dialog: reflect it here without a reload.
+    state.balance = null;
+    renderBalance();
+    void fetch('/api/auth/signout', { method: 'POST', credentials: 'include' })
+      .catch(() => {})
+      .then(() => { window.location.reload(); });
+  }).then((balance) => {
+    state.balance = balance;
+    renderBalance();
+  });
 });
 
 /* ---------------- exports ---------------- */
@@ -823,7 +851,10 @@ async function paidExport(format: PaidFormat) {
     if (creditsRemaining === 0) {
       toast('That was your last credit.', 'info', 9000, {
         label: 'Buy more',
-        onClick: () => window.open(ACCOUNT_URL, '_blank', 'noopener'),
+        onClick: () => void openCredits().then((b) => {
+          state.balance = b;
+          renderBalance();
+        }),
       });
     }
   } catch (err) {
@@ -847,7 +878,10 @@ async function paidExport(format: PaidFormat) {
       } else if (err.kind === 'credits') {
         toast('Out of credits.', 'error', 0, {
           label: 'Buy credits',
-          onClick: () => window.open(ACCOUNT_URL, '_blank', 'noopener'),
+          onClick: () => void openCredits().then((b) => {
+            state.balance = b;
+            renderBalance();
+          }),
         });
       } else if (err.kind === 'rate') {
         toast('Too many exports just now. Try again in a moment.', 'error', 6000);

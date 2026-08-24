@@ -2,21 +2,11 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
+import { PACKS } from '@/lib/packs';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
-/**
- * Credit packs, defined server-side.
- *
- * The client sends a pack id, never a price or a credit count. If it sent
- * either, a user could ask for 10000 credits at $1 and Stripe would happily
- * charge exactly what it was told.
- */
-export const PACKS = {
-  starter: { credits: 10, amount: 900, label: '10 credits' },
-  pro: { credits: 50, amount: 3500, label: '50 credits' },
-  studio: { credits: 200, amount: 11000, label: '200 credits' },
-} as const;
+export { PACKS } from '@/lib/packs';
 
 const Body = z.object({ pack: z.enum(['starter', 'pro', 'studio']) });
 

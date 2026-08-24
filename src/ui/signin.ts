@@ -54,14 +54,29 @@ export async function promptSignIn(grant?: number): Promise<SigninOutcome> {
           window.location.href = '/api/auth/signin/google';
           return;
         }
-        // Wait for the popup to finish; it lands back on this origin, so its
-        // closing is the signal that the round trip is over.
+
+        // The popup posts a message when Google returns, then closes itself.
+        // Waiting on the message rather than on `popup.closed` matters
+        // because a browser can refuse to close the popup — polling alone
+        // would hang forever on a sign-in that actually succeeded.
         await new Promise<void>((done) => {
+          let settled = false;
+          const stop = () => {
+            if (settled) return;
+            settled = true;
+            window.removeEventListener('message', onMessage);
+            clearInterval(poll);
+            done();
+          };
+          const onMessage = (ev: MessageEvent) => {
+            if (ev.origin !== window.location.origin) return;
+            if ((ev.data as { type?: string })?.type === 'cutline:signed-in') stop();
+          };
+          window.addEventListener('message', onMessage);
+          // Still watch for a manual close, which is how a cancelled sign-in
+          // ends — no message is ever posted in that case.
           const poll = window.setInterval(() => {
-            if (popup.closed) {
-              clearInterval(poll);
-              done();
-            }
+            if (popup.closed) stop();
           }, 400);
         });
         finish('signed-in');
