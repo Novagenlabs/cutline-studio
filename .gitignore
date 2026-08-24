@@ -16,3 +16,6 @@ public/cutline/
 # scratch test output
 *.txt
 !requirements*.txt
+
+# TypeScript incremental build cache
+tsconfig.tsbuildinfo
