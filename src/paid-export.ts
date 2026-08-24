@@ -103,12 +103,16 @@ function filenameFrom(header: string | null): string | null {
   return m ? m[1] : null;
 }
 
+/** Credits a new account is given, as reported by the server. */
+export let signupGrant = 0;
+
 /** Current balance, or null when signed out. */
 export async function fetchBalance(): Promise<number | null> {
   try {
     const res = await fetch(`${API}/api/me`, { credentials: 'include' });
     if (!res.ok) return null;
     const body = await res.json();
+    if (typeof body.signupGrant === 'number') signupGrant = body.signupGrant;
     return typeof body.balance === 'number' ? body.balance : null;
   } catch {
     return null;

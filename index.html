@@ -227,6 +227,25 @@
 
         <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
 
+        <dialog id="signin-sheet" class="sheet">
+          <div class="sheet-body">
+            <h3>Sign in to download</h3>
+            <p class="sheet-text">
+              Cut files are generated on our server, so downloading needs an
+              account. New accounts start with
+              <strong id="signin-grant">20</strong> free credits — one per file.
+            </p>
+            <p class="sheet-text sheet-note">
+              Your artwork stays on this page. Tracing runs in your browser and
+              nothing is uploaded until you download a file.
+            </p>
+            <div class="sheet-actions">
+              <button id="signin-cancel" class="btn ghost" type="button">Not now</button>
+              <button id="signin-go" class="btn solid" type="button">Sign in with Google</button>
+            </div>
+          </div>
+        </dialog>
+
         <dialog id="confirm-export" class="sheet">
           <form method="dialog" class="sheet-body">
             <h3 id="confirm-title">Download cut file</h3>

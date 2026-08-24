@@ -873,3 +873,10 @@ body:not(.mode-simple) #panel-simple {
 
 .job.is-done .job-sub,
 .job.is-error .job-sub { display: none; }
+
+.sheet-note {
+  font-size: 12px;
+  opacity: 0.75;
+  border-left: 2px solid var(--line);
+  padding-left: 10px;
+}

@@ -3,11 +3,12 @@ import type { CutlineParams, CutlineResult, RasterImage, RegionOverride, ShapeMo
 import { computeAiMatte, matteToImage } from './ai/matte';
 import { buildRaster } from './export/png';
 import { makeSampleImage } from './ui/sample';
-import { requestExport, fetchBalance, ExportError } from './paid-export';
+import { requestExport, fetchBalance, signupGrant, ExportError } from './paid-export';
 import { PRESETS, matchPreset } from './presets';
 import { toast } from './ui/toast';
 import { confirmSpend } from './ui/confirm';
-import { jobStart, jobStage, jobDone, jobFailed } from './ui/job';
+import { jobStart, jobStage, jobEnd } from './ui/job';
+import { promptSignIn } from './ui/signin';
 import type { PresetId } from './presets';
 import type { PaidFormat } from './paid-export';
 
@@ -762,6 +763,29 @@ void fetchBalance().then((b) => {
  */
 async function paidExport(format: PaidFormat) {
   if (!state.result) return;
+  // Signed out: ask here rather than sending them away. The loaded artwork
+  // and every slider live in this page, so navigating to sign in would throw
+  // away the work they just did.
+  if (state.balance === null) {
+    // null means EITHER signed out OR the page-load balance check has not come
+    // back yet. Confirm with the server before accusing someone of being
+    // signed out — a fast click would otherwise show the sign-in modal to a
+    // user who is already signed in.
+    state.balance = await fetchBalance();
+    renderBalance();
+  }
+  if (state.balance === null) {
+    const outcome = await promptSignIn(signupGrant);
+    if (outcome !== 'signed-in') return;
+    state.balance = await fetchBalance();
+    renderBalance();
+    // Still signed out — the popup was closed or consent was declined.
+    if (state.balance === null) {
+      toast('Sign-in was not completed.', 'error', 6000);
+      return;
+    }
+  }
+
   // Confirm before charging: a click that silently spends money is a support
   // ticket waiting to happen.
   if (!(await confirmSpend(format, state.balance))) return;
@@ -789,7 +813,6 @@ async function paidExport(format: PaidFormat) {
     });
     state.balance = creditsRemaining;
     renderBalance();
-    jobDone(`${filename} ready`);
     toast(
       creditsRemaining === null
         ? `${filename} downloaded.`
@@ -804,17 +827,22 @@ async function paidExport(format: PaidFormat) {
       });
     }
   } catch (err) {
-    jobFailed(err instanceof ExportError && err.kind === 'credits'
-      ? 'Out of credits'
-      : 'Could not prepare the file');
     if (err instanceof ExportError) {
       // Each failure implies a different next step, so they get different
       // words rather than one generic "export failed".
       if (err.kind === 'auth') {
-        // Opening a tab the user did not ask for is hostile; offer it instead.
-        toast('Sign in to download cut files.', 'error', 0, {
+        // Reached when a session expires between loading the page and
+        // downloading; the modal is the same one the first click would show.
+        state.balance = null;
+        renderBalance();
+        toast('Your session expired.', 'error', 0, {
           label: 'Sign in',
-          onClick: () => window.open(ACCOUNT_URL, '_blank', 'noopener'),
+          onClick: () => void promptSignIn(signupGrant).then(async (o) => {
+            if (o === 'signed-in') {
+              state.balance = await fetchBalance();
+              renderBalance();
+            }
+          }),
         });
       } else if (err.kind === 'credits') {
         toast('Out of credits.', 'error', 0, {
@@ -830,6 +858,8 @@ async function paidExport(format: PaidFormat) {
       toast(`Export failed: ${err instanceof Error ? err.message : err}`, 'error', 6000);
     }
   } finally {
+    // The banner reports work in progress; the outcome is the toast's job.
+    jobEnd();
     if (toRender !== null) clearTimeout(toRender);
     btn.disabled = false;
     btn.textContent = label;

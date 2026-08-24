@@ -52,38 +52,20 @@ export function jobStage(stage: keyof typeof STAGES, format?: string): void {
 }
 
 /**
- * Finish, briefly. The banner stays a moment on success so the transition
- * from working to done is visible; vanishing instantly looks like the click
- * was ignored.
+ * Stop showing the banner.
+ *
+ * The banner reports work in progress and nothing else. Outcomes belong in
+ * the toast, which is dismissible, stacks, and can carry an action — a second
+ * transient element saying the same thing in a different corner is noise, and
+ * a "done" banner is a status line that is no longer reporting any status.
  */
-export function jobDone(message: string): void {
+export function jobEnd(): void {
   const root = el();
   if (!root) return;
-  root.classList.add('is-done');
-  root.classList.remove('is-error');
-  const text = root.querySelector('.job-text');
-  const sub = root.querySelector('.job-sub');
-  if (text) text.textContent = message;
-  if (sub) sub.textContent = '';
-  hideTimer = window.setTimeout(() => {
-    root.hidden = true;
-    root.classList.remove('is-done');
-  }, 2200);
-}
-
-export function jobFailed(message: string): void {
-  const root = el();
-  if (!root) return;
-  root.classList.add('is-error');
-  root.classList.remove('is-done');
-  const text = root.querySelector('.job-text');
-  const sub = root.querySelector('.job-sub');
-  if (text) text.textContent = message;
-  // The toast carries the detail and the action; this only needs to stop
-  // claiming that work is still happening.
-  if (sub) sub.textContent = '';
-  hideTimer = window.setTimeout(() => {
-    root.hidden = true;
-    root.classList.remove('is-error');
-  }, 2600);
+  if (hideTimer !== null) {
+    clearTimeout(hideTimer);
+    hideTimer = null;
+  }
+  root.hidden = true;
+  root.classList.remove('is-done', 'is-error');
 }

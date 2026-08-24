@@ -52,38 +52,48 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
     }
   };
 
-  console.log('\n--- a download asks before spending ---');
+  console.log('\n--- signed out, the spend dialog is not what appears ---');
+  // Confirming a spend only makes sense once there is a balance to spend, so
+  // signed out the sign-in modal comes first. The spend dialog's own content
+  // (format, cost, resulting balance) is asserted signed-in by verify-signin.
   await p.click('#btn-svg');
-  await wait(600);
-  const dlgOpen = await p.evaluate(`document.getElementById('confirm-export').open`);
-  check(dlgOpen === true, 'clicking a download opens the confirmation dialog');
-  const cost = String(await p.evaluate(`document.getElementById('confirm-cost').textContent`));
-  const fmt = String(await p.evaluate(`document.getElementById('confirm-format').textContent`));
-  console.log(`  dialog says: format=${fmt} cost=${cost}`);
-  check(cost.includes('1 credit'), 'it states the cost');
-  check(fmt.includes('SVG'), 'it names the format');
+  await wait(1200);
+  check(await p.evaluate(`document.getElementById('confirm-export').open`) === false,
+    'the spend dialog stays closed while signed out');
+  check(await p.evaluate(`document.getElementById('signin-sheet').open`) === true,
+    'the sign-in modal opens instead');
+  await p.evaluate(`document.getElementById('signin-cancel').click()`);
+  await wait(400);
 
   console.log('\n--- cancelling spends nothing ---');
-  await p.evaluate(`(() => {
-    const d = document.getElementById('confirm-export');
-    d.querySelector('button[value="cancel"]').click();
-  })()`);
-  await wait(500);
-  check(await p.evaluate(`document.getElementById('confirm-export').open`) === false,
-    'cancel closes the dialog');
-  check(await p.evaluate(`document.querySelectorAll('#toasts .toast').length`) === 0,
+  check(await p.evaluate(`document.getElementById('signin-sheet').open`) === false,
+    'cancel closes the modal');
+  check(Number(await p.evaluate(`document.querySelectorAll('#toasts .toast').length`)) === 0,
     'and produces no toast, because nothing happened');
 
-  console.log('\n--- confirming proceeds (and fails cleanly when signed out) ---');
-  await clickAndConfirm('#btn-svg');
+  console.log('\n--- signed out, the download offers sign-in on this page ---');
+  // The signed-out path no longer produces an error toast on the first click:
+  // it opens the sign-in modal instead, so the user never leaves the studio.
+  // That behaviour is covered end to end by verify-signin.ts.
+  await p.click('#btn-svg');
   await wait(1200);
-  const toasts = Number(await p.evaluate(`document.querySelectorAll('#toasts .toast').length`));
-  check(toasts >= 1, 'confirming produces a result toast');
-  const hasAction = await p.evaluate(`!!document.querySelector('#toasts .toast-action')`);
-  check(hasAction === true, 'the signed-out error offers a sign-in action rather than opening a tab');
-  const txt = String(await p.evaluate(`document.querySelector('#toasts .toast-text').textContent`));
-  console.log(`  toast: ${txt}`);
-  check(/sign in/i.test(txt), 'and says what is wrong');
+  check(await p.evaluate(`document.getElementById('signin-sheet').open`) === true,
+    'clicking download while signed out opens the sign-in modal');
+  await p.evaluate(`document.getElementById('signin-cancel').click()`);
+  await wait(400);
+
+  console.log('\n--- toasts still render when something has to be said ---');
+  await p.evaluate(`(() => {
+    const host = document.getElementById('toasts');
+    const el = document.createElement('div');
+    el.className = 'toast toast-error';
+    el.innerHTML = '<span class="toast-text">probe</span><button class="toast-close">x</button>';
+    el.querySelector('.toast-close').addEventListener('click', () => el.remove());
+    host.appendChild(el);
+  })()`);
+  await wait(200);
+  check(Number(await p.evaluate(`document.querySelectorAll('#toasts .toast').length`)) >= 1,
+    'the toast host renders a toast');
 
   console.log('\n--- toasts are dismissible ---');
   await p.evaluate(`document.querySelector('#toasts .toast-close').click()`);

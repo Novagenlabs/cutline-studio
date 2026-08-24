@@ -19,7 +19,7 @@
     "verify:presets": "tsx test/verify-presets.ts",
     "verify:ui": "tsx test/verify-ui.ts",
     "verify:nav": "tsx test/verify-nav.ts",
-    "verify:job": "tsx test/verify-job.ts"
+    "verify:signin": "tsx test/verify-signin.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
