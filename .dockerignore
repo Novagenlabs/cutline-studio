@@ -2,3 +2,17 @@ node_modules
 dist
 .git
 .claude
+
+# Never ship local secrets into the image. The build log showed "Environment
+# variables loaded from .env", which means the dev database URL and keys were
+# being baked in and would shadow whatever the host sets.
+.env
+.env.*
+!.env.example
+
+# Build output is produced inside the image.
+.next
+public/cutline
+
+# Test artefacts and fixtures are not needed to run the app.
+test

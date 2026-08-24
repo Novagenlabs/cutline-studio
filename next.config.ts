@@ -21,7 +21,6 @@ const isolation = [
 ];
 
 const config: NextConfig = {
-  eslint: { ignoreDuringBuilds: true },
   // @napi-rs/canvas ships a native .node binary, which cannot be inlined into
   // a JS bundle. Leaving it external makes Node require it at runtime instead
   // of the bundler trying to place it in an ESM chunk.

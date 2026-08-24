@@ -3,7 +3,19 @@ import Stripe from 'stripe';
 import { db } from '@/lib/db';
 import { creditPurchase } from '@/lib/credits';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+/**
+ * Built lazily, per request.
+ *
+ * Constructing this at module load runs it during `next build`, which
+ * collects page data by importing every route with no environment present —
+ * so the client throws "Neither apiKey nor config.authenticator provided" and
+ * the whole build fails. Nothing here needs Stripe until a request arrives.
+ */
+function stripeClient(): Stripe {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) throw new Error('STRIPE_SECRET_KEY is not set');
+  return new Stripe(key);
+}
 
 /**
  * Stripe webhook: the ONLY place credits are granted for money.
@@ -15,6 +27,11 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
  * client cannot forge.
  */
 export async function POST(req: Request) {
+  if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
+    // Not configured: nothing can legitimately be delivered here yet.
+    return NextResponse.json({ error: 'not configured' }, { status: 503 });
+  }
+
   const sig = req.headers.get('stripe-signature');
   if (!sig) return NextResponse.json({ error: 'unsigned' }, { status: 400 });
 
@@ -24,7 +41,7 @@ export async function POST(req: Request) {
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(raw, sig, process.env.STRIPE_WEBHOOK_SECRET!);
+    event = stripeClient().webhooks.constructEvent(raw, sig, process.env.STRIPE_WEBHOOK_SECRET!);
   } catch {
     return NextResponse.json({ error: 'bad signature' }, { status: 400 });
   }
