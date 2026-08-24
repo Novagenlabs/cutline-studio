@@ -219,6 +219,12 @@
           <button id="btn-zoom-in" class="btn ghost sm" type="button" title="Zoom in (+)">+</button>
           <button id="btn-fit" class="btn ghost sm" type="button" title="Fit view">FIT</button>
         </div>
+        <div id="job" class="job" role="status" aria-live="polite" hidden>
+          <span class="job-spinner" aria-hidden="true"></span>
+          <span class="job-text" id="job-text">Preparing your file…</span>
+          <span class="job-sub" id="job-sub"></span>
+        </div>
+
         <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
 
         <dialog id="confirm-export" class="sheet">

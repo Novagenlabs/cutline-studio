@@ -17,7 +17,9 @@
     "verify:edge": "tsx test/verify-edge.ts",
     "build:cutter": "esbuild src/main.ts --bundle --format=esm --outfile=public/cutline/app.js --target=es2022 && cp src/style.css public/cutline/app.css && node scripts/build-cutter-html.mjs",
     "verify:presets": "tsx test/verify-presets.ts",
-    "verify:ui": "tsx test/verify-ui.ts"
+    "verify:ui": "tsx test/verify-ui.ts",
+    "verify:nav": "tsx test/verify-nav.ts",
+    "verify:job": "tsx test/verify-job.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",

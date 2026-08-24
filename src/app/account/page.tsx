@@ -17,7 +17,10 @@ export default async function Page() {
   if (!session?.user?.id) {
     return (
       <main style={S.main}>
-        <h1 style={S.h1}>Cutline Studio</h1>
+        <a href="/" style={S.back}>← Back to the studio</a>
+        <h1 style={S.h1}>
+          <a href="/" style={S.titleLink}>Cutline Studio</a>
+        </h1>
         <p style={S.dim}>
           Sign in to get {SIGNUP_GRANT} free credits. One credit per download.
         </p>
@@ -45,7 +48,10 @@ export default async function Page() {
 
   return (
     <main style={S.main}>
-      <h1 style={S.h1}>Cutline Studio</h1>
+      <a href="/" style={S.back}>← Back to the studio</a>
+      <h1 style={S.h1}>
+        <a href="/" style={S.titleLink}>Cutline Studio</a>
+      </h1>
       <p style={S.dim}>{session.user.email}</p>
 
       <section style={S.card}>
@@ -94,6 +100,10 @@ export default async function Page() {
         </ul>
       )}
 
+      <div style={S.returnRow}>
+        <a href="/" style={S.returnBtn}>← Back to the studio</a>
+      </div>
+
       <form
         action={async () => {
           'use server';
@@ -110,6 +120,29 @@ export default async function Page() {
 
 const S: Record<string, React.CSSProperties> = {
   main: { maxWidth: 720, margin: '0 auto', padding: '48px 24px' },
+  // The account is a detour from the studio, not a destination, so the way
+  // back is the first thing on the page and again at the end — where someone
+  // lands after buying credits and wants to get on with cutting.
+  back: {
+    display: 'inline-block',
+    marginBottom: 20,
+    fontSize: 12,
+    letterSpacing: '0.06em',
+    color: 'inherit',
+    opacity: 0.55,
+    textDecoration: 'none',
+  },
+  titleLink: { color: 'inherit', textDecoration: 'none' },
+  returnRow: { marginTop: 40 },
+  returnBtn: {
+    display: 'inline-block',
+    padding: '10px 18px',
+    borderRadius: 8,
+    border: '1px solid #26262c',
+    color: 'inherit',
+    textDecoration: 'none',
+    fontSize: 14,
+  },
   h1: { fontSize: 22, letterSpacing: '0.04em', margin: '0 0 4px' },
   h2: { fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.12em', opacity: 0.5, marginTop: 40 },
   dim: { opacity: 0.55, fontSize: 13, margin: '4px 0' },

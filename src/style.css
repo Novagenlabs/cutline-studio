@@ -815,3 +815,61 @@ body:not(.mode-simple) #panel-simple {
   justify-content: flex-end;
   gap: 8px;
 }
+
+/* ---------- on-canvas job status ---------- */
+
+.job {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(20, 20, 23, 0.92);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  font-size: 13px;
+  white-space: nowrap;
+  animation: job-in 160ms ease-out;
+}
+
+@keyframes job-in {
+  from { opacity: 0; transform: translate(-50%, -6px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.job-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  border-top-color: var(--accent);
+  animation: job-spin 700ms linear infinite;
+}
+
+@keyframes job-spin { to { transform: rotate(360deg); } }
+
+.job-sub {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Finished states stop spinning — a spinner still turning after the work is
+   done is a lie about what the app is doing. */
+.job.is-done .job-spinner {
+  border-color: #2ecc71;
+  animation: none;
+}
+
+.job.is-error .job-spinner {
+  border-color: var(--accent);
+  animation: none;
+}
+
+.job.is-done .job-sub,
+.job.is-error .job-sub { display: none; }

@@ -7,6 +7,7 @@ import { requestExport, fetchBalance, ExportError } from './paid-export';
 import { PRESETS, matchPreset } from './presets';
 import { toast } from './ui/toast';
 import { confirmSpend } from './ui/confirm';
+import { jobStart, jobStage, jobDone, jobFailed } from './ui/job';
 import type { PresetId } from './presets';
 import type { PaidFormat } from './paid-export';
 
@@ -768,6 +769,13 @@ async function paidExport(format: PaidFormat) {
   const label = btn.textContent;
   btn.disabled = true;
   btn.textContent = 'preparing...';
+  // PDF and PNG carry the artwork, which is the slow part of the request;
+  // naming that stage explains the wait instead of leaving it unexplained.
+  const carriesArtwork = format === 'PDF' || format === 'PNG';
+  jobStart(format, carriesArtwork ? 'sending' : 'rendering');
+  const toRender = carriesArtwork
+    ? window.setTimeout(() => jobStage('rendering', format), 600)
+    : null;
   try {
     const { filename, creditsRemaining } = await requestExport(format, {
       result: state.result,
@@ -781,6 +789,7 @@ async function paidExport(format: PaidFormat) {
     });
     state.balance = creditsRemaining;
     renderBalance();
+    jobDone(`${filename} ready`);
     toast(
       creditsRemaining === null
         ? `${filename} downloaded.`
@@ -795,6 +804,9 @@ async function paidExport(format: PaidFormat) {
       });
     }
   } catch (err) {
+    jobFailed(err instanceof ExportError && err.kind === 'credits'
+      ? 'Out of credits'
+      : 'Could not prepare the file');
     if (err instanceof ExportError) {
       // Each failure implies a different next step, so they get different
       // words rather than one generic "export failed".
@@ -818,6 +830,7 @@ async function paidExport(format: PaidFormat) {
       toast(`Export failed: ${err instanceof Error ? err.message : err}`, 'error', 6000);
     }
   } finally {
+    if (toRender !== null) clearTimeout(toRender);
     btn.disabled = false;
     btn.textContent = label;
   }
