@@ -52,7 +52,7 @@ describe.skipIf(!process.env.DATABASE_URL)('new account onboarding', () => {
     expect(entries[0].reason).toBe('SIGNUP_GRANT');
   });
 
-  it('a fresh account can immediately download, twice, then is cut off', async () => {
+  it('a fresh account can download until its balance is spent, then is cut off', async () => {
     let up = false;
     try {
       up = (await fetch(BASE, { signal: AbortSignal.timeout(5000) })).ok;
@@ -68,7 +68,12 @@ describe.skipIf(!process.env.DATABASE_URL)('new account onboarding', () => {
       image: null,
     });
     created.push(user.id);
-    await grantCredits(db, user.id, SIGNUP_GRANT, 'SIGNUP_GRANT');
+    // Granted explicitly rather than using SIGNUP_GRANT: the property under
+    // test is "the balance is spent down and then refused", and driving 20
+    // real exports over HTTP to prove it would be slow without testing
+    // anything the first two do not already show.
+    const TRIAL = 2;
+    await grantCredits(db, user.id, TRIAL, 'SIGNUP_GRANT');
 
     const token = randomUUID();
     await db.session.create({
@@ -105,7 +110,7 @@ describe.skipIf(!process.env.DATABASE_URL)('new account onboarding', () => {
     expect(second.status).toBe(200);
     expect(second.headers.get('x-credits-remaining')).toBe('0');
 
-    // The trial is exactly two files — the third must be refused.
+    // The balance is now spent — the next request must be refused.
     const third = await post();
     expect(third.status).toBe(402);
 

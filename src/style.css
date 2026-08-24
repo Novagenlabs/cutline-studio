@@ -452,27 +452,102 @@ input[type='checkbox'] {
   margin-left: auto;
 }
 
-/* ---------- toast ---------- */
-.toast {
-  position: absolute;
-  left: 50%;
-  bottom: 22px;
-  transform: translateX(-50%);
-  z-index: 5;
-  max-width: 520px;
-  padding: 10px 16px;
-  font-size: 12px;
-  line-height: 1.5;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--accent);
-  color: var(--ink);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+/* ---------- toasts ---------- */
+
+.toasts {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+  pointer-events: none;
 }
 
-.toast.error {
-  border-left-color: #ff4d4d;
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 420px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--muted);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  animation: toast-in 160ms ease-out;
 }
+
+.toast.leaving {
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 160ms ease-in, transform 160ms ease-in;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.toast-icon {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.toast-text { flex: 1 1 auto; }
+
+.toast-count {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.toast-action {
+  flex: 0 0 auto;
+  font: inherit;
+  font-size: 12px;
+  color: var(--accent);
+  background: none;
+  border: 0;
+  padding: 2px 4px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.toast-close {
+  flex: 0 0 auto;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  padding: 0 2px;
+  cursor: pointer;
+}
+
+.toast-close:hover { color: var(--text); }
+
+.toast-success { border-left-color: #2ecc71; }
+.toast-success .toast-icon { color: #2ecc71; }
+.toast-error { border-left-color: var(--accent); }
+.toast-error .toast-icon { color: var(--accent); }
+.toast-info { border-left-color: #4aa3ff; }
+.toast-info .toast-icon { color: #4aa3ff; }
+
 
 /* ---------- region fix ---------- */
 .chips {
@@ -629,4 +704,114 @@ body:not(.mode-simple) #panel-simple {
 #preset-hint {
   margin-top: 10px;
   line-height: 1.5;
+}
+
+/* ---------- credit pill ---------- */
+
+.credit-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 6px 12px;
+  margin-right: 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.credit-pill:hover { border-color: var(--accent); }
+
+.credit-count {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.credit-label {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 10px;
+}
+
+/* Running low, or out, should be visible before a download fails. */
+.credit-pill.is-low { border-color: #d9822b; }
+.credit-pill.is-low .credit-count { color: #d9822b; }
+.credit-pill.is-empty { border-color: var(--accent); background: var(--accent-soft); }
+.credit-pill.is-empty .credit-count { color: var(--accent); }
+
+/* ---------- confirm sheet ---------- */
+
+.sheet {
+  /* A modal <dialog> is centred by the UA default margin: auto, which the
+     global reset in this stylesheet zeroes out — without restoring it the
+     sheet pins to the top-left corner. */
+  margin: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  padding: 0;
+  max-width: 380px;
+  width: calc(100vw - 32px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+}
+
+.sheet::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.sheet-body { padding: 20px; }
+
+.sheet h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  letter-spacing: 0.01em;
+}
+
+.sheet-text {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.sheet-facts {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+  font-size: 13px;
+}
+
+.sheet-facts li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 0;
+}
+
+.sheet-facts span { color: var(--muted); }
+
+.sheet-skip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 16px;
+  cursor: pointer;
+}
+
+.sheet-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }

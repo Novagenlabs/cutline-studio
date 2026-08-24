@@ -1,7 +1,14 @@
 import { PrismaClient, type CreditReason, type ExportFormat } from '@prisma/client';
 import { createHash, randomUUID } from 'node:crypto';
 
-export const SIGNUP_GRANT = 2;
+/**
+ * Credits a new account starts with.
+ *
+ * Generous on purpose: a print shop evaluating this needs to cut several real
+ * jobs before it can tell whether the cutlines are usable, and a trial that
+ * runs out mid-evaluation reads as a broken product rather than a paywall.
+ */
+export const SIGNUP_GRANT = 20;
 /** Credits charged per successful export. One file, one credit. */
 export const COST_PER_DOWNLOAD = 1;
 /** How long an issued export authorisation stays valid. */

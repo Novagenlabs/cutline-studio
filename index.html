@@ -26,6 +26,10 @@
         </div>
         <p class="tagline">contour cut generator · spot-ready output</p>
         <div class="top-actions">
+          <a id="st-credits" class="credit-pill" href="/account" target="_blank" rel="noopener" title="Credits">
+            <span class="credit-count">—</span>
+            <span class="credit-label">credits</span>
+          </a>
           <button id="btn-sample" class="btn ghost" type="button">Load sample</button>
           <button id="btn-open" class="btn solid" type="button">Open image</button>
           <input id="file-input" type="file" accept="image/*" hidden />
@@ -215,7 +219,27 @@
           <button id="btn-zoom-in" class="btn ghost sm" type="button" title="Zoom in (+)">+</button>
           <button id="btn-fit" class="btn ghost sm" type="button" title="Fit view">FIT</button>
         </div>
-        <div id="toast" class="toast" role="status" hidden></div>
+        <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+
+        <dialog id="confirm-export" class="sheet">
+          <form method="dialog" class="sheet-body">
+            <h3 id="confirm-title">Download cut file</h3>
+            <p id="confirm-body" class="sheet-text"></p>
+            <ul class="sheet-facts">
+              <li><span>Format</span><strong id="confirm-format">—</strong></li>
+              <li><span>Cost</span><strong id="confirm-cost">1 credit</strong></li>
+              <li><span>Balance after</span><strong id="confirm-after">—</strong></li>
+            </ul>
+            <label class="sheet-skip">
+              <input id="confirm-skip" type="checkbox" />
+              Don't ask again this session
+            </label>
+            <div class="sheet-actions">
+              <button value="cancel" class="btn ghost" type="submit">Cancel</button>
+              <button id="confirm-go" value="confirm" class="btn solid" type="submit">Download</button>
+            </div>
+          </form>
+        </dialog>
       </main>
 
       <footer class="status">
@@ -223,7 +247,6 @@
         <span id="st-dims">—</span>
         <span id="st-geom">—</span>
         <span id="st-time">—</span>
-        <a id="st-credits" class="credits" href="#" title="Credits">—</a>
         <span id="st-zoom">100%</span>
       </footer>
     </div>

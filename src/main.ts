@@ -5,6 +5,8 @@ import { buildRaster } from './export/png';
 import { makeSampleImage } from './ui/sample';
 import { requestExport, fetchBalance, ExportError } from './paid-export';
 import { PRESETS, matchPreset } from './presets';
+import { toast } from './ui/toast';
+import { confirmSpend } from './ui/confirm';
 import type { PresetId } from './presets';
 import type { PaidFormat } from './paid-export';
 
@@ -64,17 +66,6 @@ const activeRegion = (): RegionOverride | null =>
 
 /* ---------------- toast ---------------- */
 
-let toastTimer: number | null = null;
-function toast(msg: string, kind: 'error' | 'info' = 'info', ms = 5000) {
-  const el = $('#toast');
-  el.textContent = msg;
-  el.className = `toast ${kind}`;
-  el.hidden = false;
-  if (toastTimer !== null) clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => {
-    el.hidden = true;
-  }, ms);
-}
 
 /* ---------------- image loading ---------------- */
 
@@ -731,15 +722,23 @@ function renderBalance() {
   const el = $<HTMLAnchorElement>('#st-credits');
   if (!el) return;
   el.href = ACCOUNT_URL;
-  el.target = '_blank';
-  el.rel = 'noopener';
+  const count = el.querySelector('.credit-count');
+  const label = el.querySelector('.credit-label');
   if (state.balance === null) {
-    el.textContent = 'not signed in';
+    if (count) count.textContent = 'Sign in';
+    if (label) label.textContent = 'to download';
     el.title = 'Sign in to download cut files';
-  } else {
-    el.textContent = `${state.balance} credit${state.balance === 1 ? '' : 's'}`;
-    el.title = state.balance === 0 ? 'Buy credits to download' : 'Credits remaining';
+    el.classList.remove('is-empty', 'is-low');
+    return;
   }
+  if (count) count.textContent = String(state.balance);
+  if (label) label.textContent = state.balance === 1 ? 'credit' : 'credits';
+  // A balance that has run out, or is about to, is worth seeing before the
+  // download fails rather than after.
+  el.classList.toggle('is-empty', state.balance === 0);
+  el.classList.toggle('is-low', state.balance > 0 && state.balance <= 3);
+  el.title =
+    state.balance === 0 ? 'Out of credits — click to buy more' : 'Credits remaining';
 }
 
 // Advisory only — the export route re-checks the balance when it charges, so
@@ -762,6 +761,9 @@ void fetchBalance().then((b) => {
  */
 async function paidExport(format: PaidFormat) {
   if (!state.result) return;
+  // Confirm before charging: a click that silently spends money is a support
+  // ticket waiting to happen.
+  if (!(await confirmSpend(format, state.balance))) return;
   const btn = $(`#btn-${format.toLowerCase()}`) as HTMLButtonElement;
   const label = btn.textContent;
   btn.disabled = true;
@@ -782,20 +784,31 @@ async function paidExport(format: PaidFormat) {
     toast(
       creditsRemaining === null
         ? `${filename} downloaded.`
-        : `${filename} downloaded - ${creditsRemaining} credit${creditsRemaining === 1 ? '' : 's'} left`,
-      'info',
+        : `${filename} downloaded · ${creditsRemaining} credit${creditsRemaining === 1 ? '' : 's'} left`,
+      'success',
       5000
     );
+    if (creditsRemaining === 0) {
+      toast('That was your last credit.', 'info', 9000, {
+        label: 'Buy more',
+        onClick: () => window.open(ACCOUNT_URL, '_blank', 'noopener'),
+      });
+    }
   } catch (err) {
     if (err instanceof ExportError) {
       // Each failure implies a different next step, so they get different
       // words rather than one generic "export failed".
       if (err.kind === 'auth') {
-        toast('Sign in to download - opening your account.', 'error', 6000);
-        window.open(ACCOUNT_URL, '_blank', 'noopener');
+        // Opening a tab the user did not ask for is hostile; offer it instead.
+        toast('Sign in to download cut files.', 'error', 0, {
+          label: 'Sign in',
+          onClick: () => window.open(ACCOUNT_URL, '_blank', 'noopener'),
+        });
       } else if (err.kind === 'credits') {
-        toast('Out of credits - buy more to keep downloading.', 'error', 7000);
-        window.open(ACCOUNT_URL, '_blank', 'noopener');
+        toast('Out of credits.', 'error', 0, {
+          label: 'Buy credits',
+          onClick: () => window.open(ACCOUNT_URL, '_blank', 'noopener'),
+        });
       } else if (err.kind === 'rate') {
         toast('Too many exports just now. Try again in a moment.', 'error', 6000);
       } else {

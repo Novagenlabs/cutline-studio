@@ -40,9 +40,9 @@ describe('balance', () => {
   it('starts at zero and sums the ledger', async () => {
     expect(await getBalance(db, userId)).toBe(0);
     await grantCredits(db, userId, SIGNUP_GRANT, 'SIGNUP_GRANT');
-    expect(await getBalance(db, userId)).toBe(2);
+    expect(await getBalance(db, userId)).toBe(SIGNUP_GRANT);
     await grantCredits(db, userId, 10, 'PURCHASE');
-    expect(await getBalance(db, userId)).toBe(12);
+    expect(await getBalance(db, userId)).toBe(SIGNUP_GRANT + 10);
   });
 
   it('refuses a non-positive or fractional grant', async () => {
