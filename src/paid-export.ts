@@ -47,7 +47,12 @@ export async function requestExport(
   format: PaidFormat,
   ctx: ExportContext
 ): Promise<{ filename: string; creditsRemaining: number | null }> {
-  const needsArtwork = format === 'PDF' || format === 'PNG';
+  // SVG carries the artwork too. A print-and-cut SVG is an artwork layer
+  // plus a stroke-only cut layer; sending only the geometry produced files
+  // containing a magenta outline around nothing. DXF is the sole vector
+  // format that genuinely needs no raster — it is cut-only by design, which
+  // is why it alone keeps the artwork on the user's machine.
+  const needsArtwork = format !== 'DXF';
 
   const res = await fetch(`${API}/api/export`, {
     method: 'POST',

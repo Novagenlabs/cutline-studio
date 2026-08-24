@@ -33,6 +33,17 @@ const base: RenderInput = {
 };
 
 describe('server rendering via the shared pipeline', () => {
+  it('SVG embeds the artwork, not just the cutline', async () => {
+    // A print-and-cut SVG is an artwork layer plus a stroke-only cut layer.
+    // Shipping only the geometry produced files that opened as a magenta
+    // outline around nothing, which looked like a broken export.
+    const { bytes } = await renderExport({ ...base, format: 'SVG' });
+    const svg = new TextDecoder().decode(bytes);
+    expect(svg).toContain('id="Artwork"');
+    expect(svg).toContain('<image ');
+    expect(svg).toContain('id="CutContour"');
+  });
+
   it('SVG carries the cut layer and mm dimensions', async () => {
     const { bytes, mime, ext } = await renderExport({ ...base, format: 'SVG' });
     const svg = new TextDecoder().decode(bytes);

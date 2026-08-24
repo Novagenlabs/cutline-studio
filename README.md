@@ -23,9 +23,9 @@ API at `/api/*`.
 cutline, and the preview is instant because nothing round-trips. **Cut files
 are generated on the server** after a credit is charged: a file the browser
 can build is a file the browser already has, so the only way to actually gate
-a download is to not build it there. SVG and DXF need geometry alone, so for
-those the artwork still never leaves your machine; PDF and PNG must embed the
-raster, so it is sent at that moment and held only in memory.
+a download is to not build it there. Only DXF is cut-only, so it alone never
+sends your artwork; SVG, PDF and PNG all embed the image and send it at the
+moment of a paid download, held in memory and never written to disk.
 
 See BACKEND.md for the credit ledger and payment design.
 

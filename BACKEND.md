@@ -115,6 +115,6 @@ The README currently promises "no uploads leave the machine". That stops being
 true for paid PDF/PNG export, which must embed the raster. The chosen
 behaviour: preview and tracing stay entirely local, and artwork is sent **only
 at the moment of a paid download**, held in memory for the render, never
-written to disk. SVG and DXF need only the geometry, so artwork never leaves
-the machine for those. The README must be updated to say exactly this before
+written to disk. DXF is cut-only and needs no raster, so it alone never sends
+the artwork. The README must be updated to say exactly this before
 launch — the current sentence would become false advertising.
