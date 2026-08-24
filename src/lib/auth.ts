@@ -26,6 +26,18 @@ if (process.env.EMAIL_SERVER && process.env.EMAIL_FROM) {
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(db),
+  /**
+   * Behind a reverse proxy (Dokploy, Vercel, anything terminating TLS) the
+   * request Auth.js sees carries the internal host, so it cannot infer the
+   * public origin and would build callback URLs pointing at localhost —
+   * which Google then rejects. Trusting the forwarded host is what makes the
+   * deployed callback match the one registered with the provider.
+   *
+   * Set here rather than relying on AUTH_TRUST_HOST being remembered at
+   * deploy time: a forgotten variable would break sign-in in production only,
+   * which is the worst place to discover it.
+   */
+  trustHost: true,
   session: { strategy: 'database' },
   providers,
   callbacks: {
