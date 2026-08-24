@@ -12,3 +12,7 @@ public/cutline/
 .env
 .env.*
 !.env.example
+
+# scratch test output
+*.txt
+!requirements*.txt
