@@ -12,6 +12,12 @@ let fails = 0;
 const check = (ok: boolean, msg: string) => { console.log(`  ${ok ? 'ok ' : 'FAIL'}  ${msg}`); if (!ok) fails++; };
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// Assert on what is actually painted. The `hidden` property can be true while
+// an author `display` rule keeps the element on screen — which is exactly the
+// bug this file previously failed to catch.
+const jobVisible = (p: any) =>
+  p.evaluate(`getComputedStyle(document.getElementById('job')).display !== 'none'`);
+
 (async () => {
   const b = await puppeteer.launch({
     executablePath: CHROME, headless: true, protocolTimeout: 180_000,
@@ -21,11 +27,17 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   await p.setViewport({ width: 1500, height: 950 });
   await p.goto(BASE, { waitUntil: 'networkidle2' });
 
+  console.log('--- a fresh page reports no work ---');
+  check(await jobVisible(p) === false,
+    'the status banner is not on screen before anything has been opened');
+
   const input = await p.$('input[type=file]');
   await input!.uploadFile('test/fixtures/hello-large.png');
   await wait(3500);
+  check(await jobVisible(p) === false,
+    'and not merely from loading artwork, which is not a job either');
 
-  console.log('--- signed out, download asks to sign in without leaving ---');
+  console.log('\n--- signed out, download asks to sign in without leaving ---');
   const before = p.url();
   await p.click('#btn-svg');
   await wait(900);
@@ -43,7 +55,7 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   check(grant === '20', 'it states the real signup grant, read from the server');
 
   console.log('\n--- the job banner does not show for a click that did no work ---');
-  check(await p.evaluate(`document.getElementById('job').hidden`) === true,
+  check(await jobVisible(p) === false,
     'no processing banner while the sign-in modal is up');
 
   console.log('\n--- dismissing leaves everything as it was ---');
@@ -51,8 +63,7 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   await wait(500);
   check(await p.evaluate(`document.getElementById('signin-sheet').open`) === false,
     'the modal closes');
-  check(await p.evaluate(`document.getElementById('job').hidden`) === true,
-    'and still no job banner');
+  check(await jobVisible(p) === false, 'and still no job banner');
   check(p.url() === before, 'and still on the same page');
 
   console.log('\n--- signed in, the banner shows only while working ---');
@@ -83,7 +94,7 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   let sawWorking = false;
   for (let i = 0; i < 60 && !sawWorking; i++) {
-    if (await p.evaluate(`!document.getElementById('job').hidden`)) sawWorking = true;
+    if (await jobVisible(p)) sawWorking = true;
     else await wait(60);
   }
   check(sawWorking, 'the banner appears while the export runs');
@@ -91,7 +102,7 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   // And is gone once the work finishes — not lingering with an outcome.
   let hidden = false;
   for (let i = 0; i < 150; i++) {
-    if (await p.evaluate(`document.getElementById('job').hidden`)) { hidden = true; break; }
+    if (!(await jobVisible(p))) { hidden = true; break; }
     await wait(100);
   }
   check(hidden, 'and disappears as soon as the work is done');

@@ -818,6 +818,11 @@ body:not(.mode-simple) #panel-simple {
 
 /* ---------- on-canvas job status ---------- */
 
+/* `hidden` is only a UA default of display:none, so any author `display` rule
+   beats it — without this the banner is on screen from page load announcing
+   that a file is being prepared before the user has opened one. */
+.job[hidden] { display: none; }
+
 .job {
   position: absolute;
   top: 18px;
