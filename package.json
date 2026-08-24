@@ -21,7 +21,8 @@
     "verify:nav": "tsx test/verify-nav.ts",
     "verify:signin": "tsx test/verify-signin.ts",
     "verify:popup": "tsx test/verify-popup.ts",
-    "verify:credits": "tsx test/verify-credits.ts"
+    "verify:credits": "tsx test/verify-credits.ts",
+    "verify:loading": "tsx test/verify-loading.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",

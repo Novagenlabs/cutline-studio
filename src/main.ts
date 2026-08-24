@@ -799,19 +799,34 @@ async function paidExport(format: PaidFormat) {
     // back yet. Confirm with the server before accusing someone of being
     // signed out — a fast click would otherwise show the sign-in modal to a
     // user who is already signed in.
-    state.balance = await fetchBalance();
-    renderBalance();
+    jobStart(null, 'checking');
+    try {
+      state.balance = await fetchBalance();
+      renderBalance();
+    } finally {
+      jobEnd();
+    }
   }
   if (state.balance === null) {
     const outcome = await promptSignIn(signupGrant);
     if (outcome !== 'signed-in') return;
-    state.balance = await fetchBalance();
-    renderBalance();
+
+    // Signing in is several seconds of popup, session check and balance
+    // fetch. Leaving the screen silent through all of it is what made a
+    // successful sign-in look like a hang.
+    jobStart(null, 'loading');
+    try {
+      state.balance = await fetchBalance();
+      renderBalance();
+    } finally {
+      jobEnd();
+    }
     // Still signed out — the popup was closed or consent was declined.
     if (state.balance === null) {
       toast('Sign-in was not completed.', 'error', 6000);
       return;
     }
+    toast(`Signed in · ${state.balance} credits`, 'success', 4000);
   }
 
   // Confirm before charging: a click that silently spends money is a support

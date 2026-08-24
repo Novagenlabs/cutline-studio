@@ -1,14 +1,30 @@
 /**
- * On-canvas job status.
+ * On-canvas status for anything the user is waiting on.
  *
  * A disabled button reading "preparing..." is easy to miss — the eye is on the
- * artwork, not the sidebar — and a paid action that appears to do nothing is
- * the moment a user clicks again. This puts the state where they are already
- * looking, and names the stage so a slow PDF reads as work in progress rather
- * than a hang.
+ * artwork, not the sidebar — and an action that appears to do nothing is the
+ * moment a user clicks again. This puts the state where they are already
+ * looking, and names the stage so a slow step reads as work in progress
+ * rather than a hang.
+ *
+ * It covers the whole wait, not just the export. Signing in mid-download is
+ * several seconds of popup, session check and balance fetch, and leaving the
+ * screen silent through all of it is what made a working sign-in look stuck.
  */
 
 const STAGES: Record<string, { text: string; sub: string }> = {
+  checking: {
+    text: 'Checking your account',
+    sub: 'One moment.',
+  },
+  signing: {
+    text: 'Waiting for the other window',
+    sub: 'Finish in the window that just opened.',
+  },
+  loading: {
+    text: 'Loading your workspace',
+    sub: 'Fetching your credits.',
+  },
   sending: {
     text: 'Sending your artwork',
     sub: 'Only needed for the formats that embed the image.',
@@ -29,7 +45,7 @@ function el(): HTMLElement | null {
   return document.getElementById('job');
 }
 
-export function jobStart(format: string, stage: keyof typeof STAGES = 'rendering'): void {
+export function jobStart(format: string | null, stage: keyof typeof STAGES = 'rendering'): void {
   const root = el();
   if (!root) return;
   if (hideTimer !== null) {
@@ -41,7 +57,7 @@ export function jobStart(format: string, stage: keyof typeof STAGES = 'rendering
   jobStage(stage, format);
 }
 
-export function jobStage(stage: keyof typeof STAGES, format?: string): void {
+export function jobStage(stage: keyof typeof STAGES, format?: string | null): void {
   const root = el();
   if (!root) return;
   const s = STAGES[stage] ?? STAGES.rendering;

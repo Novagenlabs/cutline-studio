@@ -7,6 +7,8 @@
  * Checkout opens in a popup and returns them to this same page.
  */
 
+import { jobStart, jobEnd } from './job';
+
 export interface Pack {
   credits: number;
   amount: number;
@@ -90,6 +92,9 @@ export async function openCredits(onSignOut?: () => void): Promise<number | null
           return;
         }
         if (note) note.textContent = 'Complete your purchase in the Stripe window…';
+        // Same reason as sign-in: the studio would otherwise sit silent for
+        // however long checkout takes.
+        jobStart(null, 'signing');
         await new Promise<void>((done) => {
           const poll = window.setInterval(() => {
             if (w.closed) {
@@ -111,6 +116,7 @@ export async function openCredits(onSignOut?: () => void): Promise<number | null
       } catch (err) {
         if (note) note.textContent = err instanceof Error ? err.message : 'Checkout failed.';
       } finally {
+        jobEnd();
         btn.disabled = false;
       }
     };

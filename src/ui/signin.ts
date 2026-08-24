@@ -11,6 +11,8 @@
  * popup and this page simply re-checks the balance when it closes.
  */
 
+import { jobStart, jobEnd } from './job';
+
 export type SigninOutcome = 'signed-in' | 'dismissed';
 
 export async function promptSignIn(grant?: number): Promise<SigninOutcome> {
@@ -32,6 +34,10 @@ export async function promptSignIn(grant?: number): Promise<SigninOutcome> {
 
   return new Promise<SigninOutcome>((resolve) => {
     let settled = false;
+    // Set once the Google popup is open. The dialog is closed at that point
+    // so the status banner behind it is visible, and its `close` event must
+    // not then be read as the user cancelling a sign-in already under way.
+    let started = false;
     const finish = (outcome: SigninOutcome) => {
       if (settled) return;
       settled = true;
@@ -54,6 +60,13 @@ export async function promptSignIn(grant?: number): Promise<SigninOutcome> {
           window.location.href = '/api/auth/signin/google';
           return;
         }
+
+        // The modal closes as soon as the popup opens, so the studio is
+        // visible behind it — and would otherwise be showing nothing at all
+        // while Google runs. The banner is what says the app is still waiting.
+        started = true;
+        if (dlg.open) dlg.close();
+        jobStart(null, 'signing');
 
         // The popup posts a message when Google returns, then closes itself.
         // Waiting on the message rather than on `popup.closed` matters
@@ -81,6 +94,7 @@ export async function promptSignIn(grant?: number): Promise<SigninOutcome> {
         });
         finish('signed-in');
       } finally {
+        jobEnd();
         go.disabled = false;
         go.textContent = label;
       }
@@ -88,7 +102,9 @@ export async function promptSignIn(grant?: number): Promise<SigninOutcome> {
 
     go.addEventListener('click', onGo);
     cancel.addEventListener('click', onCancel);
-    dlg.addEventListener('close', () => finish('dismissed'), { once: true });
+    dlg.addEventListener('close', () => {
+      if (!started) finish('dismissed');
+    }, { once: true });
     dlg.showModal();
   });
 }
