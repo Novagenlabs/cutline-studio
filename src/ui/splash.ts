@@ -51,10 +51,14 @@ export interface SplashMotion {
 }
 
 export const DEFAULT_SPLASH: SplashMotion = {
-  sweepMs: 1100,
+  // ~3.5s end to end (2400 + 500 + 600). The previous 1780ms read as a flash
+  // rather than an arrival: the ray-marched flare needs time to travel for
+  // the scattering to be visible at all, and a light pass that is over before
+  // the eye finds it is just a flicker.
+  sweepMs: 2400,
   bandWidth: 0.22,
-  holdMs: 260,
-  fadeMs: 420,
+  holdMs: 500,
+  fadeMs: 600,
   fontPx: 76,
   trackingEm: 0.16,
   strokePx: 1.25,
@@ -172,7 +176,7 @@ export function createSplash(motion: SplashMotion = DEFAULT_SPLASH): Splash {
       const gpuReady = (async () => {
         if (!('gpu' in navigator)) return false;
         if (matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
-        const [{ createRenderer }, { setLogoGeometry: setGeometry }, raster] =
+        const [{ createRenderer }, pipelineMod, raster] =
           await Promise.all([
             import('../vendor/flare/renderer'),
             import('../vendor/flare/pipeline'),
@@ -181,7 +185,10 @@ export function createSplash(motion: SplashMotion = DEFAULT_SPLASH): Splash {
         // Fonts first: the aspect is measured from the loaded typeface, and
         // measuring against a fallback would set the box to the wrong width.
         await document.fonts?.ready?.catch?.(() => undefined);
-        setGeometry({
+        // Roughly a quarter-orbit over the splash's length, so the light has
+        // demonstrably moved by the time it lifts without racing.
+        pipelineMod.setAutonomousRate((Math.PI / 2) / (current.sweepMs / 1000));
+        pipelineMod.setLogoGeometry({
           centerInBox: raster.CUTLINE_CENTER,
           aspect: raster.measureCutlineAspect(),
           // A wide lockup is sized off the canvas height here, and the

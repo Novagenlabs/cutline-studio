@@ -76,6 +76,8 @@ enum CreditReason {
   DOWNLOAD
   REFUND
   ADMIN_ADJUSTMENT
+  /// Monthly allowance from an active Whop subscription.
+  SUBSCRIPTION
 }
 
 /// One immutable movement of credits. Balance = SUM(amount) for a user.
@@ -182,4 +184,96 @@ model ExportToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, expiresAt])
+}
+
+// ------------------------------------------------------------ subscriptions
+
+/// Whop membership lifecycle, mirrored locally.
+///
+/// Whop's own values, not ours — storing their vocabulary verbatim means a
+/// payload maps straight onto a row with no lossy translation, and a status
+/// we have not seen before is still recorded rather than silently dropped.
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  COMPLETED
+  CANCELED
+  CANCELING
+  EXPIRED
+  UNRESOLVED
+  DRAFTED
+  /// Anything Whop adds after this was written.
+  UNKNOWN
+}
+
+/// One Whop membership, mirrored so access can be decided without calling out.
+///
+/// Access is NOT read from `status` alone. `canceling` still has access until
+/// the period ends, and `active` with a renewal date in the past means we
+/// missed a webhook — see `hasActiveSubscription()` in src/lib/subscription.ts.
+model Subscription {
+  id String @id @default(cuid())
+
+  /// Null until the buyer links this membership to a Cutline account. A Whop
+  /// checkout can complete before anyone signs in here, so the membership is
+  /// recorded first and claimed after — losing the webhook because no user
+  /// existed yet would mean a paying customer with nothing to show for it.
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  /// Whop's membership id (`mem_...`). The natural key: every webhook for a
+  /// membership carries it, so upserting on it makes replays harmless and
+  /// out-of-order deliveries converge.
+  whopMembershipId String @unique
+
+  /// Denormalised from the payload for support and for claiming. Whop is the
+  /// source of truth; these are a local copy, not an authority.
+  whopUserId    String?
+  whopUserEmail String?
+  whopPlanId    String?
+  whopProductId String?
+  licenseKey    String?
+
+  status SubscriptionStatus @default(UNKNOWN)
+
+  /// End of the paid period. Access survives to here even once canceled.
+  renewalPeriodEnd DateTime?
+  cancelAtPeriodEnd Boolean  @default(false)
+
+  /// Whop's `updated_at`. Webhooks can arrive out of order, so an event older
+  /// than what we already hold is ignored rather than applied.
+  whopUpdatedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  events WhopEvent[]
+
+  @@index([userId])
+  @@index([whopUserEmail])
+}
+
+/// Every webhook Whop delivers, kept for idempotency and for support.
+///
+/// Whop guarantees at-least-once delivery with retries over ~71 hours, so
+/// duplicates are expected rather than exceptional. The unique id is what
+/// makes a replay a no-op.
+model WhopEvent {
+  /// Whop's `webhook-id` header — the Standard Webhooks message id.
+  id String @id
+
+  type      String
+  /// The raw payload, so a handler bug can be replayed against real data.
+  payload   Json
+  receivedAt DateTime @default(now())
+  /// Null until handled; set when the event has been applied.
+  processedAt DateTime?
+  /// Set when handling threw, so a failure is visible rather than silent.
+  error String?
+
+  subscriptionId String?
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([type, receivedAt])
 }

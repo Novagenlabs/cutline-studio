@@ -198,6 +198,20 @@
   </section>
 
   <section class="lab-card lab-wide">
+    <h2>WebGPU flare</h2>
+    <p class="note">
+      The real thing: a rim-lit lockup with volumetric scattering, from vgpu's
+      nextjs-flare. Hold it on screen and turn the flare dials — the render
+      updates live, and the pointer steers the light. Needs WebGPU; without it
+      the app shows the CSS splash above instead.
+    </p>
+    <div class="lab-row">
+      <button id="hold-flare">Hold flare on screen</button>
+    </div>
+    <p class="note" id="flare-status"></p>
+  </section>
+
+  <section class="lab-card lab-wide">
     <h2>Values</h2>
     <pre id="out">—</pre>
     <div class="lab-row">

@@ -181,6 +181,106 @@ document.getElementById('hold-splash')?.addEventListener('click', () => {
   liveSplash.el.classList.add('is-sweeping');
 });
 
+/* ---------------- the WebGPU flare ---------------- */
+
+/**
+ * The flare gets its own panel and its own held preview.
+ *
+ * It is a different thing from the CSS splash — a ray-marched render with its
+ * own look parameters — and it only exists on machines with WebGPU, so
+ * bundling its dials into the splash panel would show controls that do
+ * nothing on half the machines that open this page.
+ */
+const flareDial = DialKit.createDialKit('WebGPU flare', {
+  rimIntensity: [1, 0, 3, 0.05],
+  beamIntensity: [0.8, 0, 3, 0.05],
+  extension: [0.6, 0, 2, 0.05],
+  scatter: [1, 0, 3, 0.05],
+  spotFocus: [0.08, 0.01, 0.5, 0.01],
+  filmGrain: [0.03, 0, 0.2, 0.005],
+  // Radians per second for the autonomous light. The example's own value is
+  // 0.32; the splash overrides it to about a quarter-turn per sweep.
+  orbitRate: [0.32, 0.02, 2, 0.02],
+});
+
+let flareRenderer: { dispose(): void } | undefined;
+let flareEl: HTMLElement | undefined;
+
+flareDial.subscribe(async (v) => {
+  // Only reachable once the flare chunk has loaded, which needs WebGPU.
+  if (!('gpu' in navigator)) return;
+  const pipeline = await import('./vendor/flare/pipeline');
+  pipeline.setFlareLook({
+    rimIntensity: v.rimIntensity,
+    beamIntensity: v.beamIntensity,
+    extension: v.extension,
+    scatter: v.scatter,
+    spotFocus: v.spotFocus,
+    filmGrain: v.filmGrain,
+  });
+  pipeline.setAutonomousRate(v.orbitRate);
+});
+
+const flareStatus = document.getElementById('flare-status');
+
+document.getElementById('hold-flare')?.addEventListener('click', async () => {
+  if (flareEl) {
+    flareRenderer?.dispose();
+    flareRenderer = undefined;
+    flareEl.remove();
+    flareEl = undefined;
+    if (flareStatus) flareStatus.textContent = '';
+    return;
+  }
+
+  if (!('gpu' in navigator)) {
+    if (flareStatus) {
+      flareStatus.textContent =
+        'No WebGPU in this browser — the app falls back to the CSS splash here.';
+    }
+    return;
+  }
+
+  const el = document.createElement('div');
+  el.className = 'splash';
+  const canvas = document.createElement('canvas');
+  canvas.className = 'splash-gpu';
+  el.append(canvas);
+  document.body.append(el);
+  flareEl = el;
+
+  try {
+    const [{ createRenderer }, pipeline, raster] = await Promise.all([
+      import('./vendor/flare/renderer'),
+      import('./vendor/flare/pipeline'),
+      import('./vendor/flare/logo-raster'),
+    ]);
+    await document.fonts?.ready;
+    pipeline.setLogoGeometry({
+      centerInBox: raster.CUTLINE_CENTER,
+      aspect: raster.measureCutlineAspect(),
+      heightRatio: 0.16,
+    });
+    const r = createRenderer({ canvas });
+    await r.ready;
+    flareRenderer = r;
+    el.classList.add('is-gpu');
+    if (flareStatus) {
+      flareStatus.textContent =
+        'Held. Turn the WebGPU flare dials — the render updates live. Move the pointer over it to steer the light.';
+    }
+  } catch (error) {
+    // A held preview that fails should say so rather than sit black.
+    if (flareStatus) {
+      flareStatus.textContent = `Flare failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`;
+    }
+    el.remove();
+    flareEl = undefined;
+  }
+});
+
 document.getElementById('play-splash')?.addEventListener('click', () => {
   void createSplash(splashMotion).play();
 });

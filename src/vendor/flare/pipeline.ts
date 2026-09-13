@@ -103,7 +103,45 @@ export function setLogoGeometry(geometry: {
 const MAX_RENDER_WIDTH = 1920;
 const PULSE_TRANSITION_SECONDS = 2;
 const PULSE_FLOOR = 0.2;
-const FLARE_COLOR = [179 / 255, 191 / 255, 1] as const;
+
+/**
+ * ADAPTED: the composite pass's look was a set of literals inlined at the
+ * call site. They are the dials worth having — beam strength, scatter, grain,
+ * how far the rays reach — so they are collected here and settable, which is
+ * what lets the motion lab tune the flare instead of only its timing.
+ */
+export interface FlareLook {
+  /** Tint of the light, linear RGB 0–1. */
+  readonly color: readonly [number, number, number];
+  /** Edge light on the glyphs. */
+  readonly rimIntensity: number;
+  /** Strength of the volumetric rays. */
+  readonly beamIntensity: number;
+  /** How far the rays reach from the artwork. */
+  readonly extension: number;
+  /** Density of the scattering medium. */
+  readonly scatter: number;
+  /** Tightness of the light's hotspot. Smaller is tighter. */
+  readonly spotFocus: number;
+  /** Film grain, which hides banding in the blur chain. */
+  readonly filmGrain: number;
+}
+
+export const DEFAULT_LOOK: FlareLook = {
+  color: [179 / 255, 191 / 255, 1],
+  rimIntensity: 1,
+  beamIntensity: 0.8,
+  extension: 0.6,
+  scatter: 1,
+  spotFocus: 0.08,
+  filmGrain: 0.03,
+};
+
+let LOOK: FlareLook = DEFAULT_LOOK;
+
+export function setFlareLook(look: Partial<FlareLook>): void {
+  LOOK = { ...LOOK, ...look };
+}
 const BLUR_CENTER_WEIGHT = 0.0799404796215474;
 const BLUR_TAPS = [
   [1.48500449838059, 0.15215191554518462, 0, 0],
@@ -276,16 +314,16 @@ export class FlarePipeline {
         light,
         aspect: placement.canvasToLogo,
         logoCenter: placement.logoCenter,
-        flareColor: FLARE_COLOR,
-        rimIntensity: attenuation,
-        extension: 0.6,
-        beamIntensity: 0.8 * attenuation,
-        filmGrain: 0.03,
+        flareColor: LOOK.color,
+        rimIntensity: LOOK.rimIntensity * attenuation,
+        extension: LOOK.extension,
+        beamIntensity: LOOK.beamIntensity * attenuation,
+        filmGrain: LOOK.filmGrain,
         smoothness: 1,
         logoOpacity: 1,
         frameIndex,
-        spotFocus: 0.08,
-        scatter: 1,
+        spotFocus: LOOK.spotFocus,
+        scatter: LOOK.scatter,
         rimFill: 1,
         verticalEdgeFade: 0.1,
       },
@@ -412,11 +450,23 @@ export function centeredPlacement(
   };
 }
 
+/**
+ * ADAPTED: the orbit rate was a literal 0.32 rad/s. Exposed so the splash can
+ * slow the light to match its own length — the example runs indefinitely and
+ * can afford a leisurely drift, whereas a few seconds of splash wants the
+ * light to have visibly travelled by the time it lifts.
+ */
+let AUTONOMOUS_RATE = 0.32;
+
+export function setAutonomousRate(radiansPerSecond: number): void {
+  AUTONOMOUS_RATE = radiansPerSecond;
+}
+
 export function mapAutonomousLight(
   timeSeconds: number,
   placement: FlarePlacement
 ): Point {
-  const phase = timeSeconds * 0.32;
+  const phase = timeSeconds * AUTONOMOUS_RATE;
   const radius = 0.34 + 0.09 * Math.sin(phase * 0.83);
   const local: Point = [
     0.5 + Math.cos(phase) * radius * 1.1,

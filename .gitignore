@@ -12,6 +12,8 @@ public/cutline/
 public/motion-lab/lab.js
 public/motion-lab/dialkit.js
 public/motion-lab/dialkit.css
+# Code-split chunks for the lazily loaded WebGPU flare.
+public/motion-lab/*-*.js
 
 # Secrets — never commit. Neon URLs and Stripe keys live here.
 .env

@@ -24,7 +24,7 @@
     "verify:credits": "tsx test/verify-credits.ts",
     "verify:loading": "tsx test/verify-loading.ts",
     "verify:cutmark": "tsx test/verify-cutmark.ts",
-    "motion-lab": "cp node_modules/dialkit/dist/vanilla/browser.global.js public/motion-lab/dialkit.js && cp node_modules/dialkit/dist/vanilla/styles.css public/motion-lab/dialkit.css && esbuild src/motion-lab.ts --bundle --format=esm --outfile=public/motion-lab/lab.js --target=es2022",
+    "motion-lab": "cp node_modules/dialkit/dist/vanilla/browser.global.js public/motion-lab/dialkit.js && cp node_modules/dialkit/dist/vanilla/styles.css public/motion-lab/dialkit.css && esbuild src/motion-lab.ts --bundle --format=esm --outdir=public/motion-lab --entry-names=lab --loader:.wgsl=text --splitting --target=es2022",
     "verify:elements": "tsx test/verify-elements.ts",
     "verify:export": "tsx test/verify-export-dialog.ts",
     "verify:slider": "tsx test/verify-slider-geometry.ts"
