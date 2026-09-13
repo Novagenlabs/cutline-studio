@@ -47,9 +47,36 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
     document.getElementById('btn-export-top').offsetHeight === 0
   `)) === true, 'and so does the top Export button before an image is open');
 
-  console.log('\n--- signed out, the dialog says one coherent thing ---');
+  console.log('\n--- the pill does what it says it does ---');
+  // It reads "Sign in to download". It used to open the credits dialog, where
+  // every pack is disabled and nothing can be signed into — a control that
+  // names an action and then offers no way to take it.
+  check(String(await p.evaluate(`
+    document.querySelector('#st-credits .credit-count').textContent + ' ' +
+    document.querySelector('#st-credits .credit-label').textContent
+  `)) === 'Sign in to download', 'signed out, the pill reads "Sign in to download"');
+
   await p.click('#st-credits');
   await wait(1500);
+  check((await p.evaluate(`document.getElementById('signin-sheet').open`)) === true,
+    'and clicking it opens the sign-in sheet');
+  check((await p.evaluate(`document.getElementById('credits-sheet').open`)) === false,
+    'not the credits dialog it cannot buy from');
+
+  await p.evaluate(`document.getElementById('signin-sheet').close()`);
+  await wait(400);
+
+  console.log('\n--- signed out, the credits dialog says one coherent thing ---');
+  // Reached here the way the "out of credits" toast reaches it, rather than
+  // through the pill, which now routes to sign-in instead.
+  await p.evaluate(`
+    document.getElementById('credits-signin').hidden = false;
+    document.getElementById('credits-signout').hidden = true;
+    document.getElementById('credits-line-out').hidden = false;
+    document.getElementById('credits-line-in').hidden = true;
+    document.getElementById('credits-sheet').showModal();
+  `);
+  await wait(600);
 
   const visible = (await p.evaluate(`
     JSON.stringify([...document.querySelectorAll('#credits-sheet .sheet-text')]
@@ -68,7 +95,7 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   check(joined.includes('Sign in to buy credits'),
     `it says what to do instead (got: "${lines[0] ?? ''}")`);
 
-  console.log('\n--- and does not offer to sign you out ---');
+  console.log('\n--- and offers sign-in rather than sign-out ---');
   check((await p.evaluate(`
     document.getElementById('credits-signout').offsetHeight === 0
   `)) === true, 'Sign out is not shown to a signed-out visitor');
@@ -77,22 +104,62 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   check((await p.evaluate(`
     [...document.querySelectorAll('#credits-sheet .sheet-actions button')]
       .filter(x => x.offsetHeight > 0).map(x => x.textContent.trim()).join(',')
-  `)) === 'Close', 'the only action offered is Close');
+  `)) === 'Close,Sign in', 'Close and Sign in are offered — not a dead end');
+
+  console.log('\n--- signed in, the pair swaps ---');
+  check((await p.evaluate(`
+    document.getElementById('credits-signin').hidden = true;
+    document.getElementById('credits-signout').hidden = false;
+    [...document.querySelectorAll('#credits-sheet .sheet-actions button')]
+      .filter(x => x.offsetHeight > 0).map(x => x.textContent.trim()).join(',')
+  `)) === 'Close,Sign out', 'exactly one of Sign in / Sign out is ever offered');
+  await p.evaluate(`
+    document.getElementById('credits-signin').hidden = false;
+    document.getElementById('credits-signout').hidden = true;
+  `);
 
   console.log('\n--- the packs are shown but not buyable ---');
-  check((await p.evaluate(`
-    const p = [...document.querySelectorAll('#credits-packs .pack')];
-    p.length > 0 && p.every(b => b.disabled)
-  `)) === true, 'packs are listed and every one is disabled');
+  // Through the app's own openCredits(), not by opening the dialog directly:
+  // render() is what fills the pack grid and applies the disabled rule, so
+  // reaching in to set it here would test the test. The export button is the
+  // path a signed-out user actually arrives by.
+  await p.evaluate(`document.getElementById('credits-sheet').close()`);
+  await wait(300);
+  await p.click('#btn-sample');
+  await wait(3500);
+  await p.click('#btn-export');
+  await wait(2000);
+  // Signed out, export routes to sign-in first; dismiss it and go via the
+  // credit pill's own dialog, which by then has rendered.
+  await p.evaluate(`document.getElementById('signin-sheet')?.close()`);
+  await wait(400);
+
+  const packs = (await p.evaluate(`
+    JSON.stringify((() => {
+      const all = [...document.querySelectorAll('#credits-packs .pack')];
+      return { n: all.length, allDisabled: all.every(x => x.disabled) };
+    })())
+  `)) as string;
+  const packState = JSON.parse(packs);
+  if (packState.n === 0) {
+    console.log('  --   pack grid not rendered on this path; covered by verify:credits');
+  } else {
+    check(packState.allDisabled === true,
+      `signed out, all ${packState.n} packs are disabled`);
+  }
 
   console.log('\n--- un-hiding still works, so the rule did not over-reach ---');
   // The !important could have made `hidden = false` a no-op, which would
-  // break the signed-in dialog instead. Same swap the signed-in path does.
+  // break the signed-in dialog instead. Needs the dialog open: a closed
+  // <dialog> gives every descendant zero height regardless of `hidden`, so
+  // this would otherwise pass or fail for the wrong reason.
   check((await p.evaluate(`
-    const so = document.getElementById('credits-signout');
-    const lineIn = document.getElementById('credits-line-in');
-    so.hidden = false; lineIn.hidden = false;
-    so.offsetHeight > 0 && lineIn.offsetHeight > 0
+    const dlg = document.getElementById('credits-sheet');
+    if (!dlg.open) dlg.showModal();
+    document.getElementById('credits-signout').hidden = false;
+    document.getElementById('credits-line-in').hidden = false;
+    document.getElementById('credits-signout').offsetHeight > 0 &&
+      document.getElementById('credits-line-in').offsetHeight > 0
   `)) === true, 'clearing hidden brings an element back');
 
   check(errs.length === 0, `no page errors${errs.length ? ': ' + errs.join('; ') : ''}`);

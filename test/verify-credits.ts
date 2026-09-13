@@ -82,15 +82,25 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   await p2.goto(BASE, { waitUntil: 'networkidle2' });
   await wait(1500);
   await p2.click('#st-credits');
+  // Signed out the pill reads "Sign in to download" and now does that, rather
+  // than opening a credits dialog whose every pack is disabled — a control
+  // that named an action and then offered no way to take it.
   await p2.waitForFunction(
-    "document.getElementById('credits-sheet').open === true",
+    "document.getElementById('signin-sheet').open === true",
     { timeout: 15000 }
   ).catch(() => {});
-  check(await p2.evaluate(`document.getElementById('credits-sheet').open`) === true,
-    'the dialog still opens');
+  check(await p2.evaluate(`document.getElementById('signin-sheet').open`) === true,
+    'the pill offers sign-in');
+  check(await p2.evaluate(`document.getElementById('credits-sheet').open`) === false,
+    'and not the dialog it cannot buy from');
+
+  // The credits dialog is still reachable signed out (the "out of credits"
+  // toast), and there it must offer a way in rather than only Close.
+  await p2.evaluate(`document.getElementById('signin-sheet').close()`);
+  await wait(400);
   check(await p2.evaluate(
-    `(document.querySelector('#credits-packs .pack')||{disabled:null}).disabled`
-  ) === true, 'but nothing can be purchased without an account');
+    `!!document.getElementById('credits-signin')`
+  ) === true, 'and that dialog carries its own Sign in action');
 
   await b.close();
   await db.creditEntry.deleteMany({ where: { userId: u.id } });

@@ -1188,6 +1188,31 @@ $('#in-holes-simple').addEventListener('change', (e) => {
 /** The account page, served by this same app. */
 const ACCOUNT_URL = '/account';
 
+/**
+ * Sign in, then show what that bought.
+ *
+ * Every entry point that discovers it needs an account ends the same way: the
+ * popup closes, the balance is fetched, and the pill has to stop saying "Sign
+ * in". Sharing it keeps those paths from drifting — one of them silently not
+ * refreshing the balance is the kind of bug that looks like a failed sign-in.
+ */
+async function signInThenRefresh(): Promise<void> {
+  const outcome = await promptSignIn(signupGrant);
+  if (outcome !== 'signed-in') return;
+  // The popup, the session check and the balance fetch are several seconds
+  // between the click and anything visible changing.
+  jobStart(null, 'loading');
+  try {
+    state.balance = await fetchBalance();
+    renderBalance();
+  } finally {
+    jobEnd();
+  }
+  if (state.balance !== null) {
+    toast(`Signed in · ${state.balance} credits`, 'success', 4000);
+  }
+}
+
 function renderBalance() {
   const el = $<HTMLAnchorElement>('#st-credits');
   if (!el) return;
@@ -1273,6 +1298,16 @@ $('#st-credits').addEventListener('click', (e) => {
   // Let deliberate new-tab clicks through to the real page.
   if ((e as MouseEvent).metaKey || (e as MouseEvent).ctrlKey || (e as MouseEvent).shiftKey) return;
   e.preventDefault();
+
+  // Signed out the pill reads "Sign in to download", so that is what it must
+  // do. It used to open the credits dialog either way, which signed out is a
+  // dead end: nothing there can be bought without an account, so the control
+  // named an action and then offered no way to take it.
+  if (state.balance === null) {
+    void signInThenRefresh();
+    return;
+  }
+
   void openCredits(() => {
     // Signing out from the dialog: reflect it here without a reload.
     state.balance = null;
@@ -1403,7 +1438,7 @@ async function paidExport(format: PaidFormat, preconfirmed = false) {
       } else if (err.kind === 'credits') {
         toast('Out of credits.', 'error', 0, {
           label: 'Buy credits',
-          onClick: () => void openCredits().then((b) => {
+          onClick: () => void openCredits(undefined, () => void signInThenRefresh()).then((b) => {
             state.balance = b;
             renderBalance();
           }),

@@ -64,7 +64,13 @@ describe.skipIf(!process.env.DATABASE_URL)('one app, one origin', () => {
     const res = await fetch(BASE);
     expect(res.status).toBe(200);
     const html = await res.text();
-    expect(html).toContain('CUTLINE');
+    // Case-insensitive on purpose. This used to assert the literal 'CUTLINE',
+    // which passed only because the wordmark happened to be uppercase in the
+    // markup; the splash now builds that word in JS and uppercases it in CSS,
+    // so the old assertion failed while the cutter was being served perfectly.
+    // What matters here is that the root serves the studio, not how a brand
+    // string is cased on its way to the screen.
+    expect(html).toMatch(/cutline/i);
     // The shipped v3 engine is still the default in the served UI.
     expect(html).toContain('v3 — text accurate');
   });

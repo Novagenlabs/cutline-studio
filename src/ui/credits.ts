@@ -41,7 +41,10 @@ export async function fetchAccount(): Promise<AccountInfo> {
  * Show the credits dialog. Resolves with the balance when it closes, so the
  * caller can update the pill without a second round trip.
  */
-export async function openCredits(onSignOut?: () => void): Promise<number | null> {
+export async function openCredits(
+  onSignOut?: () => void,
+  onSignIn?: () => void
+): Promise<number | null> {
   const dlg = document.getElementById('credits-sheet') as HTMLDialogElement | null;
   if (!dlg || typeof dlg.showModal !== 'function') {
     window.location.href = '/account';
@@ -55,10 +58,12 @@ export async function openCredits(onSignOut?: () => void): Promise<number | null
   return new Promise<number | null>((resolve) => {
     const close = document.getElementById('credits-close') as HTMLButtonElement;
     const signout = document.getElementById('credits-signout') as HTMLButtonElement;
+    const signin = document.getElementById('credits-signin') as HTMLButtonElement | null;
 
     const cleanup = () => {
       close.removeEventListener('click', onClose);
       signout.removeEventListener('click', onSignOutClick);
+      signin?.removeEventListener('click', onSignInClick);
       packButtons().forEach((b) => b.removeEventListener('click', onBuy));
     };
 
@@ -67,6 +72,14 @@ export async function openCredits(onSignOut?: () => void): Promise<number | null
       cleanup();
       dlg.close();
       onSignOut?.();
+    };
+    // Closes first: the sign-in sheet is itself a modal dialog, and stacking
+    // one on top of another leaves the buyer looking at two overlapping
+    // sheets with no obvious way back.
+    const onSignInClick = () => {
+      cleanup();
+      dlg.close();
+      onSignIn?.();
     };
 
     const onBuy = async (ev: Event) => {
@@ -123,6 +136,7 @@ export async function openCredits(onSignOut?: () => void): Promise<number | null
 
     close.addEventListener('click', onClose);
     signout.addEventListener('click', onSignOutClick);
+    signin?.addEventListener('click', onSignInClick);
     packButtons().forEach((b) => b.addEventListener('click', onBuy));
 
     dlg.addEventListener(
@@ -155,8 +169,13 @@ function render(info: AccountInfo): void {
   if (bal) bal.textContent = info.balance === null ? '0' : String(info.balance);
   if (dls) dls.textContent = String(info.downloads);
 
+  // Exactly one of these is ever offered, and which one is the whole point:
+  // signed out, every pack is disabled, so Sign in is the only thing left to
+  // do here.
   const signout = document.getElementById('credits-signout') as HTMLButtonElement | null;
   if (signout) signout.hidden = !info.signedIn;
+  const signin = document.getElementById('credits-signin') as HTMLButtonElement | null;
+  if (signin) signin.hidden = info.signedIn;
 
   const host = document.getElementById('credits-packs');
   if (!host) return;
