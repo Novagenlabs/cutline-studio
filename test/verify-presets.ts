@@ -71,15 +71,22 @@ const read = (p: any, sel: string) => p.evaluate(`document.querySelector('${sel}
   }
 
   console.log('\n--- the two hole checkboxes are one setting ---');
+  // Clicks the mounted control, not the hidden <input> that models it: the
+  // native input is the value, the Base UI checkbox is what a user presses.
+  const tick = (modelId: string) =>
+    p.evaluate(
+      `document.getElementById('${modelId}').nextElementSibling.querySelector('.bui-checkbox').click()`
+    );
+
   await p.click('#tab-simple');
   await new Promise((r) => setTimeout(r, 200));
-  await p.click('#in-holes-simple');
+  await tick('in-holes-simple');
   await new Promise((r) => setTimeout(r, 400));
   check(await p.evaluate(`document.querySelector('#in-holes').checked`) === true,
     'ticking the simple box ticks the advanced one');
   await p.click('#tab-advanced');
   await new Promise((r) => setTimeout(r, 250));
-  await p.click('#in-holes');
+  await tick('in-holes');
   await new Promise((r) => setTimeout(r, 400));
   check(await p.evaluate(`document.querySelector('#in-holes-simple').checked`) === false,
     'and unticking the advanced one unticks the simple one');

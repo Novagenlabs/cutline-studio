@@ -1,10 +1,14 @@
 // The export dialog's format choice and its save-as-default switch.
 //
-// Two bugs live here if nobody watches. The switch is an <input type=checkbox>
-// wearing a different shape, so a generic checkbox rule can silently steal its
-// knob geometry — it once rendered as a 4x8px sliver of the checkmark instead
-// of a 21px circle. And the dialog repaints when a format is chosen, which
-// once reset the toggle out from under the user.
+// Two bugs lived here. The switch used to be an <input type=checkbox> wearing
+// a different shape, so a generic checkbox rule silently stole its knob
+// geometry and rendered a 4x8px sliver of a checkmark instead of a 21px
+// circle. It is a Base UI Switch now — the thumb is the library's own element,
+// which is both why that cannot recur and why these assertions can measure it.
+// The hidden <input> that remains is only the value model the dialog reads.
+//
+// The second bug stands: the dialog repaints when a format is chosen, and that
+// repaint once reset the toggle out from under the user.
 import puppeteer from 'puppeteer-core';
 
 const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -37,23 +41,30 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   await wait(500);
 
   console.log('--- the switch is a switch, not a checkbox ---');
+  // Measures the Base UI switch, not the hidden <input> that models its
+  // value: the thumb is a real element now, so the geometry that used to be
+  // unassertable (a ::after on a checkbox) can be read directly.
   const knob = await p.evaluate(`(() => {
-    const s = document.getElementById('export-save-default');
-    const cs = getComputedStyle(s);
-    const a = getComputedStyle(s, '::after');
-    return { trackW: cs.width, trackH: cs.height, knobW: a.width, knobH: a.height };
-  })()`) as Record<string, string>;
-  console.log(`  track ${knob.trackW}x${knob.trackH}, knob ${knob.knobW}x${knob.knobH}`);
+    const track = document.querySelector('.bui-switch');
+    const thumb = document.querySelector('.bui-switch-thumb');
+    if (!track || !thumb) return null;
+    const t = track.getBoundingClientRect();
+    const k = thumb.getBoundingClientRect();
+    return { trackW: t.width, trackH: t.height, knobW: k.width, knobH: k.height };
+  })()`) as Record<string, number> | null;
 
-  check(knob.trackW === '42px' && knob.trackH === '25px', 'the track keeps its own size');
-  // The regression: the checkmark rule is 4x8. A square knob proves the
-  // generic checkbox styling is not reaching this control.
-  check(knob.knobW === knob.knobH, `the knob is round, not a checkmark sliver (${knob.knobW}x${knob.knobH})`);
-  check(parseFloat(knob.knobW) > 15, 'and it fills the track rather than hiding in a corner');
+  check(knob !== null, 'the Base UI switch is mounted');
+  if (knob) {
+    console.log(`  track ${knob.trackW}x${knob.trackH}, knob ${knob.knobW}x${knob.knobH}`);
+    check(knob.trackW === 42 && knob.trackH === 25, 'the track keeps its own size');
+    // The old regression: a checkmark rule stole the knob and made it 4x8.
+    check(knob.knobW === knob.knobH, `the knob is square-boxed, not a sliver (${knob.knobW}x${knob.knobH})`);
+    check(knob.knobW > 15, 'and it fills the track rather than hiding in a corner');
+  }
 
   console.log('\n--- the switch survives choosing a format ---');
   // This is the interaction that used to silently undo the user's choice.
-  await p.evaluate(`document.getElementById('export-save-default').click()`);
+  await p.evaluate(`document.querySelector('.bui-switch').click()`);
   await wait(200);
   const afterToggle = await p.evaluate(`document.getElementById('export-save-default').checked`);
   check(afterToggle === true, 'clicking it turns it on');
@@ -72,7 +83,7 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
     'and the label names the new format');
 
   console.log('\n--- the default is actually saved ---');
-  await p.evaluate(`document.getElementById('export-save-default').click()`);
+  await p.evaluate(`document.querySelector('.bui-switch').click()`);
   await wait(200);
   await p.evaluate(`document.querySelector('#export-sheet button[value="download"]').click()`);
   await wait(800);

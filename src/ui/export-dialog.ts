@@ -1,4 +1,5 @@
 import type { PaidFormat } from '../paid-export';
+import { mountSwitch } from './controls';
 
 /**
  * Pick a format, see the cost, download.
@@ -96,6 +97,7 @@ export async function chooseExport(balance: number | null): Promise<PaidFormat |
         // default", so it reflects whether THIS format is the stored one.
         const box = dlg?.querySelector('#export-save-default') as HTMLInputElement | null;
         if (box) box.checked = saved !== null && saved === picked;
+        drawSwitch();
         paint();
       });
       return row;
@@ -104,6 +106,28 @@ export async function chooseExport(balance: number | null): Promise<PaidFormat |
 
   const save = dlg.querySelector('#export-save-default') as HTMLInputElement | null;
   if (save) save.checked = saved !== null && saved === picked;
+
+  /**
+   * Draw the Base UI switch from the hidden model.
+   *
+   * The model is what the rest of this file reads, so the switch writes to it
+   * and then re-draws itself. Replaces a hand-drawn checkbox whose knob was
+   * once silently overwritten by the generic checkbox tick rule — a class of
+   * bug that cannot recur when the thumb is the library's own element.
+   */
+  const switchHost = dlg.querySelector('#mount-save-default');
+  function drawSwitch() {
+    if (!switchHost || !save) return;
+    mountSwitch(switchHost, {
+      checked: save.checked,
+      label: `Make ${picked} my default`,
+      onChange: (on) => {
+        save.checked = on;
+        drawSwitch();
+      },
+    });
+  }
+  drawSwitch();
 
   const text = (id: string, s: string) => {
     const el = dlg.querySelector(`#${id}`);

@@ -10,7 +10,7 @@ import { confirmSpend } from './ui/confirm';
 import { chooseExport, defaultFormat } from './ui/export-dialog';
 import { jobStart, jobStage, jobEnd } from './ui/job';
 import { showLoading, loadingText } from './ui/loading';
-import { mountCutSlider, mountValueSlider } from './ui/controls';
+import { mountCutSlider, mountValueSlider, mountCheckbox } from './ui/controls';
 import { promptSignIn } from './ui/signin';
 import { openCredits } from './ui/credits';
 import type { PresetId } from './presets';
@@ -104,6 +104,7 @@ function adoptImage(el: HTMLImageElement | HTMLCanvasElement, w: number, h: numb
   state.useAi = false;
   const aiCheck = $('#in-ai') as HTMLInputElement;
   aiCheck.checked = false;
+  redrawCheckboxes();
   aiCheck.disabled = false;
   state.params.regions = [];
   state.activeRegion = -1;
@@ -567,6 +568,7 @@ function syncRegionControls() {
   redrawSlider('#in-alpha');
   redrawSlider('#in-denoise');
   redrawSlider('#in-offset');
+  redrawCheckboxes();
   $('#region-hint').textContent = r
     ? `R${state.activeRegion + 1}: threshold / denoise / hug-body / offset apply to this region only`
     : '';
@@ -668,6 +670,53 @@ function redrawSlider(inputSel: string): void {
   sliderRedraws.get(inputSel)?.();
 }
 
+/**
+ * Upgrade every option checkbox to a Base UI Checkbox.
+ *
+ * Same shape as the sliders: the native input stays as the model so all the
+ * existing `.checked` reads and writes keep working, and a drawn control is
+ * mounted beside it. Done as a sweep rather than per control because these
+ * are seven instances of one thing — and because the hand-drawn version was
+ * a tick built from rotated borders, which is exactly the kind of CSS that
+ * collides with the next control that also wants an ::after.
+ */
+const checkboxRedraws = new Map<HTMLInputElement, () => void>();
+
+function upgradeCheckboxes(): void {
+  for (const input of document.querySelectorAll<HTMLInputElement>('.row.check input[type="checkbox"]')) {
+    if (checkboxRedraws.has(input)) continue;
+
+    const host = document.createElement('span');
+    host.className = 'bui-checkbox-host';
+    input.after(host);
+    input.hidden = true;
+
+    const label = input.closest('.row.check')?.querySelector('label')?.textContent?.trim() ?? '';
+
+    const draw = () => {
+      mountCheckbox(host, {
+        checked: input.checked,
+        label,
+        onChange: (on) => {
+          input.checked = on;
+          draw();
+          // Dispatched so the existing change listeners — which are where the
+          // behaviour actually lives — run exactly as they did before.
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+        },
+      });
+    };
+
+    checkboxRedraws.set(input, draw);
+    draw();
+  }
+}
+
+/** Re-read every checkbox after code has written .checked directly. */
+function redrawCheckboxes(): void {
+  for (const draw of checkboxRedraws.values()) draw();
+}
+
 bindSlider('#in-offset', '#out-offset', (v) => `${v.toFixed(1)} mm`, (v) => {
   // With an element selected the offset applies to that element alone, so a
   // heavy mark and a fine strapline can each carry the border their scale
@@ -719,6 +768,10 @@ bindSlider('#in-precision', '#out-precision', (v) => `±${v.toFixed(2)} mm`, (v)
 ($('#in-holes') as HTMLInputElement).addEventListener('change', (e) => {
   state.params.keepHoles = (e.target as HTMLInputElement).checked;
   ($('#in-holes-simple') as HTMLInputElement).checked = state.params.keepHoles;
+  // The mirrored box is a model behind a mounted control, so writing it is
+  // only half the job — without this the two copies of one setting disagree
+  // on screen while agreeing underneath.
+  redrawCheckboxes();
   recompute(true);
 });
 
@@ -740,6 +793,7 @@ aiCheckbox.addEventListener('change', async () => {
   if (!state.workImg) {
     state.useAi = false;
     aiCheckbox.checked = false;
+    redrawCheckboxes();
     toast('Open an image first.', 'error');
     return;
   }
@@ -763,6 +817,7 @@ aiCheckbox.addEventListener('change', async () => {
     console.error('AI matting failed', err);
     state.useAi = false;
     aiCheckbox.checked = false;
+    redrawCheckboxes();
     hint.textContent = 'AI matting failed on this device/browser — the classic pipeline still works.';
     toast(`AI matting failed: ${err instanceof Error ? err.message : err}`, 'error', 9000);
   } finally {
@@ -955,10 +1010,14 @@ function syncPresetSelection() {
   }
   const holes = $('#in-holes-simple') as HTMLInputElement | null;
   if (holes) holes.checked = state.params.keepHoles;
+  redrawCheckboxes();
 }
 
 // Simple is the default: it is the mode that answers the question most
 // people arrive with, and Advanced is one click away.
+// Upgrade the option checkboxes before the first sync, so nothing draws the
+// native control even briefly.
+upgradeCheckboxes();
 setMode('simple');
 applyPreset('sticker');
 
@@ -976,6 +1035,7 @@ for (const btn of document.querySelectorAll<HTMLButtonElement>('.cutstop')) {
 $('#in-holes-simple').addEventListener('change', (e) => {
   state.params.keepHoles = (e.target as HTMLInputElement).checked;
   ($('#in-holes') as HTMLInputElement).checked = state.params.keepHoles;
+  redrawCheckboxes();
   recompute(true);
 });
 

@@ -392,7 +392,11 @@
                 <strong id="export-save-label">Make SVG my default</strong>
                 <span>Preselected every time you export</span>
               </span>
-              <input id="export-save-default" type="checkbox" class="switch" />
+              <!-- Hidden model; the Base UI switch is mounted beside it and
+                   writes here, so the dialog's existing reads of .checked all
+                   keep working. -->
+              <input id="export-save-default" type="checkbox" hidden />
+              <span id="mount-save-default"></span>
             </label>
 
             <div class="sheet-actions">

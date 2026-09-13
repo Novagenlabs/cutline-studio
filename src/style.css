@@ -1302,6 +1302,102 @@ body:not(.mode-simple) #panel-simple {
   outline-offset: 2px;
 }
 
+/* ---------- Base UI switch ----------
+   A preference that takes effect later, which a switch says and a checkbox
+   does not. The thumb is the library's own element, so the generic checkbox
+   styling can no longer reach in and overwrite its geometry — which is
+   exactly what once shrank it to a 4x8px sliver of a checkmark. */
+.bui-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 42px;
+  height: 25px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 13px;
+  background: #3a3a40;
+  cursor: pointer;
+  transition: background 160ms;
+}
+
+.bui-switch[data-checked] {
+  background: var(--accent);
+}
+
+.bui-switch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.bui-switch-thumb {
+  position: absolute;
+  left: 2px;
+  width: 21px;
+  height: 21px;
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  transition: transform 160ms;
+}
+
+.bui-switch-thumb[data-checked] {
+  transform: translateX(17px);
+}
+
+/* ---------- Base UI checkbox ---------- */
+.bui-checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background: var(--panel);
+  color: var(--bg);
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms;
+}
+
+.bui-checkbox:hover { border-color: #3a3a40; }
+
+.bui-checkbox[data-checked] {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.bui-checkbox:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.bui-checkbox-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 11px;
+  height: 11px;
+}
+
+.bui-checkbox-indicator svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Holds a mounted checkbox where its hidden native input used to sit. */
+.bui-checkbox-host {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.row.check input[type='checkbox'][hidden] {
+  display: none;
+}
+
 /* The stop labels are two lines tall and sit directly above the next
    control, so the block owns the space beneath it — without this the "0 mm"
    sub-labels are overlapped by whatever row follows. */
@@ -1777,40 +1873,6 @@ body:not(.mode-simple) #panel-simple {
   color: var(--muted);
 }
 
-/* An iOS-style switch: this is a preference that takes effect later, which a
-   switch says and a checkbox does not. */
-/* Written as input.switch, not .switch: `input[type='checkbox']` above is
-   (0,1,1) — an attribute selector counts the same as a class — so a bare
-   .switch at (0,1,0) loses the width and collapses the track onto the knob. */
-input.switch {
-  appearance: none;
-  -webkit-appearance: none;
-  position: relative;
-  width: 42px;
-  height: 25px;
-  flex-shrink: 0;
-  margin: 0;
-  border-radius: 13px;
-  background: #3a3a40;
-  cursor: pointer;
-  transition: background 160ms;
-}
-
-input.switch::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 21px;
-  height: 21px;
-  border-radius: 11px;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-  transition: transform 160ms;
-}
-
-input.switch:checked { background: var(--accent); }
-input.switch:checked::after { transform: translateX(17px); }
 
 .btn-sub {
   font-family: var(--mono);
