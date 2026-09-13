@@ -1128,30 +1128,53 @@ body:not(.mode-simple) #panel-simple {
 
 .cutslider {
   position: relative;
-  height: 22px;
+  height: 20px;
   display: flex;
   align-items: center;
-  padding: 0 4px;
+}
+
+/* Geometry note, because this is easy to get subtly wrong:
+   a range input centres its thumb at (thumbW / 2) from each end, so the thumb
+   travels over an area inset by half a thumb at both sides — NOT the full
+   track. Ticks laid out across the whole track therefore drift away from the
+   stops they mark, worst at the two ends. Both are inset by the same
+   --knob half-width here, so tick and thumb share one travel range. */
+.cutslider {
+  --knob: 16px;
 }
 
 .cutslider-track {
   position: absolute;
-  left: 4px;
-  right: 4px;
+  left: 0;
+  right: 0;
   height: 4px;
   border-radius: 2px;
   background: var(--line-strong);
+}
+
+/* The ticks sit in their own inset row rather than inside the track, so the
+   track can stay full-width while the dots line up with the thumb. */
+.cutslider-ticks {
+  position: absolute;
+  left: calc(var(--knob) / 2);
+  right: calc(var(--knob) / 2);
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  pointer-events: none;
 }
 
+/* 6px, down from 8px: the dot marks a position, it is not a control, and at
+   8px it read as a second row of handles competing with the knob. */
 .cutslider-tick {
-  width: 8px;
-  height: 8px;
-  border-radius: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
   background: var(--tick);
   flex-shrink: 0;
+  /* Centres the dot on its stop — the flex row aligns dot edges otherwise. */
+  margin: 0 -3px;
 }
 
 /* The input is invisible but still the thing you click and focus. */
@@ -1166,33 +1189,39 @@ body:not(.mode-simple) #panel-simple {
   cursor: pointer;
 }
 
+/* Matches the thumb height so the browser centres the thumb on the row
+   without a margin-top fudge that only works in one engine. */
 .cutslider input[type='range']::-webkit-slider-runnable-track {
-  height: 22px;
+  height: var(--knob);
   background: transparent;
 }
 
 .cutslider input[type='range']::-moz-range-track {
-  height: 22px;
+  height: var(--knob);
   background: transparent;
 }
 
+/* 16px, down from 22px. A handle on a 4px track only has to be grabbable and
+   unambiguous; at 22px it was wider than the gaps between stops, so it sat on
+   top of the very ticks it was meant to point at. */
 .cutslider input[type='range']::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 22px;
-  height: 22px;
-  border-radius: 11px;
+  width: var(--knob);
+  height: var(--knob);
+  border-radius: 50%;
   background: var(--ink);
-  border: 1px solid rgba(0, 0, 0, 0.2);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
 }
 
 .cutslider input[type='range']::-moz-range-thumb {
-  width: 22px;
-  height: 22px;
-  border-radius: 11px;
+  width: var(--knob);
+  height: var(--knob);
+  border-radius: 50%;
   background: var(--ink);
-  border: 1px solid rgba(0, 0, 0, 0.2);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  box-sizing: border-box;
 }
 
 .cutslider input[type='range']:focus-visible::-webkit-slider-thumb {
@@ -1209,6 +1238,7 @@ body:not(.mode-simple) #panel-simple {
   padding-top: 10px;
   margin-bottom: 14px;
 }
+
 
 /* The stops are also buttons: the slider is the primary control, but a
    direct click on "Sticker" is the faster path when you know what you want. */

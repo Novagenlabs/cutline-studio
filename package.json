@@ -26,7 +26,8 @@
     "verify:cutmark": "tsx test/verify-cutmark.ts",
     "motion-lab": "cp node_modules/dialkit/dist/vanilla/browser.global.js public/motion-lab/dialkit.js && cp node_modules/dialkit/dist/vanilla/styles.css public/motion-lab/dialkit.css && esbuild src/motion-lab.ts --bundle --format=esm --outfile=public/motion-lab/lab.js --target=es2022",
     "verify:elements": "tsx test/verify-elements.ts",
-    "verify:export": "tsx test/verify-export-dialog.ts"
+    "verify:export": "tsx test/verify-export-dialog.ts",
+    "verify:slider": "tsx test/verify-slider-geometry.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
