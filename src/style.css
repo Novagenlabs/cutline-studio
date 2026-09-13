@@ -187,6 +187,17 @@ body {
    for state. `solid` is the light fill, `ghost` the outline, and neither
    changes hue on hover — only lifts, which reads as a surface responding
    rather than a colour event. */
+/* `hidden` must win over every display this file sets.
+   [hidden] is only display:none in the UA sheet, so any class that sets its
+   own display silently outranks it and the element stays on screen with the
+   attribute still set — which is how a "Sign out" button appeared to someone
+   who was not signed in, and how the top Export button would have appeared
+   before an image was open. Scoped to the whole document so the next
+   component to set display does not reintroduce it. */
+[hidden] {
+  display: none !important;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;

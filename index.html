@@ -370,10 +370,17 @@
         <dialog id="credits-sheet" class="sheet">
           <div class="sheet-body">
             <h3>Credits</h3>
-            <p class="sheet-text">
+            <!-- Two sentences, not one with blanks in it: signed out there is
+                 no balance and no download count, and the old single sentence
+                 rendered as "Not signed in left · 0 downloaded". render()
+                 swaps which one is shown. -->
+            <p class="sheet-text" id="credits-line-in">
               <strong id="credits-balance">—</strong> left ·
               <span id="credits-downloads">—</span> downloaded. One credit per
               cut file.
+            </p>
+            <p class="sheet-text" id="credits-line-out" hidden>
+              Sign in to buy credits. One credit per cut file.
             </p>
             <div id="credits-packs" class="pack-grid"></div>
             <p class="sheet-text sheet-note" id="credits-note">

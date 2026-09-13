@@ -141,9 +141,18 @@ function packButtons(): HTMLButtonElement[] {
 }
 
 function render(info: AccountInfo): void {
+  // Signed out, the balance sentence has nothing to say — its numbers do not
+  // exist yet — so the whole sentence is swapped rather than filled with a
+  // placeholder that reads as broken grammar ("Not signed in left · 0
+  // downloaded").
+  const lineIn = document.getElementById('credits-line-in');
+  const lineOut = document.getElementById('credits-line-out');
+  if (lineIn) lineIn.hidden = !info.signedIn;
+  if (lineOut) lineOut.hidden = info.signedIn;
+
   const bal = document.getElementById('credits-balance');
   const dls = document.getElementById('credits-downloads');
-  if (bal) bal.textContent = info.balance === null ? 'Not signed in' : `${info.balance} credits`;
+  if (bal) bal.textContent = info.balance === null ? '0' : String(info.balance);
   if (dls) dls.textContent = String(info.downloads);
 
   const signout = document.getElementById('credits-signout') as HTMLButtonElement | null;
