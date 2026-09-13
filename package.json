@@ -29,7 +29,8 @@
     "verify:elements": "tsx test/verify-elements.ts",
     "verify:export": "tsx test/verify-export-dialog.ts",
     "verify:slider": "tsx test/verify-slider-geometry.ts",
-    "verify:accordion": "tsx test/verify-accordion.ts"
+    "verify:accordion": "tsx test/verify-accordion.ts",
+    "verify:reset": "tsx test/verify-reset.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",

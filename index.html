@@ -275,6 +275,20 @@
           </div>
         </section>
 
+        <!-- Applies to every Advanced section, so it sits after all of them
+             rather than inside one. Quiet by default: a destructive-ish
+             action the user looks for deliberately, not one that competes
+             with Export for attention. -->
+        <section class="group reset-row" id="panel-reset">
+          <button id="btn-reset" class="link-btn reset-btn" type="button">
+            <!-- Phosphor ArrowCounterClockwise (MIT), inlined like the others. -->
+            <svg viewBox="0 0 256 256" aria-hidden="true" width="13" height="13">
+              <path d="M195.88 60.12a95.92 95.92 0 0 0-135.76 0L27.72 92.28A8 8 0 0 0 24 99.88V152a8 8 0 0 0 8 8h52.12a8 8 0 0 0 5.66-13.66l-25.9-25.9a64 64 0 1 1 1.29 91.22 8 8 0 0 0-11 11.62A80 80 0 1 0 195.88 60.12Z"/>
+            </svg>
+            Reset all settings
+          </button>
+        </section>
+
         <!-- Pinned to the bottom of the rail: the one action the whole panel
              leads to, always reachable without scrolling past the controls. -->
         <div class="rail-spacer"></div>

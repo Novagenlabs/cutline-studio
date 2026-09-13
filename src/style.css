@@ -1723,6 +1723,40 @@ body:not(.mode-simple) #panel-simple {
 
 .link-btn:hover { color: #ffb02e; }
 
+/* Recessive on purpose. Reset undoes the user's work, so it must be findable
+   without competing with Export — amber here would read as the thing to
+   press. Muted until hover, where it turns amber to confirm it is live. */
+.reset-row {
+  padding-top: 4px;
+}
+
+.reset-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--line, #232326);
+  border-radius: 7px;
+  color: var(--muted);
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.reset-btn svg {
+  fill: currentColor;
+  flex: none;
+}
+
+.reset-btn:hover {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.reset-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .el-list {
   display: flex;
   flex-direction: column;

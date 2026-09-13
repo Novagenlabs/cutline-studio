@@ -969,6 +969,78 @@ function applyPreset(id: PresetId) {
   recompute(true);
 }
 
+/**
+ * Put every setting back to its shipped default.
+ *
+ * Deliberately not a reload: the artwork, the zoom and the sign-in state are
+ * not settings, and throwing them away to reset a slider would be a worse
+ * surprise than the one the user is trying to undo. Only params, the two
+ * view toggles and the spot name go back.
+ *
+ * The values come from DEFAULT_PARAMS rather than from literals repeated
+ * here, so a setting added to the defaults is reset without anyone
+ * remembering to update this function. Regions are cleared rather than
+ * defaulted: they describe the image that happens to be open, and a default
+ * for them is meaningless.
+ */
+function resetAllSettings() {
+  state.params = { ...DEFAULT_PARAMS, regions: [] };
+  state.activeRegion = -1;
+  state.halo = true;
+  state.compareV1 = false;
+  state.spotName = 'CutContour';
+  state.useAi = false;
+
+  // Numeric inputs and their mounted sliders.
+  syncCutControls();
+  const p = state.params;
+  const setSlider = (sel: string, out: string, v: number, fmt: (n: number) => string) => {
+    const el = $(sel) as HTMLInputElement | null;
+    if (el) el.value = String(v);
+    const o = $(out);
+    if (o) o.textContent = fmt(v);
+    redrawSlider(sel);
+  };
+  setSlider('#in-alpha', '#out-alpha', p.alphaThreshold, (v) => String(v));
+  setSlider('#in-bgtol', '#out-bgtol', p.bgTolerance, (v) => String(v));
+  setSlider('#in-denoise', '#out-denoise', p.denoisePx, (v) => `${v.toFixed(1)} px`);
+  setSlider('#in-holemin', '#out-holemin', p.holeMinMm2, (v) => `${v.toFixed(0)} mm²`);
+  ($('#in-dpi') as HTMLInputElement).value = String(p.dpi);
+
+  // Checkboxes are mirrored by a custom control, so writing .checked is not
+  // enough on its own — redrawCheckboxes() is what makes the change visible.
+  const check = (sel: string, on: boolean) => {
+    const el = $(sel) as HTMLInputElement | null;
+    if (el) el.checked = on;
+  };
+  check('#in-holes', p.keepHoles);
+  check('#in-holes-simple', p.keepHoles);
+  check('#in-body', p.hugBody);
+  check('#in-ai', false);
+  check('#in-halo', true);
+  check('#in-v1', false);
+  redrawCheckboxes();
+
+  // Die shape is a button group, not an input: its state is the active class.
+  document.querySelectorAll<HTMLButtonElement>('.shape').forEach((b) => {
+    b.classList.toggle('active', b.dataset.shape === p.shape);
+  });
+
+  // Output.
+  const cutmode = $('#in-cutmode') as HTMLSelectElement | null;
+  if (cutmode) {
+    cutmode.value = 'kiss';
+    cutmode.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  spotInput.value = state.spotName;
+
+  // The Simple tab reads the same params, so it has to follow too.
+  syncPresetSelection();
+  renderElementList();
+  recompute(true);
+  toast('Settings reset to defaults.', 'info', 3000);
+}
+
 /** Reflect params in the advanced Cut path controls. */
 function syncCutControls() {
   const p = state.params;
@@ -1079,6 +1151,8 @@ $('.mode-tabs').addEventListener('keydown', (e) => {
 
 $('#tab-simple').addEventListener('click', () => setMode('simple'));
 $('#tab-advanced').addEventListener('click', () => setMode('advanced'));
+
+$('#btn-reset').addEventListener('click', () => resetAllSettings());
 
 // Advanced is four sections deep and most jobs touch one of them. Each
 // heading collapses its own body so the rail can be narrowed to the section
