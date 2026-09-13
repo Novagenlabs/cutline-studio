@@ -1019,6 +1019,91 @@ body:not(.mode-simple) #panel-simple {
   font-size: 11px;
 }
 
+/* ---------- detected elements ---------- */
+#panel-elements { padding-top: 4px; }
+
+/* Wins over the mode rules above, which set `display` on .group and would
+   otherwise override the `hidden` attribute — the same trap the job banner
+   hit, where the element was on screen while hidden read as true. */
+#panel-elements[hidden] { display: none !important; }
+
+/* A text link, not a button: "Detect" sits in a section header where a
+   bordered control would outweigh the heading beside it. */
+.link-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: var(--display);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.link-btn:hover { color: #ffb02e; }
+
+.el-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.el-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line-panel);
+  border-radius: 9px;
+  background: var(--panel);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--ink);
+  transition: border-color 120ms, background 120ms;
+}
+
+.el-row:hover { border-color: var(--line-strong); }
+
+.el-row.active {
+  border-color: rgba(255, 159, 10, 0.5);
+  background: rgba(255, 159, 10, 0.06);
+}
+
+/* The swatch is the row's only colour, and it is lit only on the selected
+   element — so the list says which one the offset slider is about. */
+.el-swatch {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--muted-2);
+  flex-shrink: 0;
+  transition: background 120ms;
+}
+
+.el-row.active .el-swatch { background: var(--accent); }
+
+.el-name {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.el-mm {
+  width: 52px;
+  flex-shrink: 0;
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
 /* ---------- credit pill ---------- */
 
 .credit-pill {

@@ -96,6 +96,17 @@
           <p class="hint" id="preset-hint"></p>
         </section>
 
+        <!-- Per-element tuning, in Simple rather than buried in Advanced: on a
+             logo the icon and the strapline usually want different offsets,
+             which is a routine job, not an expert one. -->
+        <section class="group always-on" id="panel-elements" hidden>
+          <div class="group-head">
+            <h2>Elements</h2>
+            <button id="btn-detect-simple" class="link-btn" type="button">Detect</button>
+          </div>
+          <div class="el-list" id="el-list"></div>
+        </section>
+
         <section class="group">
           <h2>Artwork</h2>
           <div class="row">

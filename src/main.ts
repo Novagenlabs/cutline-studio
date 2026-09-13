@@ -118,6 +118,8 @@ function adoptImage(el: HTMLImageElement | HTMLCanvasElement, w: number, h: numb
   for (const id of ['#btn-svg', '#btn-pdf', '#btn-dxf', '#btn-png', '#btn-jpg', '#btn-export']) {
     ($(id) as HTMLButtonElement).disabled = false;
   }
+  // Reveals the Elements section now that there is artwork to detect within.
+  renderElementList();
   recompute();
   requestAnimationFrame(fitView);
 }
@@ -329,6 +331,10 @@ $('#btn-region').addEventListener('click', () => setMarqueeArmed(!marqueeArmed))
  * each can be tuned on its own. Artwork that mixes a heavy mark with fine
  * type has no single set of values that suits all of it.
  */
+// Two entry points, one behaviour: the Simple tab's "Detect" link and the
+// Advanced tab's button run the same detection rather than diverging.
+$('#btn-detect-simple').addEventListener('click', () => $('#btn-detect').click());
+
 $('#btn-detect').addEventListener('click', () => {
   const engine = state.useAi && state.aiEngine ? state.aiEngine : state.engine;
   if (!engine) {
@@ -371,7 +377,89 @@ $('#btn-detect').addEventListener('click', () => {
   );
 });
 
+/**
+ * Name a detected element from where it sits and how tall it is.
+ *
+ * The detector returns boxes, not meanings, so these are descriptions rather
+ * than claims: the tallest band is almost always the icon or the display
+ * type, and a short band under it is a strapline. Getting a name slightly
+ * wrong is harmless — the row is identified by its swatch and its position in
+ * the list — but "R2" tells the user nothing at all.
+ */
+function elementName(r: RegionOverride, all: RegionOverride[]): string {
+  if (all.length === 1) return 'Whole artwork';
+  const tallest = Math.max(...all.map((x) => x.h));
+  const widest = Math.max(...all.map((x) => x.w));
+
+  const base = (x: RegionOverride): string => {
+    // A tall, narrow block beside wider ones reads as a mark rather than text.
+    if (x.h >= tallest * 0.8 && x.w <= widest * 0.55) return 'Icon';
+    if (x.h >= tallest * 0.8) return 'Display type';
+    if (x.h <= tallest * 0.5) return 'Strapline';
+    return 'Element';
+  };
+
+  const name = base(r);
+  // Two bands of similar height genuinely earn the same description, so the
+  // duplicates are numbered rather than left identical — a list with two rows
+  // reading "Strapline" cannot be talked about or told apart.
+  const sameName = all.filter((x) => base(x) === name);
+  if (sameName.length < 2) return name;
+  return `${name} ${sameName.indexOf(r) + 1}`;
+}
+
+/** The element list in the Simple tab: one row per detected region. */
+function renderElementList() {
+  const panel = $('#panel-elements');
+  const list = $('#el-list');
+  if (!panel || !list) return;
+
+  const regions = state.params.regions;
+  // The section appears as soon as there is artwork to detect within, not
+  // once regions exist — otherwise the control that creates them is hidden
+  // behind their existence.
+  panel.hidden = state.imageEl === null;
+  list.innerHTML = '';
+
+  if (regions.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'hint';
+    empty.textContent = 'Detect to tune the icon and the text separately.';
+    list.appendChild(empty);
+    return;
+  }
+
+  regions.forEach((r, i) => {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = `el-row${state.activeRegion === i ? ' active' : ''}`;
+
+    const sw = document.createElement('span');
+    sw.className = 'el-swatch';
+
+    const name = document.createElement('span');
+    name.className = 'el-name';
+    name.textContent = elementName(r, regions);
+
+    const mm = document.createElement('span');
+    mm.className = 'el-mm';
+    // Falls back to the global offset: a region with no override of its own
+    // is cut at whatever the slider says, and showing a blank there would
+    // imply it is not being cut at all.
+    mm.textContent = `${(r.offsetMm ?? state.params.offsetMm).toFixed(1)} mm`;
+
+    row.append(sw, name, mm);
+    row.addEventListener('click', () => {
+      state.activeRegion = i;
+      renderRegions();
+      syncRegionControls();
+    });
+    list.appendChild(row);
+  });
+}
+
 function renderRegions() {
+  renderElementList();
   const chips = $('#region-chips');
   chips.innerHTML = '';
   const mk = (label: string, idx: number) => {
@@ -483,6 +571,9 @@ bindSlider('#in-offset', '#out-offset', (v) => `${v.toFixed(1)} mm`, (v) => {
   const r = activeRegion();
   if (r && state.params.engineVersion === 'v3') r.offsetMm = v;
   else state.params.offsetMm = v;
+  // The element rows quote their own offsets, so they have to follow the
+  // slider rather than only refreshing when the selection changes.
+  renderElementList();
 });
 bindSlider('#in-bridge', '#out-bridge', (v) => (v === 0 ? 'off' : `${v.toFixed(1)} mm`), (v) => {
   state.params.bridgeMm = v;
