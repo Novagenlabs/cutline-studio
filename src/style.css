@@ -287,6 +287,71 @@ body {
   margin-bottom: 14px;
 }
 
+/* An accordion header, not a button that looks like one: the heading keeps
+   its own type and colour, and the trigger is the full-width hit area around
+   it so the whole row is clickable rather than just eleven pixels of text. */
+.group h2:has(.group-toggle) {
+  margin-bottom: 0;
+}
+
+.group-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 0 0 14px;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.group-toggle:hover {
+  color: var(--ink);
+}
+
+.group-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.group-chev {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+  opacity: 0.65;
+  transition: transform 160ms ease;
+}
+
+.group-toggle[aria-expanded='false'] .group-chev {
+  transform: rotate(-90deg);
+}
+
+/* Collapsed sections keep their bottom padding out of the stack too, or a
+   rail of closed headings sits in a column of dead space. */
+.group-toggle[aria-expanded='false'] {
+  padding-bottom: 0;
+}
+
+.group:has(.group-toggle[aria-expanded='false']) {
+  padding-bottom: 14px;
+}
+
+.group-body {
+  overflow: hidden;
+}
+
+.group-body[hidden] {
+  display: none;
+}
+
 .row {
   display: flex;
   align-items: center;

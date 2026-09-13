@@ -9,7 +9,7 @@ import { toast } from './ui/toast';
 import { confirmSpend } from './ui/confirm';
 import { chooseExport, defaultFormat } from './ui/export-dialog';
 import { jobStart, jobStage, jobEnd } from './ui/job';
-import { showLoading, loadingText } from './ui/loading';
+import { showLoading } from './ui/loading';
 import { createSplash, splashSeen } from './ui/splash';
 import { mountCutSlider, mountValueSlider, mountCheckbox, mountSelect } from './ui/controls';
 import { promptSignIn } from './ui/signin';
@@ -835,27 +835,33 @@ aiCheckbox.addEventListener('change', async () => {
   }
   aiCheckbox.disabled = true;
   const hint = $('#hint-ai');
-  // The model is tens of megabytes and the first run can take minutes. A
-  // long-lived toast was the wrong instrument for that: it sits in the corner
-  // while the canvas appears frozen. The overlay says plainly that the app is
-  // busy, and carries the same progress messages as they arrive.
-  const closeLoading = showLoading('Loading the AI matting model');
+  // The first run can take minutes while the model downloads, so the wait
+  // gets the full overlay rather than a toast in the corner.
+  //
+  // The progress messages are deliberately NOT shown. They name the model and
+  // its size, which is implementation detail the user did not ask about and
+  // cannot act on — "Preparing your workspace" is the whole of what they need
+  // to know. The messages still reach the console, where they are useful to
+  // whoever is debugging a slow first run.
+  const closeLoading = showLoading('Preparing your workspace');
   try {
     const matte = await computeAiMatte(state.workImg, (msg) => {
-      hint.textContent = msg;
-      loadingText(msg);
+      console.info('[matte]', msg);
     });
     state.aiEngine = new CutlineEngine(matteToImage(state.workImg, matte), state.workScale);
-    hint.textContent = 'AI matte active — threshold, denoise and regions now shape the neural edge.';
-    toast('AI matte ready.', 'info', 4000);
+    hint.textContent = 'Smart edges active — threshold, denoise and regions now shape them.';
+    toast('Smart edges ready.', 'info', 4000);
     recompute(true);
   } catch (err) {
-    console.error('AI matting failed', err);
+    console.error('Smart edge detection failed', err);
     state.useAi = false;
     aiCheckbox.checked = false;
     redrawCheckboxes();
-    hint.textContent = 'AI matting failed on this device/browser — the classic pipeline still works.';
-    toast(`AI matting failed: ${err instanceof Error ? err.message : err}`, 'error', 9000);
+    hint.textContent = 'Smart edges are not available on this device — the usual trace still works.';
+    // The underlying error goes to the console, not to the user: it names
+    // wasm backends and model files, which is noise to someone who just
+    // wanted a cutline.
+    toast('Smart edges are not available on this device.', 'error', 7000);
   } finally {
     closeLoading();
     aiCheckbox.disabled = false;
@@ -1073,6 +1079,20 @@ $('.mode-tabs').addEventListener('keydown', (e) => {
 
 $('#tab-simple').addEventListener('click', () => setMode('simple'));
 $('#tab-advanced').addEventListener('click', () => setMode('advanced'));
+
+// Advanced is four sections deep and most jobs touch one of them. Each
+// heading collapses its own body so the rail can be narrowed to the section
+// in hand. Toggling `hidden` on the body rather than a class keeps the
+// collapsed controls out of the accessibility tree as well as out of view.
+for (const toggle of document.querySelectorAll<HTMLButtonElement>('.group-toggle')) {
+  const body = toggle.closest('.group')?.querySelector<HTMLElement>('.group-body');
+  if (!body) continue;
+  toggle.addEventListener('click', () => {
+    const open = toggle.getAttribute('aria-expanded') === 'true';
+    toggle.setAttribute('aria-expanded', String(!open));
+    body.hidden = open;
+  });
+}
 
 // Two ways into the same four presets: drag the slider, or click a stop by
 // name. The slider's own handler is passed to the mount in

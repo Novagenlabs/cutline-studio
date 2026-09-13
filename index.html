@@ -124,142 +124,154 @@
         </section>
 
         <section class="group">
-          <h2>Artwork</h2>
-          <div class="row">
-            <label for="in-dpi">Print DPI</label>
-            <input id="in-dpi" type="number" min="72" max="1200" step="1" value="300" />
-          </div>
-          <div class="row readout"><span>Physical size</span><output id="out-size">—</output></div>
-          <div class="row slider">
-            <label for="in-alpha">Alpha threshold <output id="out-alpha">128</output></label>
-            <input id="in-alpha" type="range" min="1" max="254" step="1" value="128" />
-          </div>
-          <div class="row slider">
-            <label for="in-bgtol">Background tolerance <output id="out-bgtol">32</output></label>
-            <input id="in-bgtol" type="range" min="4" max="120" step="1" value="32" />
-          </div>
-          <div class="row slider">
-            <label for="in-denoise">Edge denoise <output id="out-denoise">0.4 px</output></label>
-            <input id="in-denoise" type="range" min="0" max="2" step="0.1" value="0.4" />
-          </div>
-          <div class="row check">
-            <input id="in-body" type="checkbox" />
-            <label for="in-body">Hug colored body (peel white outline)</label>
-          </div>
-          <div class="row check">
-            <input id="in-ai" type="checkbox" />
-            <label for="in-ai">AI edge detection (BiRefNet)</label>
-          </div>
-          <p class="hint" id="hint-ai">Neural matting for photos &amp; busy backgrounds — one-time ~98 MB model download, then runs locally in your browser.</p>
-          <div class="row">
-            <button id="btn-region" class="btn ghost sm" type="button">
-              <svg viewBox="0 0 24 24" aria-hidden="true" width="12" height="12">
-                <rect x="4" y="4" width="16" height="16" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/>
-                <path d="M12 9v6M9 12h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-              </svg>
-              Fix a region
-            </button>
-            <button id="btn-detect" class="btn ghost sm" type="button">
-              <svg viewBox="0 0 24 24" aria-hidden="true" width="12" height="12">
-                <rect x="3" y="6" width="8" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
-                <rect x="14" y="6" width="7" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
-              </svg>
-              Detect elements
-            </button>
-            <span class="hint" id="region-hint"></span>
-          </div>
-          <div class="chips" id="region-chips"></div>
-          <p class="hint" id="hint-mask">—</p>
-        </section>
-
-        <section class="group">
-          <h2>Cut path</h2>
-          <div class="row slider">
-            <label for="in-offset">Offset <output id="out-offset">3.0 mm</output></label>
-            <input id="in-offset" type="range" min="-2" max="20" step="0.05" value="3" />
-          </div>
-          <div class="row slider">
-            <label for="in-bridge">Bridge gaps <output id="out-bridge">off</output></label>
-            <input id="in-bridge" type="range" min="0" max="20" step="0.5" value="0" />
-          </div>
-          <div class="row slider">
-            <label for="in-smooth">Smoothness <output id="out-smooth">2</output></label>
-            <input id="in-smooth" type="range" min="0" max="3" step="1" value="2" />
-          </div>
-          <div class="row slider">
-            <label for="in-precision">Precision <output id="out-precision">±0.08 mm</output></label>
-            <input id="in-precision" type="range" min="0.02" max="0.3" step="0.01" value="0.08" />
-          </div>
-          <div class="row slider">
-            <label for="in-corner">Min corner radius <output id="out-corner">1.0 mm</output></label>
-            <input id="in-corner" type="range" min="0" max="3" step="0.1" value="1" />
-          </div>
-          <div class="row check">
-            <input id="in-holes" type="checkbox" />
-            <label for="in-holes">Cut interior holes (decals)</label>
-          </div>
-          <div class="row slider">
-            <label for="in-holemin">Fill counters under <output id="out-holemin">1 mm²</output></label>
-            <input id="in-holemin" type="range" min="0" max="80" step="1" value="1" />
-          </div>
-          <div class="row check">
-            <input id="in-halo" type="checkbox" checked />
-            <label for="in-halo">White halo border</label>
-          </div>
-          <div class="row">
-            <label for="in-engine">Engine</label>
-            <select id="in-engine">
-              <option value="v3" selected>v3 — text accurate</option>
-              <option value="v2">v2 — original</option>
-            </select>
-          </div>
-          <div class="row check">
-            <input id="in-v1" type="checkbox" />
-            <label for="in-v1">Compare v1 engine (cyan)</label>
+          <h2><button type="button" class="group-toggle" aria-expanded="true"><span>Artwork</span><svg class="group-chev" viewBox="0 0 256 256" aria-hidden="true"><path d="M213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80A8 8 0 0 1 53.66 90.34L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32Z"/></svg></button></h2>
+          <div class="group-body">
+            <div class="row">
+              <label for="in-dpi">Print DPI</label>
+              <input id="in-dpi" type="number" min="72" max="1200" step="1" value="300" />
+            </div>
+            <div class="row readout"><span>Physical size</span><output id="out-size">—</output></div>
+            <div class="row slider">
+              <label for="in-alpha">Alpha threshold <output id="out-alpha">128</output></label>
+              <input id="in-alpha" type="range" min="1" max="254" step="1" value="128" />
+            </div>
+            <div class="row slider">
+              <label for="in-bgtol">Background tolerance <output id="out-bgtol">32</output></label>
+              <input id="in-bgtol" type="range" min="4" max="120" step="1" value="32" />
+            </div>
+            <div class="row slider">
+              <label for="in-denoise">Edge denoise <output id="out-denoise">0.4 px</output></label>
+              <input id="in-denoise" type="range" min="0" max="2" step="0.1" value="0.4" />
+            </div>
+            <div class="row check">
+              <input id="in-body" type="checkbox" />
+              <label for="in-body">Hug colored body (peel white outline)</label>
+            </div>
+            <div class="row check">
+              <input id="in-ai" type="checkbox" />
+              <label for="in-ai">Smart edge detection</label>
+            </div>
+            <!-- Says what it does for the user, not what it is built from. The
+                 model name and its download size were implementation detail
+                 leaking into the product; the first run is slower, which the
+                 loading overlay already communicates. -->
+            <p class="hint" id="hint-ai">Finds edges on photos and busy backgrounds where the usual trace struggles. Runs entirely on your machine — the artwork never leaves it.</p>
+            <div class="row">
+              <button id="btn-region" class="btn ghost sm" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true" width="12" height="12">
+                  <rect x="4" y="4" width="16" height="16" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/>
+                  <path d="M12 9v6M9 12h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                Fix a region
+              </button>
+              <button id="btn-detect" class="btn ghost sm" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true" width="12" height="12">
+                  <rect x="3" y="6" width="8" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+                  <rect x="14" y="6" width="7" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                Detect elements
+              </button>
+              <span class="hint" id="region-hint"></span>
+            </div>
+            <div class="chips" id="region-chips"></div>
+            <p class="hint" id="hint-mask">—</p>
           </div>
         </section>
 
         <section class="group">
-          <h2>Die shape</h2>
-          <div class="shape-picker" role="radiogroup" aria-label="Die shape">
-            <button type="button" class="shape active" data-shape="contour" title="Contour">
-              <svg viewBox="0 0 32 32"><path d="M16 4 L20 12 L28 13 L22 19 L24 27 L16 23 L8 27 L10 19 L4 13 L12 12 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
-            </button>
-            <button type="button" class="shape" data-shape="rect" title="Rectangle">
-              <svg viewBox="0 0 32 32"><rect x="5" y="7" width="22" height="18" fill="none" stroke="currentColor" stroke-width="2"/></svg>
-            </button>
-            <button type="button" class="shape" data-shape="rounded" title="Rounded rectangle">
-              <svg viewBox="0 0 32 32"><rect x="5" y="7" width="22" height="18" rx="6" fill="none" stroke="currentColor" stroke-width="2"/></svg>
-            </button>
-            <button type="button" class="shape" data-shape="circle" title="Circle">
-              <svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="11" fill="none" stroke="currentColor" stroke-width="2"/></svg>
-            </button>
+          <h2><button type="button" class="group-toggle" aria-expanded="true"><span>Cut path</span><svg class="group-chev" viewBox="0 0 256 256" aria-hidden="true"><path d="M213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80A8 8 0 0 1 53.66 90.34L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32Z"/></svg></button></h2>
+          <div class="group-body">
+            <div class="row slider">
+              <label for="in-offset">Offset <output id="out-offset">3.0 mm</output></label>
+              <input id="in-offset" type="range" min="-2" max="20" step="0.05" value="3" />
+            </div>
+            <div class="row slider">
+              <label for="in-bridge">Bridge gaps <output id="out-bridge">off</output></label>
+              <input id="in-bridge" type="range" min="0" max="20" step="0.5" value="0" />
+            </div>
+            <div class="row slider">
+              <label for="in-smooth">Smoothness <output id="out-smooth">2</output></label>
+              <input id="in-smooth" type="range" min="0" max="3" step="1" value="2" />
+            </div>
+            <div class="row slider">
+              <label for="in-precision">Precision <output id="out-precision">±0.08 mm</output></label>
+              <input id="in-precision" type="range" min="0.02" max="0.3" step="0.01" value="0.08" />
+            </div>
+            <div class="row slider">
+              <label for="in-corner">Min corner radius <output id="out-corner">1.0 mm</output></label>
+              <input id="in-corner" type="range" min="0" max="3" step="0.1" value="1" />
+            </div>
+            <div class="row check">
+              <input id="in-holes" type="checkbox" />
+              <label for="in-holes">Cut interior holes (decals)</label>
+            </div>
+            <div class="row slider">
+              <label for="in-holemin">Fill counters under <output id="out-holemin">1 mm²</output></label>
+              <input id="in-holemin" type="range" min="0" max="80" step="1" value="1" />
+            </div>
+            <div class="row check">
+              <input id="in-halo" type="checkbox" checked />
+              <label for="in-halo">White halo border</label>
+            </div>
+            <div class="row">
+              <label for="in-engine">Engine</label>
+              <select id="in-engine">
+                <option value="v3" selected>v3 — text accurate</option>
+                <option value="v2">v2 — original</option>
+              </select>
+            </div>
+            <div class="row check">
+              <input id="in-v1" type="checkbox" />
+              <label for="in-v1">Compare v1 engine (cyan)</label>
+            </div>
+          </div>
+        </section>
+
+        <section class="group">
+          <h2><button type="button" class="group-toggle" aria-expanded="true"><span>Die shape</span><svg class="group-chev" viewBox="0 0 256 256" aria-hidden="true"><path d="M213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80A8 8 0 0 1 53.66 90.34L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32Z"/></svg></button></h2>
+          <div class="group-body">
+            <div class="shape-picker" role="radiogroup" aria-label="Die shape">
+              <button type="button" class="shape active" data-shape="contour" title="Contour">
+                <svg viewBox="0 0 32 32"><path d="M16 4 L20 12 L28 13 L22 19 L24 27 L16 23 L8 27 L10 19 L4 13 L12 12 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+              </button>
+              <button type="button" class="shape" data-shape="rect" title="Rectangle">
+                <svg viewBox="0 0 32 32"><rect x="5" y="7" width="22" height="18" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+              <button type="button" class="shape" data-shape="rounded" title="Rounded rectangle">
+                <svg viewBox="0 0 32 32"><rect x="5" y="7" width="22" height="18" rx="6" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+              <button type="button" class="shape" data-shape="circle" title="Circle">
+                <svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="11" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+            </div>
           </div>
         </section>
 
         <section class="group always-on">
-          <h2>Output</h2>
-          <div class="row">
-            <label for="in-cutmode">Cut type</label>
-            <select id="in-cutmode">
-              <option value="kiss">Kiss cut · CutContour</option>
-              <option value="perf">Die cut · PerfCutContour</option>
-            </select>
-          </div>
-          <div class="row">
-            <label for="in-spot">Spot name</label>
-            <input id="in-spot" type="text" value="CutContour" spellcheck="false" />
-          </div>
-          <!-- The per-format buttons are still the thing that performs an
-               export; the dialog picks a format and then clicks one of these.
-               Keeping them in the DOM means one code path does the exporting
-               whether it was reached from the dialog or from a direct call. -->
-          <div class="export-grid" hidden>
-            <button id="btn-svg" class="btn export" type="button" disabled>SVG<span>layered</span></button>
-            <button id="btn-pdf" class="btn export" type="button" disabled>PDF<span>spot color</span></button>
-            <button id="btn-dxf" class="btn export" type="button" disabled>DXF<span>plotter</span></button>
-            <button id="btn-png" class="btn export" type="button" disabled>PNG<span>print-cut</span></button>
-            <button id="btn-jpg" class="btn export" type="button" disabled>JPG<span>flattened</span></button>
+          <h2><button type="button" class="group-toggle" aria-expanded="true"><span>Output</span><svg class="group-chev" viewBox="0 0 256 256" aria-hidden="true"><path d="M213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80A8 8 0 0 1 53.66 90.34L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32Z"/></svg></button></h2>
+          <div class="group-body">
+            <div class="row">
+              <label for="in-cutmode">Cut type</label>
+              <select id="in-cutmode">
+                <option value="kiss">Kiss cut · CutContour</option>
+                <option value="perf">Die cut · PerfCutContour</option>
+              </select>
+            </div>
+            <div class="row">
+              <label for="in-spot">Spot name</label>
+              <input id="in-spot" type="text" value="CutContour" spellcheck="false" />
+            </div>
+            <!-- The per-format buttons are still the thing that performs an
+                 export; the dialog picks a format and then clicks one of these.
+                 Keeping them in the DOM means one code path does the exporting
+                 whether it was reached from the dialog or from a direct call. -->
+            <div class="export-grid" hidden>
+              <button id="btn-svg" class="btn export" type="button" disabled>SVG<span>layered</span></button>
+              <button id="btn-pdf" class="btn export" type="button" disabled>PDF<span>spot color</span></button>
+              <button id="btn-dxf" class="btn export" type="button" disabled>DXF<span>plotter</span></button>
+              <button id="btn-png" class="btn export" type="button" disabled>PNG<span>print-cut</span></button>
+              <button id="btn-jpg" class="btn export" type="button" disabled>JPG<span>flattened</span></button>
+            </div>
           </div>
         </section>
 
