@@ -14,7 +14,7 @@ All of these go in Dokploy's **Environment** tab for the application.
 |---|---|
 | `DATABASE_URL` | Neon Postgres connection string. The pooled URL is fine — verified against both endpoints. |
 | `AUTH_SECRET` | Signs session cookies. Generate with `npx auth secret` or `openssl rand -base64 32`. **Must differ from the development value**, and changing it later signs everyone out. |
-| `APP_URL` | The public origin, e.g. `https://cutline.novagenlabs.ai`. Stripe redirects back here after checkout, so a wrong value strands buyers. No trailing slash. |
+| `APP_URL` | The public origin — currently `https://cutlinestudio.space`. Stripe redirects back here after checkout, so a wrong value strands buyers. No trailing slash. |
 | `AUTH_URL` | Same value as `APP_URL`. Auth.js builds its callback URLs from this. (`trustHost` is set in code, so this is belt-and-braces rather than the only thing standing between you and a broken sign-in.) |
 | `AUTH_GOOGLE_ID` | Google OAuth client id. Read by name — the provider is configured as bare `Google`. |
 | `AUTH_GOOGLE_SECRET` | Google OAuth client secret. |
