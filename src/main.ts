@@ -115,11 +115,19 @@ function adoptImage(el: HTMLImageElement | HTMLCanvasElement, w: number, h: numb
   art.setAttribute('height', String(h));
   $('#dropzone').classList.add('hidden');
   $('#st-file').textContent = base;
+  // The toolbar names the file the way the user knows it, with its pixel
+  // dimensions beside it; the status bar keeps the derived measurements.
+  $('#ct-name').textContent = base;
+  $('#ct-dims').textContent = `${w} × ${h}`;
   for (const id of ['#btn-svg', '#btn-pdf', '#btn-dxf', '#btn-png', '#btn-jpg', '#btn-export']) {
     ($(id) as HTMLButtonElement).disabled = false;
   }
   // Reveals the Elements section now that there is artwork to detect within.
   renderElementList();
+  // The baseline for "edited" is whatever this image opened with, so opening
+  // a second file clears the tag rather than inheriting the first one's.
+  openedWith = cutFingerprint();
+  syncEditedState();
   recompute();
   requestAnimationFrame(fitView);
 }
@@ -153,6 +161,35 @@ function loadFile(file: File) {
 /* ---------------- pipeline ---------------- */
 
 let pending: number | null = null;
+/**
+ * A snapshot of the cut settings as the current image was opened.
+ *
+ * "Edited" is derived by comparing against this rather than set by a flag on
+ * every interaction: a flag would have to be cleared by hand in a dozen
+ * places and would eventually lie. Comparing means moving a slider and moving
+ * it back correctly reports "not edited", because it isn't.
+ */
+let openedWith = '';
+
+function cutFingerprint(): string {
+  const p = state.params;
+  return JSON.stringify([
+    p.offsetMm, p.minCornerRadiusMm, p.precisionMm, p.smoothness, p.bridgeMm,
+    p.keepHoles, p.alphaThreshold, p.bgTolerance, p.denoisePx, p.engineVersion,
+    state.halo, state.spotName,
+    p.regions.map((r) => [r.x, r.y, r.w, r.h, r.offsetMm ?? null]),
+  ]);
+}
+
+/** Show the edited tag and the top-bar export only once something changed. */
+function syncEditedState() {
+  const edited = state.imageEl !== null && cutFingerprint() !== openedWith;
+  const tag = $('#edited-tag');
+  const btn = $('#btn-export-top') as HTMLButtonElement | null;
+  if (tag) tag.hidden = !edited;
+  if (btn) btn.hidden = !edited;
+}
+
 function recompute(immediate = false) {
   // AI mode traces the neural matte; v1 comparison always uses the original.
   const engine = state.useAi && state.aiEngine ? state.aiEngine : state.engine;
@@ -161,6 +198,7 @@ function recompute(immediate = false) {
   pending = window.setTimeout(
     () => {
       pending = null;
+      syncEditedState();
       const t0 = performance.now();
       const result = engine.compute(state.params);
       state.result = result;
@@ -219,7 +257,11 @@ const previewSvg = $('#preview') as unknown as SVGSVGElement;
 
 function applyView() {
   viewport.setAttribute('transform', `translate(${view.tx} ${view.ty}) scale(${view.k})`);
-  $('#st-zoom').textContent = `${Math.round(view.k * 100)}%`;
+  const zoom = `${Math.round(view.k * 100)}%`;
+  $('#st-zoom').textContent = zoom;
+  // The toolbar reading is the one beside the +/− buttons that change it.
+  const ctZoom = $('#ct-zoom');
+  if (ctZoom) ctZoom.textContent = zoom;
 }
 
 function fitView() {
@@ -1112,6 +1154,8 @@ function syncExportCaption() {
 }
 
 $('#btn-export').addEventListener('click', () => void openExportDialog());
+// Same dialog from the top bar: one export path, two places to start it.
+$('#btn-export-top').addEventListener('click', () => void openExportDialog());
 syncExportCaption();
 
 $('#btn-svg').addEventListener('click', () => paidExport('SVG'));

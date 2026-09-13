@@ -36,10 +36,35 @@
   --display: 'Inter', system-ui, sans-serif;
 }
 
+/* Anything set in mono here is a number that changes, so tabular figures are
+   the default rather than something each readout has to remember. */
+.credit-count,
+.group-value,
+.cutstop-sub,
+.el-mm,
+.ct-dims,
+.ct-zoom,
+.status,
+.fmt-cost strong {
+  font-variant-numeric: tabular-nums;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
+
+/* Form controls do not inherit the page font by default — they fall back to
+   the UA's own (Arial 13.33px here). Without this, every button, input and
+   select silently opts out of the type system. */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
 }
 
 html,
@@ -122,6 +147,38 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* Says the cut no longer matches the file as opened. Ghost-weight on
+   purpose: it is a note about state, not a control. */
+.edited-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding-right: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.edited-tag[hidden] { display: none; }
+
+.edited-tag i {
+  width: 5px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
+#btn-export-top[hidden] { display: none; }
+
+/* Divides state (what the file is) from actions (what you can do to it). */
+.topbar-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--line-strong);
+  flex-shrink: 0;
 }
 
 /* ---------- buttons ----------
@@ -246,87 +303,216 @@ body {
   color: var(--muted);
 }
 
-.row.readout output {
-  color: var(--ink);
+/* A readout row is a label and a value like any other, so its label is muted
+   to match. It rendered at full brightness because a bare <span> inherited
+   the body colour while sibling rows used <label>. */
+.row.readout > span:first-child {
+  color: var(--muted);
 }
 
+/* A slider is two lines tall, so it needs more air beneath it than a
+   single-line row — otherwise its handle reads as belonging to the label
+   underneath. */
 .row.slider {
   flex-direction: column;
   align-items: stretch;
-  gap: 6px;
+  gap: 4px;
+  margin-bottom: 16px;
 }
 
 .row.slider label {
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
 }
 
-.row.slider output {
+/* Every changing number is mono and tabular. Proportional digits shift width
+   as the value changes, so a slider readout wobbles while you drag it —
+   tabular figures hold the column still. The design sets all readouts this
+   way, and it is the reason mono is in the type system at all. */
+.row.slider output,
+.row.readout output {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
 
+/* Aligned to the top rather than centred: a label that wraps to two lines
+   should start level with its box, not float half a line below it. */
 .row.check {
   justify-content: flex-start;
+  align-items: flex-start;
+  gap: 10px;
 }
 
 .row.check label {
   color: var(--ink);
   cursor: pointer;
+  line-height: 16px;
+  padding-top: 0;
 }
 
+/* Explanatory text is a step quieter than the labels it explains, and never
+   competes with a value. */
 .hint {
-  color: var(--muted);
+  color: var(--muted-2);
   font-size: 11px;
   line-height: 1.5;
   margin-top: 10px;
 }
 
+/* Advanced stacks five sections; a hairline between them stops the rail
+   reading as one undifferentiated column of controls without boxing every
+   group in its own card. */
+body:not(.mode-simple) .rail > .group + .group {
+  border-top: 1px solid var(--line-soft);
+}
+
+/* Fields share the control geometry used everywhere else — 30px tall, 7px
+   radius — so a text field and a button read as the same family rather than
+   as a styled app containing some raw HTML. */
 input[type='number'],
 input[type='text'],
 select {
+  height: 30px;
   font-family: var(--mono);
   font-size: 12px;
+  font-variant-numeric: tabular-nums;
   color: var(--ink);
-  background: var(--bg);
-  border: 1px solid var(--line);
-  padding: 6px 8px;
+  background: var(--panel);
+  border: 1px solid var(--line-panel);
+  border-radius: 7px;
+  padding: 0 10px;
   width: 150px;
+  transition: border-color 120ms, background 120ms;
+}
+
+select {
+  cursor: pointer;
+  /* The UA arrow is drawn in the platform's own colour and sits badly on a
+     dark field, so it is replaced with one that matches the icon set. */
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 28px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6' fill='none' stroke='%238a8a91' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 14px 14px;
 }
 
 input[type='number'] {
   width: 80px;
 }
 
-input:focus,
+input[type='number']:hover,
+input[type='text']:hover,
+select:hover {
+  border-color: var(--line-strong);
+}
+
+input[type='number']:focus,
+input[type='text']:focus,
 select:focus {
   outline: none;
   border-color: var(--accent);
 }
 
+/* The track is 4px but the control reserves 16px so the thumb has room to
+   sit inside its own row. At 3px tall the thumb overhung both edges and
+   collided with the label beneath it. */
 input[type='range'] {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 3px;
-  background: var(--line);
+  height: 16px;
+  background: transparent;
   cursor: pointer;
 }
 
+input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line-strong);
+}
+
+input[type='range']::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line-strong);
+}
+
+/* A neutral knob, not an amber one. Amber marks state in this interface —
+   the live value, the active element — and a permanently amber handle on
+   every slider spends that meaning on furniture. */
 input[type='range']::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 14px;
   height: 14px;
-  background: var(--accent);
-  border: 2px solid var(--bg);
+  margin-top: -5px;
+  background: var(--ink);
+  border: 1px solid rgba(0, 0, 0, 0.25);
   border-radius: 50%;
-  box-shadow: 0 0 0 1px var(--accent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
-input[type='checkbox'] {
-  accent-color: var(--accent);
+input[type='range']::-moz-range-thumb {
   width: 14px;
   height: 14px;
+  background: var(--ink);
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+input[type='range']:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Drawn rather than accent-coloured: `accent-color` still renders the
+   platform checkbox, which on a near-black panel is a bright filled square
+   that does not belong to this interface. */
+input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background: var(--panel);
+  cursor: pointer;
+  position: relative;
+  transition: background 120ms, border-color 120ms;
+}
+
+input[type='checkbox']:hover { border-color: #3a3a40; }
+
+input[type='checkbox']:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* The tick is drawn with two borders rotated into an L — no glyph, so it
+   cannot be affected by the font stack or fail to load. */
+input[type='checkbox']:checked::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 1.5px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--bg);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+input[type='checkbox']:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .shape-picker {
@@ -479,9 +665,62 @@ input[type='checkbox'] {
   background-color: #121215;
 }
 
+/* ---------- canvas toolbar ---------- */
+.canvas-toolbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 4;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--bg);
+}
+
+.ct-file {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+#ct-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ct-dims {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted-3);
+  flex-shrink: 0;
+}
+
+.ct-zoom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  height: 24px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+
 #preview {
   position: absolute;
-  inset: 0;
+  /* Below the toolbar, not under it: the artwork must never be clipped by
+     chrome that is painted on top of it. */
+  inset: 44px 0 0 0;
   width: 100%;
   height: 100%;
   cursor: grab;
@@ -559,10 +798,6 @@ input[type='checkbox'] {
    single control group, and grouping them into one bordered box stops them
    reading as three unrelated floating chips over the artwork. */
 .stage-tools {
-  position: absolute;
-  right: 16px;
-  top: 12px;
-  z-index: 3;
   display: flex;
   align-items: center;
   gap: 2px;
@@ -965,10 +1200,14 @@ body:not(.mode-simple) #panel-simple {
   outline-offset: 2px;
 }
 
+/* The stop labels are two lines tall and sit directly above the next
+   control, so the block owns the space beneath it — without this the "0 mm"
+   sub-labels are overlapped by whatever row follows. */
 .cutslider-labels {
   display: flex;
   justify-content: space-between;
   padding-top: 10px;
+  margin-bottom: 14px;
 }
 
 /* The stops are also buttons: the slider is the primary control, but a
@@ -1013,10 +1252,26 @@ body:not(.mode-simple) #panel-simple {
 .cutstop.active .cutstop-sub { color: var(--muted-2); }
 
 #preset-hint {
-  margin-top: 12px;
+  margin-top: 0;
   line-height: 1.5;
   color: var(--muted-2);
   font-size: 11px;
+}
+
+/* A second, independent decision inside the same section. The rule and the
+   space above it are what say "this is not part of the slider" — without
+   them the checkbox reads as a fifth cut-style option. */
+.sub-setting {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.sub-setting-hint {
+  margin-top: 8px;
+  /* Indented to the label above it, so the caption clearly belongs to this
+     checkbox rather than to the section. */
+  padding-left: 26px;
 }
 
 /* ---------- detected elements ---------- */

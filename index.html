@@ -28,11 +28,21 @@
         </div>
         <p class="tagline">contour cut generator · spot-ready output</p>
         <div class="top-actions">
+          <!-- Both appear only once the opened image has actually been
+               edited, so an untouched file shows a quiet bar. -->
+          <span id="edited-tag" class="edited-tag" hidden><i aria-hidden="true"></i>Edited</span>
+          <button id="btn-export-top" class="btn accent" type="button" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true" width="13" height="13">
+              <path d="M12 4v12M12 16l-5-5M12 16l5-5M4 19h16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Export
+          </button>
           <a id="st-credits" class="credit-pill" href="/account" target="_blank" rel="noopener" title="Credits">
             <span class="credit-count">—</span>
             <span class="credit-label">credits</span>
           </a>
-          <button id="btn-sample" class="btn ghost" type="button">Load sample</button>
+          <span class="topbar-sep" aria-hidden="true"></span>
+          <button id="btn-sample" class="btn ghost" type="button">Sample</button>
           <button id="btn-open" class="btn solid" type="button">Open image</button>
           <input id="file-input" type="file" accept="image/*" hidden />
         </div>
@@ -89,11 +99,24 @@
               <span class="cutstop-sub">6 mm</span>
             </button>
           </div>
-          <div class="row check">
-            <input id="in-holes-simple" type="checkbox" />
-            <label for="in-holes-simple">Cut interior holes (decals)</label>
-          </div>
+          <!-- The hint describes the cut style, so it stays with the slider.
+               It previously sat below the holes checkbox, which put an
+               unrelated control between a control and its own description. -->
           <p class="hint" id="preset-hint"></p>
+
+          <!-- A separate decision from the cut style, so it is separated:
+               its own rule and its own caption, rather than a stray checkbox
+               tucked under the slider's stop labels. -->
+          <div class="sub-setting">
+            <div class="row check">
+              <input id="in-holes-simple" type="checkbox" />
+              <label for="in-holes-simple">Cut interior holes (decals)</label>
+            </div>
+            <p class="hint sub-setting-hint">
+              Cuts the enclosed gaps too — the middle of an O, or a window in
+              a shape. Leave off for stickers.
+            </p>
+          </div>
         </section>
 
         <!-- Per-element tuning, in Simple rather than buried in Advanced: on a
@@ -136,8 +159,20 @@
           </div>
           <p class="hint" id="hint-ai">Neural matting for photos &amp; busy backgrounds — one-time ~98 MB model download, then runs locally in your browser.</p>
           <div class="row">
-            <button id="btn-region" class="btn ghost sm" type="button">⊞ Fix a region</button>
-            <button id="btn-detect" class="btn ghost sm" type="button">◱ Detect elements</button>
+            <button id="btn-region" class="btn ghost sm" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true" width="12" height="12">
+                <rect x="4" y="4" width="16" height="16" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/>
+                <path d="M12 9v6M9 12h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              Fix a region
+            </button>
+            <button id="btn-detect" class="btn ghost sm" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true" width="12" height="12">
+                <rect x="3" y="6" width="8" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+                <rect x="14" y="6" width="7" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+              </svg>
+              Detect elements
+            </button>
             <span class="hint" id="region-hint"></span>
           </div>
           <div class="chips" id="region-chips"></div>
@@ -273,10 +308,20 @@
             <rect id="marquee" fill="none" hidden />
           </g>
         </svg>
-        <div class="stage-tools">
-          <button id="btn-zoom-out" class="btn ghost sm" type="button" title="Zoom out (-)">−</button>
-          <button id="btn-zoom-in" class="btn ghost sm" type="button" title="Zoom in (+)">+</button>
-          <button id="btn-fit" class="btn ghost sm" type="button" title="Fit view">FIT</button>
+        <!-- The canvas gets its own bar: what is open on the left, how it is
+             being viewed on the right. Both are facts about the canvas, so
+             they belong to it rather than to the app-wide status bar. -->
+        <div class="canvas-toolbar">
+          <div class="ct-file">
+            <span id="ct-name">No image open</span>
+            <span id="ct-dims" class="ct-dims"></span>
+          </div>
+          <div class="stage-tools">
+            <button id="btn-zoom-out" class="btn ghost sm" type="button" title="Zoom out (-)">−</button>
+            <span id="ct-zoom" class="ct-zoom">100%</span>
+            <button id="btn-zoom-in" class="btn ghost sm" type="button" title="Zoom in (+)">+</button>
+            <button id="btn-fit" class="btn ghost sm" type="button" title="Fit view">FIT</button>
+          </div>
         </div>
         <div id="job" class="job" role="status" aria-live="polite" hidden>
           <span class="job-spinner" aria-hidden="true"></span>
