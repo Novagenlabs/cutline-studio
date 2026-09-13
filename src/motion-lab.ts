@@ -13,6 +13,8 @@
  * so a value that flatters the 64px view but dies at 18px is caught here.
  */
 import { createCutMark, DEFAULT_MOTION, type CutMarkMotion } from './ui/cutmark';
+import { createSplash, DEFAULT_SPLASH, type SplashMotion } from './ui/splash';
+import { showLoading } from './ui/loading';
 
 declare const DialKit: {
   createDialRoot(options?: Record<string, unknown>): { destroy(): void };
@@ -95,4 +97,98 @@ document.getElementById('toggle')?.addEventListener('click', () => {
     if (running) m.start();
     else m.stop();
   }
+});
+
+/* ---------------- startup splash ---------------- */
+
+// A second panel rather than more rows on the first: the splash is a
+// sequence, not another view of the same blades, and mixing the two sets of
+// numbers in one panel makes it unclear which control affects what.
+const splashDial = DialKit.createDialKit('Startup splash', {
+  // Timing.
+  sweepMs: [DEFAULT_SPLASH.sweepMs, 300, 3000, 20],
+  bandWidth: [DEFAULT_SPLASH.bandWidth, 0.05, 0.6, 0.01],
+  holdMs: [DEFAULT_SPLASH.holdMs, 0, 1200, 20],
+  fadeMs: [DEFAULT_SPLASH.fadeMs, 120, 1200, 20],
+  // Look. The outline weight and the resting opacity are the two that
+  // decide whether the light reads as revealing the letters or just
+  // brightening them, so they are worth a dial each.
+  fontPx: [DEFAULT_SPLASH.fontPx, 24, 140, 1],
+  trackingEm: [DEFAULT_SPLASH.trackingEm, 0, 0.5, 0.01],
+  strokePx: [DEFAULT_SPLASH.strokePx, 0.5, 4, 0.05],
+  restOpacity: [DEFAULT_SPLASH.restOpacity, 0, 1, 0.01],
+  markPx: [DEFAULT_SPLASH.markPx, 16, 120, 1],
+  gapPx: [DEFAULT_SPLASH.gapPx, 0, 80, 1],
+});
+
+let splashMotion: SplashMotion = { ...DEFAULT_SPLASH };
+/** The splash currently on screen, so dial changes retime it live. */
+let liveSplash: ReturnType<typeof createSplash> | null = null;
+
+splashDial.subscribe((v) => {
+  splashMotion = {
+    sweepMs: v.sweepMs,
+    bandWidth: v.bandWidth,
+    holdMs: v.holdMs,
+    fadeMs: v.fadeMs,
+    fontPx: v.fontPx,
+    trackingEm: v.trackingEm,
+    strokePx: v.strokePx,
+    restOpacity: v.restOpacity,
+    markPx: v.markPx,
+    gapPx: v.gapPx,
+    // The blades follow the cut-mark panel, so tuning one tunes both and the
+    // splash cannot drift away from the loading state it hands over to.
+    mark: latest,
+  };
+  liveSplash?.apply(splashMotion);
+});
+
+/** Copyable source for the splash, same idea as the cut mark's. */
+function splashSource(m: SplashMotion): string {
+  return [
+    'export const DEFAULT_SPLASH: SplashMotion = {',
+    `  sweepMs: ${m.sweepMs},`,
+    `  bandWidth: ${round(m.bandWidth)},`,
+    `  holdMs: ${m.holdMs},`,
+    `  fadeMs: ${m.fadeMs},`,
+    `  fontPx: ${m.fontPx},`,
+    `  trackingEm: ${round(m.trackingEm)},`,
+    `  strokePx: ${round(m.strokePx)},`,
+    `  restOpacity: ${round(m.restOpacity)},`,
+    `  markPx: ${m.markPx},`,
+    `  gapPx: ${m.gapPx},`,
+    '  mark: DEFAULT_MOTION,',
+    '};',
+  ].join('\n');
+}
+
+document.getElementById('copy-splash')?.addEventListener('click', () => {
+  void navigator.clipboard.writeText(splashSource(splashMotion));
+});
+
+// Parks the splash on screen so the dials can be turned against it. Without
+// this every tweak needs a replay, and the look is the part that wants
+// fiddling rather than watching.
+document.getElementById('hold-splash')?.addEventListener('click', () => {
+  if (liveSplash) {
+    liveSplash.el.remove();
+    liveSplash = null;
+    return;
+  }
+  liveSplash = createSplash(splashMotion);
+  document.body.append(liveSplash.el);
+  liveSplash.el.classList.add('is-sweeping');
+});
+
+document.getElementById('play-splash')?.addEventListener('click', () => {
+  void createSplash(splashMotion).play();
+});
+
+// The real question is not whether either looks good alone — it is whether
+// the wordmark fading into the wait reads as one motion or as two screens.
+document.getElementById('play-sequence')?.addEventListener('click', async () => {
+  await createSplash(splashMotion).play();
+  const close = showLoading('Loading your workspace');
+  setTimeout(close, 1800);
 });

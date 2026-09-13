@@ -10,6 +10,12 @@
 <!-- DialKit ships its stylesheet separately from browser.global.js; without
      this the panel renders as unstyled markup dumped at the end of the page. -->
 <link rel="stylesheet" href="/motion-lab/dialkit.css" />
+<!-- The app's own stylesheet, so the splash and the loading overlay preview
+     exactly as they ship. Both are position:fixed overlays appended to
+     <body>, so only their own rules matter — but the sheet also styles .stage
+     and .row, which this page uses for its own layout. Loading it first means
+     the inline styles below win those collisions. -->
+<link rel="stylesheet" href="/cutline/app.css" />
 <style>
   :root {
     --bg: #0B0B0C;
@@ -20,12 +26,17 @@
     color-scheme: dark;
   }
   * { box-sizing: border-box; }
+  /* The app stylesheet is loaded for the overlays, but it also sets
+     `overflow: hidden` on the body for the studio's fixed layout — which
+     clips this page. The lab is a scrolling document, so it takes that back. */
   body {
     margin: 0;
     background: var(--bg);
     color: var(--text);
     font: 400 14px/1.5 Inter, system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
+    overflow: auto !important;
+    height: auto !important;
   }
   header {
     padding: 20px 24px;
@@ -43,7 +54,7 @@
     gap: 18px;
     max-width: 1100px;
   }
-  .stage {
+  .lab-card {
     background: var(--panel);
     border: 1px solid var(--line);
     border-radius: 14px;
@@ -53,14 +64,14 @@
     gap: 16px;
     min-height: 190px;
   }
-  .stage h2 {
+  .lab-card h2 {
     margin: 0;
     font: 500 11px/1 'JetBrains Mono', ui-monospace, monospace;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--dim);
   }
-  .stage .body {
+  .lab-card .body {
     flex: 1;
     display: flex;
     align-items: center;
@@ -99,7 +110,7 @@
   /* Context 3: large, so the geometry is legible while tuning. */
   .big { color: var(--text); }
 
-  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .lab-row { display: flex; gap: 10px; flex-wrap: wrap; }
   button {
     font: 500 12px Inter, system-ui, sans-serif;
     color: var(--text);
@@ -126,7 +137,12 @@
     font-size: 12px;
     color: #C7C7CE;
   }
-  .wide { grid-column: 1 / -1; }
+  .lab-wide { grid-column: 1 / -1; }
+
+  /* The held splash is a full-screen overlay at z-index 95, so the dials have
+     to sit above it — the whole point of holding it is turning them while it
+     is on screen. */
+  [class*='dialkit'], [data-dialkit], [class*='DialKit'] { z-index: 200 !important; }
 </style>
 </head>
 <body>
@@ -136,7 +152,7 @@
 </header>
 
 <main>
-  <section class="stage">
+  <section class="lab-card">
     <h2>Top bar · 18px</h2>
     <div class="body">
       <div class="topbar">
@@ -147,7 +163,7 @@
     <p class="note">Where the mark lives at rest. It animates only while work is in flight.</p>
   </section>
 
-  <section class="stage">
+  <section class="lab-card">
     <h2>Job line · 20px</h2>
     <div class="body">
       <span class="joblin">
@@ -159,7 +175,7 @@
     <p class="note">The real use: a cut-style change re-runs the pipeline.</p>
   </section>
 
-  <section class="stage">
+  <section class="lab-card">
     <h2>Large · 64px</h2>
     <div class="body big">
       <span id="slot-big" style="display:flex"></span>
@@ -167,10 +183,24 @@
     <p class="note">Tuning view. Judge the bite and the ring travel here.</p>
   </section>
 
-  <section class="stage wide">
+  <section class="lab-card lab-wide">
+    <h2>Startup splash</h2>
+    <p class="note">
+      The first thing anyone sees. A light pass crosses the wordmark once, then
+      it hands over to the loading overlay — same mark, same size, same place.
+    </p>
+    <div class="lab-row">
+      <button id="play-splash">Play splash</button>
+      <button id="play-sequence">Play splash → loading</button>
+      <button id="hold-splash">Hold on screen</button>
+      <button id="copy-splash">Copy as DEFAULT_SPLASH</button>
+    </div>
+  </section>
+
+  <section class="lab-card lab-wide">
     <h2>Values</h2>
     <pre id="out">—</pre>
-    <div class="row">
+    <div class="lab-row">
       <button id="copy">Copy as DEFAULT_MOTION</button>
       <button id="toggle">Pause / resume</button>
     </div>

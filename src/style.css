@@ -2031,6 +2031,96 @@ body:not(.mode-simple) #panel-simple {
 /* Full-surface loading (src/ui/loading.ts), for waits that block the whole
    workspace rather than annotating a working one. Kept out of the layout
    until it is needed: visibility alone would leave it intercepting clicks. */
+/* ---------- startup splash ----------
+   Sits above the loading overlay and resolves into it: same mark, same size,
+   same place, so the wordmark fades and the wait is already there. */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  /* Decoration over a live app: it must never eat a click meant for the
+     studio underneath, and any real interaction dismisses it early. */
+  pointer-events: none;
+  transition: opacity var(--fade, 420ms) ease-out;
+}
+
+.splash.is-leaving { opacity: 0; }
+
+.splash-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--splash-gap, 26px);
+  color: var(--ink);
+}
+
+/* Large, uppercase, and hollow. Outlined glyphs are the point: an unlit
+   outline is nearly invisible on black, so the light passing through does not
+   merely brighten the letters — it is the only thing that draws them. */
+.splash-word {
+  position: relative;
+  font-size: var(--splash-font, 76px);
+  font-weight: 700;
+  letter-spacing: var(--splash-track, 0.16em);
+  /* The tracking adds a trailing gap; this keeps the word optically centred. */
+  text-indent: var(--splash-track, 0.16em);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* The resting outline. Painted with -webkit-text-stroke rather than a shadow
+   so the counters stay open and the weight is even on every edge. */
+.splash-word-base {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  -webkit-text-stroke: var(--splash-stroke, 1.25px)
+    rgba(245, 245, 247, var(--splash-rest, 0.3));
+}
+
+/* The flare. background-clip: text confines a moving gradient to the glyphs,
+   so the light reads as travelling along the letters rather than as a shape
+   sliding over them — the one detail that separates this from a shine.
+   Stroked too, so the band lights the outline rather than filling it in. */
+.splash-word-flare {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(
+    100deg,
+    transparent 0,
+    transparent calc(50% - var(--band, 22%)),
+    #fff 50%,
+    transparent calc(50% + var(--band, 22%)),
+    transparent 100%
+  );
+  background-size: 300% 100%;
+  background-position: 150% 0;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  -webkit-text-stroke: var(--splash-stroke, 1.25px) transparent;
+}
+
+.splash.is-sweeping .splash-word-flare {
+  animation: splash-sweep var(--sweep, 1100ms) cubic-bezier(0.3, 0, 0.2, 1) forwards;
+}
+
+/* Ends at -150% rather than 0: the band leaves the far edge instead of
+   parking mid-word. */
+@keyframes splash-sweep {
+  from { background-position: 150% 0; }
+  to   { background-position: -150% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash-word-flare { animation: none; }
+}
+
 .loading {
   position: fixed;
   inset: 0;

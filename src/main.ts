@@ -10,6 +10,7 @@ import { confirmSpend } from './ui/confirm';
 import { chooseExport, defaultFormat } from './ui/export-dialog';
 import { jobStart, jobStage, jobEnd } from './ui/job';
 import { showLoading, loadingText } from './ui/loading';
+import { createSplash, splashSeen } from './ui/splash';
 import { mountCutSlider, mountValueSlider, mountCheckbox, mountSelect } from './ui/controls';
 import { promptSignIn } from './ui/signin';
 import { openCredits } from './ui/credits';
@@ -1127,20 +1128,40 @@ function renderBalance() {
 // makes a fast app feel slower than one that simply appeared ready. It only
 // takes over the screen if the wait is long enough to be worth explaining.
 {
-  let close: (() => void) | null = null;
-  const grace = window.setTimeout(() => {
-    close = showLoading('Loading your workspace');
-  }, 400);
+  // The splash is decoration over a live app, not a gate in front of one.
+  // The request goes out immediately and the result is applied the moment it
+  // lands — the balance must not wait on an animation, or the studio is
+  // genuinely slower than it was for the sake of looking faster.
+  let settled = false;
+  const balance = fetchBalance().then((b) => {
+    state.balance = b;
+    renderBalance();
+    settled = true;
+  });
 
-  void fetchBalance()
-    .then((b) => {
-      state.balance = b;
-      renderBalance();
-    })
-    .finally(() => {
+  // Once per session — a brand moment on every navigation is a tax on the
+  // people who use this all day.
+  const intro = splashSeen() ? Promise.resolve() : createSplash().play();
+
+  void intro.then(() => {
+    // Usually the answer arrived while the light was crossing the wordmark,
+    // and there is nothing left to wait for.
+    if (settled) return;
+
+    let close: (() => void) | null = null;
+    // The overlay is on a grace timer rather than shown outright: this
+    // request is usually tens of milliseconds, and a screen that flashes up
+    // and vanishes makes a fast app feel slower than one that simply
+    // appeared ready. It only takes over if the wait is worth explaining.
+    const grace = window.setTimeout(() => {
+      close = showLoading('Loading your workspace');
+    }, 400);
+
+    void balance.finally(() => {
       clearTimeout(grace);
       close?.();
     });
+  });
 }
 
 /**
