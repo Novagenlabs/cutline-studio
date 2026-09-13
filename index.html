@@ -4,11 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cutline Studio</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✂️</text></svg>" />
+    <!-- The brand mark itself, not a stock emoji: the tab should carry the
+         same blades as the top bar and the loading state. -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'><path d='M4 4 L20 20 M4 20 L20 4' stroke='%23ff9f0a' stroke-width='2' stroke-linecap='round'/><circle cx='5.4' cy='5.4' r='2.4' stroke='%23ff9f0a' stroke-width='1.8'/><circle cx='5.4' cy='18.6' r='2.4' stroke='%23ff9f0a' stroke-width='1.8'/></svg>" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Spline+Sans+Mono:wght@400;500;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/cutline/app.css" />
@@ -18,11 +20,11 @@
       <header class="topbar">
         <div class="brand">
           <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M3 5 L21 19 M3 19 L21 5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" fill="none"/>
-            <circle cx="5.2" cy="5.2" r="2.6" fill="none" stroke="currentColor" stroke-width="1.8"/>
-            <circle cx="5.2" cy="18.8" r="2.6" fill="none" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M4 4 L20 20 M4 20 L20 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+            <circle cx="5.4" cy="5.4" r="2.4" fill="none" stroke-width="1.4"/>
+            <circle cx="5.4" cy="18.6" r="2.4" fill="none" stroke-width="1.4"/>
           </svg>
-          <h1>CUTLINE<em>STUDIO</em></h1>
+          <h1>Cutline Studio</h1>
         </div>
         <p class="tagline">contour cut generator · spot-ready output</p>
         <div class="top-actions">
@@ -43,23 +45,48 @@
         </div>
 
         <section class="group" id="panel-simple">
-          <h2>Cut style</h2>
-          <div class="preset-grid" role="radiogroup" aria-label="Cut style">
-            <button type="button" class="preset active" data-preset="tight">
-              <span class="preset-name">Tight</span>
-              <span class="preset-sub">right on the edge</span>
+          <div class="group-head">
+            <h2>Cut style</h2>
+            <output class="group-value" id="out-cut-offset">0.00 mm</output>
+          </div>
+          <!-- A real range input rather than four buttons dressed as a slider:
+               arrow keys, Home/End and screen-reader semantics all come free,
+               and the four presets are genuinely ordered by how much room they
+               leave, which is what a slider says and a button grid does not. -->
+          <div class="cutslider">
+            <div class="cutslider-track" aria-hidden="true">
+              <span class="cutslider-tick"></span>
+              <span class="cutslider-tick"></span>
+              <span class="cutslider-tick"></span>
+              <span class="cutslider-tick"></span>
+            </div>
+            <input
+              id="in-cutstyle"
+              type="range"
+              min="0"
+              max="3"
+              step="1"
+              value="0"
+              aria-label="Cut style"
+              aria-valuetext="Tight, 0 mm"
+            />
+          </div>
+          <div class="cutslider-labels" aria-hidden="true">
+            <button type="button" class="cutstop active" data-preset="tight">
+              <span class="cutstop-name">Tight</span>
+              <span class="cutstop-sub">0 mm</span>
             </button>
-            <button type="button" class="preset" data-preset="close">
-              <span class="preset-name">Close</span>
-              <span class="preset-sub">1 mm border</span>
+            <button type="button" class="cutstop" data-preset="close">
+              <span class="cutstop-name">Close</span>
+              <span class="cutstop-sub">1 mm</span>
             </button>
-            <button type="button" class="preset" data-preset="sticker">
-              <span class="preset-name">Sticker</span>
-              <span class="preset-sub">3 mm border</span>
+            <button type="button" class="cutstop" data-preset="sticker">
+              <span class="cutstop-name">Sticker</span>
+              <span class="cutstop-sub">3 mm</span>
             </button>
-            <button type="button" class="preset" data-preset="loose">
-              <span class="preset-name">Loose</span>
-              <span class="preset-sub">6 mm border</span>
+            <button type="button" class="cutstop" data-preset="loose">
+              <span class="cutstop-name">Loose</span>
+              <span class="cutstop-sub">6 mm</span>
             </button>
           </div>
           <div class="row check">
@@ -184,13 +211,34 @@
             <label for="in-spot">Spot name</label>
             <input id="in-spot" type="text" value="CutContour" spellcheck="false" />
           </div>
-          <div class="export-grid">
+          <!-- The per-format buttons are still the thing that performs an
+               export; the dialog picks a format and then clicks one of these.
+               Keeping them in the DOM means one code path does the exporting
+               whether it was reached from the dialog or from a direct call. -->
+          <div class="export-grid" hidden>
             <button id="btn-svg" class="btn export" type="button" disabled>SVG<span>layered</span></button>
             <button id="btn-pdf" class="btn export" type="button" disabled>PDF<span>spot color</span></button>
             <button id="btn-dxf" class="btn export" type="button" disabled>DXF<span>plotter</span></button>
             <button id="btn-png" class="btn export" type="button" disabled>PNG<span>print-cut</span></button>
             <button id="btn-jpg" class="btn export" type="button" disabled>JPG<span>flattened</span></button>
           </div>
+        </section>
+
+        <!-- Pinned to the bottom of the rail: the one action the whole panel
+             leads to, always reachable without scrolling past the controls. -->
+        <div class="rail-spacer"></div>
+        <section class="export-block">
+          <button id="btn-export" class="btn-export" type="button" disabled>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 4v12M12 16l-5-5M12 16l5-5M4 19h16" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>Export cut file</span>
+          </button>
+          <p class="export-caption">
+            <span id="export-cost">1 credit</span>
+            <span class="export-dot" aria-hidden="true"></span>
+            <span id="export-default">SVG is your default</span>
+          </p>
         </section>
       </aside>
 
@@ -265,6 +313,35 @@
           </div>
         </dialog>
 
+        <dialog id="export-sheet" class="sheet sheet-wide">
+          <form method="dialog" class="sheet-body">
+            <h3>Export cut file</h3>
+            <p class="sheet-text">Generated on our server and downloaded straight away.</p>
+
+            <h4 class="fmt-head">Format</h4>
+            <div class="fmt-list"></div>
+
+            <div class="fmt-cost">
+              <div><span>Cost</span><strong>1</strong></div>
+              <div><span>Balance</span><strong id="export-balance">—</strong></div>
+              <div><span>After</span><strong id="export-after" class="is-accent">—</strong></div>
+            </div>
+
+            <label class="fmt-save">
+              <span class="fmt-save-text">
+                <strong id="export-save-label">Make SVG my default</strong>
+                <span>Preselected every time you export</span>
+              </span>
+              <input id="export-save-default" type="checkbox" class="switch" />
+            </label>
+
+            <div class="sheet-actions">
+              <button value="cancel" class="btn ghost" type="submit">Cancel</button>
+              <button value="download" class="btn solid" type="submit">Download <span class="btn-sub">−1</span></button>
+            </div>
+          </form>
+        </dialog>
+
         <dialog id="confirm-export" class="sheet">
           <form method="dialog" class="sheet-body">
             <h3 id="confirm-title">Download cut file</h3>
@@ -287,6 +364,7 @@
       </main>
 
       <footer class="status">
+        <span id="st-ready" class="st-ready" hidden><i aria-hidden="true"></i>Cut ready</span>
         <span id="st-file">no file</span>
         <span id="st-dims">—</span>
         <span id="st-geom">—</span>

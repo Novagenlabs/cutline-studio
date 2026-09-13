@@ -1,6 +1,7 @@
 // Signed out, a download must offer sign-in ON THIS PAGE, and the job banner
 // must only be visible while work is actually happening.
 import puppeteer from 'puppeteer-core';
+import { startExport } from './export-helper';
 import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 
@@ -39,7 +40,7 @@ const jobVisible = (p: any) =>
 
   console.log('\n--- signed out, download asks to sign in without leaving ---');
   const before = p.url();
-  await p.click('#btn-svg');
+  await startExport(p);
   await wait(900);
 
   check(await p.evaluate(`document.getElementById('signin-sheet').open`) === true,
@@ -79,7 +80,7 @@ const jobVisible = (p: any) =>
   await input2!.uploadFile('test/fixtures/hello-large.png');
   await wait(3500);
 
-  await p.click('#btn-svg');
+  await startExport(p);
   // The gate re-checks the balance with the server before deciding, so the
   // dialog opens after a round trip rather than synchronously.
   await p.waitForFunction(

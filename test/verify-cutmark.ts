@@ -86,18 +86,31 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   console.log('--- the blades close towards each other ---');
 
-  // Decompose the 2D matrix back to an angle. Opposite signs mean the pair
-  // closes; matching signs would mean both swept the same way.
-  const angles = await p.evaluate(`(() => {
+  // Decompose the 2D matrix back to an angle. The blades must be equal and
+  // opposite — mirrored about the cut line — or they are a windmill, not
+  // scissors.
+  //
+  // Sampled over a window rather than at one instant: the pair closes to 0°
+  // at the bite, where both angles are legitimately zero and carry no sign.
+  // The widest moment seen is the one that proves the mirroring.
+  const angles = await p.evaluate(`(async () => {
     const gs = document.querySelector('svg.cutmark').querySelectorAll('g');
-    return Array.from(gs).map((g) => {
+    const read = () => Array.from(gs).map((g) => {
       const m = new DOMMatrix(getComputedStyle(g).transform);
       return Math.atan2(m.b, m.a) * 180 / Math.PI;
     });
+    let widest = [0, 0];
+    for (let i = 0; i < 24; i++) {
+      const a = read();
+      if (Math.abs(a[0]) + Math.abs(a[1]) > Math.abs(widest[0]) + Math.abs(widest[1])) widest = a;
+      await new Promise((r) => setTimeout(r, 40));
+    }
+    return widest;
   })()`) as number[];
 
   check(
-    Math.sign(angles[0]) !== Math.sign(angles[1]),
+    Math.sign(angles[0]) === -Math.sign(angles[1]) &&
+      Math.abs(Math.abs(angles[0]) - Math.abs(angles[1])) < 1,
     `blades mirror about the cut line (${angles.map((a) => a.toFixed(1)).join(' / ')})`
   );
 
@@ -136,5 +149,5 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   await b.close();
   console.log(fails === 0 ? '\nall good' : `\n${fails} failed`);
-  process.exit(fails === 0 ? 1 - 1 : 1);
+  process.exit(fails === 0 ? 0 : 1);
 })();

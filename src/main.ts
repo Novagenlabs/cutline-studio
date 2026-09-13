@@ -7,6 +7,7 @@ import { requestExport, fetchBalance, signupGrant, ExportError } from './paid-ex
 import { PRESETS, matchPreset } from './presets';
 import { toast } from './ui/toast';
 import { confirmSpend } from './ui/confirm';
+import { chooseExport, defaultFormat } from './ui/export-dialog';
 import { jobStart, jobStage, jobEnd } from './ui/job';
 import { showLoading, loadingText } from './ui/loading';
 import { promptSignIn } from './ui/signin';
@@ -114,7 +115,7 @@ function adoptImage(el: HTMLImageElement | HTMLCanvasElement, w: number, h: numb
   art.setAttribute('height', String(h));
   $('#dropzone').classList.add('hidden');
   $('#st-file').textContent = base;
-  for (const id of ['#btn-svg', '#btn-pdf', '#btn-dxf', '#btn-png', '#btn-jpg']) {
+  for (const id of ['#btn-svg', '#btn-pdf', '#btn-dxf', '#btn-png', '#btn-jpg', '#btn-export']) {
     ($(id) as HTMLButtonElement).disabled = false;
   }
   recompute();
@@ -185,6 +186,10 @@ function renderResult(r: CutlineResult, ms: number) {
   $('#st-dims').textContent =
     `${state.srcW}×${state.srcH}px · ${mm(state.srcW)}×${mm(state.srcH)}mm @ ${state.params.dpi}dpi`;
   $('#st-geom').textContent = `${r.rings.length} path${r.rings.length === 1 ? '' : 's'} · ${r.nodeCount} nodes`;
+  // "Cut ready" means there is geometry to export — which is exactly the
+  // condition under which the export button does anything, so it is read
+  // from the same fact rather than set optimistically alongside it.
+  $('#st-ready').hidden = r.rings.length === 0;
   if (r.rings.length === 0) {
     toast(
       r.usedAlpha
@@ -684,6 +689,26 @@ function syncCutControls() {
 }
 
 /**
+ * The four presets in the order the slider walks them: tightest to loosest.
+ * This is the slider's axis, so it must stay ordered by offset.
+ */
+const PRESET_ORDER: PresetId[] = ['tight', 'close', 'sticker', 'loose'];
+
+/** The stop whose offset is closest to an arbitrary value. */
+function nearestStopByOffset(mm: number): number {
+  let best = 0;
+  let bestGap = Infinity;
+  for (let i = 0; i < PRESET_ORDER.length; i++) {
+    const gap = Math.abs(PRESETS[PRESET_ORDER[i]].params.offsetMm - mm);
+    if (gap < bestGap) {
+      bestGap = gap;
+      best = i;
+    }
+  }
+  return best;
+}
+
+/**
  * Highlight the preset that matches the current parameters, or none.
  *
  * Leaving every button unlit after an advanced tweak is deliberate: a lit
@@ -691,9 +716,32 @@ function syncCutControls() {
  */
 function syncPresetSelection() {
   const active = matchPreset(state.params);
-  for (const btn of document.querySelectorAll<HTMLButtonElement>('.preset')) {
+  for (const btn of document.querySelectorAll<HTMLButtonElement>('.cutstop')) {
     btn.classList.toggle('active', btn.dataset.preset === active);
   }
+
+  // The knob follows the parameters, not the other way round: an advanced
+  // tweak that lands between presets leaves the stops unlit but must not
+  // leave the knob somewhere that contradicts the numbers, so it parks at the
+  // nearest stop by offset while the labels stay dark.
+  const slider = $('#in-cutstyle') as HTMLInputElement | null;
+  if (slider) {
+    const idx = active
+      ? PRESET_ORDER.indexOf(active)
+      : nearestStopByOffset(state.params.offsetMm);
+    slider.value = String(idx);
+    const p = PRESETS[PRESET_ORDER[idx]];
+    slider.setAttribute(
+      'aria-valuetext',
+      active ? `${p.label}, ${p.params.offsetMm} mm` : `Custom, ${state.params.offsetMm.toFixed(2)} mm`
+    );
+  }
+
+  // The live offset, in the section header. This is the number the whole
+  // control exists to set, so it is shown even when no preset matches.
+  const value = $('#out-cut-offset');
+  if (value) value.textContent = `${state.params.offsetMm.toFixed(2)} mm`;
+
   const hint = $('#preset-hint');
   if (hint) {
     hint.textContent = active
@@ -712,7 +760,15 @@ applyPreset('sticker');
 $('#tab-simple').addEventListener('click', () => setMode('simple'));
 $('#tab-advanced').addEventListener('click', () => setMode('advanced'));
 
-for (const btn of document.querySelectorAll<HTMLButtonElement>('.preset')) {
+// Two ways into the same four presets: drag the slider, or click a stop by
+// name. `input` rather than `change` so dragging retraces live instead of
+// waiting for the mouse to come up.
+($('#in-cutstyle') as HTMLInputElement).addEventListener('input', (e) => {
+  const i = Number((e.target as HTMLInputElement).value);
+  applyPreset(PRESET_ORDER[i] ?? 'tight');
+});
+
+for (const btn of document.querySelectorAll<HTMLButtonElement>('.cutstop')) {
   btn.addEventListener('click', () => applyPreset(btn.dataset.preset as PresetId));
 }
 
@@ -813,7 +869,7 @@ $('#st-credits').addEventListener('click', (e) => {
  * browser can build is a file the browser already has, and a credit check in
  * front of that only stops the people who were never going to bypass it.
  */
-async function paidExport(format: PaidFormat) {
+async function paidExport(format: PaidFormat, preconfirmed = false) {
   if (!state.result) return;
   // Signed out: ask here rather than sending them away. The loaded artwork
   // and every slider live in this page, so navigating to sign in would throw
@@ -854,8 +910,10 @@ async function paidExport(format: PaidFormat) {
   }
 
   // Confirm before charging: a click that silently spends money is a support
-  // ticket waiting to happen.
-  if (!(await confirmSpend(format, state.balance))) return;
+  // ticket waiting to happen. The export dialog already states the cost and
+  // the balance after, so a call that came from there passes `preconfirmed`
+  // rather than asking the same question twice.
+  if (!preconfirmed && !(await confirmSpend(format, state.balance))) return;
   const btn = $(`#btn-${format.toLowerCase()}`) as HTMLButtonElement;
   const label = btn.textContent;
   btn.disabled = true;
@@ -938,6 +996,32 @@ async function paidExport(format: PaidFormat) {
     btn.textContent = label;
   }
 }
+
+/**
+ * The rail's one export button: choose a format, then export it.
+ *
+ * The balance is refreshed before the dialog opens rather than after, because
+ * the dialog's whole job is to show what a download will cost and what will
+ * be left — stale numbers there would undermine the point of having it.
+ */
+async function openExportDialog() {
+  if (!state.result) return;
+  const chosen = await chooseExport(state.balance);
+  if (!chosen) return;
+  syncExportCaption();
+  await paidExport(chosen, true);
+}
+
+/** Keep the caption under the export button honest about the saved default. */
+function syncExportCaption() {
+  const el = $('#export-default');
+  if (!el) return;
+  const f = defaultFormat();
+  el.textContent = f ? `${f} is your default` : 'choose a format';
+}
+
+$('#btn-export').addEventListener('click', () => void openExportDialog());
+syncExportCaption();
 
 $('#btn-svg').addEventListener('click', () => paidExport('SVG'));
 $('#btn-pdf').addEventListener('click', () => paidExport('PDF'));

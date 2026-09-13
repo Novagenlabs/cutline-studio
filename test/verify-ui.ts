@@ -1,5 +1,6 @@
 // Toasts, the spend-confirmation dialog, and the credit pill, in the real UI.
 import puppeteer from 'puppeteer-core';
+import { startExport } from './export-helper';
 
 const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const URL = process.env.APP_URL ?? 'http://localhost:3000/';
@@ -56,7 +57,11 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   // Confirming a spend only makes sense once there is a balance to spend, so
   // signed out the sign-in modal comes first. The spend dialog's own content
   // (format, cost, resulting balance) is asserted signed-in by verify-signin.
-  await p.click('#btn-svg');
+  //
+  // Goes through the export dialog rather than clicking a per-format button
+  // directly: those buttons are no longer on screen, and driving a control
+  // the user cannot reach would stop testing the path the user takes.
+  await startExport(p);
   await wait(1200);
   check(await p.evaluate(`document.getElementById('confirm-export').open`) === false,
     'the spend dialog stays closed while signed out');
@@ -75,7 +80,7 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   // The signed-out path no longer produces an error toast on the first click:
   // it opens the sign-in modal instead, so the user never leaves the studio.
   // That behaviour is covered end to end by verify-signin.ts.
-  await p.click('#btn-svg');
+  await startExport(p);
   await wait(1200);
   check(await p.evaluate(`document.getElementById('signin-sheet').open`) === true,
     'clicking download while signed out opens the sign-in modal');

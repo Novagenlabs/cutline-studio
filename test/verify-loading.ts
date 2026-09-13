@@ -3,6 +3,7 @@
 // The reported symptom: after signing in mid-download the screen looked stuck,
 // because the balance re-fetch and the re-run export happened in silence.
 import puppeteer from 'puppeteer-core';
+import { startExport } from './export-helper';
 import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 
@@ -44,7 +45,7 @@ const jobText = (p: any) =>
     await input!.uploadFile('test/fixtures/hello-large.png');
     await wait(3500);
 
-    await p.click('#btn-svg');
+    await startExport(p);
     let seen: string | null = null;
     for (let i = 0; i < 40 && !seen; i++) {
       seen = await jobText(p);

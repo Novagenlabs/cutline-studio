@@ -1,14 +1,39 @@
+/**
+ * Jet black, amber accent. Values taken from the Paper file, not eyeballed.
+ *
+ * The greys are deliberately close together and deliberately distinct: the
+ * page, the rail and a panel sitting on the rail are three different blacks,
+ * and collapsing them into one flattens the whole interface. Likewise the
+ * three hairlines — a rail edge, a panel edge and a control edge are not the
+ * same line.
+ *
+ * Amber is for state, not decoration: the live value, the active element, the
+ * one button that starts work. The primary action is white, because on a
+ * near-black surface white outranks any hue.
+ */
 :root {
-  --bg: #0d0d0f;
-  --panel: #141417;
-  --panel-2: #191920;
-  --line: #26262e;
-  --ink: #ecebe6;
-  --muted: #8e8e99;
-  --accent: #ec008c;
-  --accent-soft: rgba(236, 0, 140, 0.14);
-  --mono: 'Spline Sans Mono', ui-monospace, monospace;
-  --display: 'Bricolage Grotesque', sans-serif;
+  --bg: #0a0a0b;
+  --rail: #0d0d0e;
+  --bar: #0b0b0c;
+  --panel: #141416;
+  --panel-2: #1c1c1f;
+  --line: #1c1c1f;
+  --line-soft: #141416;
+  --line-panel: #1f1f22;
+  --line-strong: #2a2a2e;
+  --segment: #151517;
+  --segment-on: #2c2c30;
+  --ink: #f5f5f7;
+  --ink-2: #c7c7cc;
+  --muted: #8a8a91;
+  --muted-2: #6e6e76;
+  --muted-3: #5a5a61;
+  --tick: #3a3a40;
+  --accent: #ff9f0a;
+  --accent-soft: rgba(255, 159, 10, 0.14);
+  --ok: #30d158;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
+  --display: 'Inter', system-ui, sans-serif;
 }
 
 * {
@@ -23,38 +48,41 @@ body,
   height: 100%;
 }
 
+/* Inter for everything the user reads, mono only for numbers that change.
+   The old sheet set mono on the body, which put an operator's console face on
+   labels and prose that are not data — legible, but it made the whole app
+   read as a terminal rather than a tool. */
 body {
   background: var(--bg);
   color: var(--ink);
-  font-family: var(--mono);
+  font-family: var(--display);
   font-size: 13px;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
 }
 
 #app {
   display: grid;
   grid-template:
-    'topbar topbar' 58px
+    'topbar topbar' 52px
     'rail stage' 1fr
-    'status status' 32px
-    / 304px 1fr;
+    'status status' 34px
+    / 296px 1fr;
 }
 
 /* ---------- top bar ---------- */
+/* Flat black. The old bar carried a diagonal candy stripe behind the brand;
+   at 52px it fought the wordmark and dated the whole app. */
 .topbar {
   grid-area: topbar;
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding: 0 18px;
+  justify-content: space-between;
+  padding: 0 16px 0 20px;
   border-bottom: 1px solid var(--line);
-  background:
-    repeating-linear-gradient(
-      -45deg,
-      transparent 0 22px,
-      rgba(236, 0, 140, 0.05) 22px 24px
-    ),
-    var(--panel);
+  background: var(--bg);
 }
 
 .brand {
@@ -64,56 +92,67 @@ body {
 }
 
 .brand-mark {
-  width: 26px;
-  height: 26px;
-  color: var(--accent);
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: var(--ink);
+}
+
+/* The rings read as the quieter part of the mark, so they sit a step down
+   from the blades rather than matching them. */
+.brand-mark circle {
+  stroke: var(--muted);
 }
 
 .brand h1 {
-  font-family: var(--display);
-  font-weight: 800;
-  font-size: 21px;
-  letter-spacing: 0.01em;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
 }
 
-.brand h1 em {
-  font-style: normal;
-  color: var(--accent);
-  font-weight: 500;
-  margin-left: 2px;
-}
-
+/* The tagline was a third piece of text competing with the wordmark and the
+   controls for a 52px bar. The product name is enough. */
 .tagline {
-  color: var(--muted);
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  display: none;
 }
 
 .top-actions {
   margin-left: auto;
   display: flex;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
 }
 
-/* ---------- buttons ---------- */
+/* ---------- buttons ----------
+   Three variants, and the hierarchy is deliberate: on a near-black surface
+   white outranks any hue, so the primary action is light and amber is kept
+   for state. `solid` is the light fill, `ghost` the outline, and neither
+   changes hue on hover — only lifts, which reads as a surface responding
+   rather than a colour event. */
 .btn {
-  font-family: var(--mono);
-  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 7px;
+  font-family: var(--display);
+  font-size: 13px;
   font-weight: 500;
-  letter-spacing: 0.04em;
-  color: var(--ink);
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  padding: 8px 14px;
+  color: var(--ink-2);
+  background: transparent;
+  border: 1px solid var(--line-strong);
   cursor: pointer;
-  transition: border-color 120ms, background 120ms, color 120ms;
+  white-space: nowrap;
+  transition: background 120ms, border-color 120ms, color 120ms, opacity 120ms;
   user-select: none;
 }
 
 .btn:hover:not(:disabled) {
-  border-color: var(--accent);
-  color: #fff;
+  border-color: #3a3a40;
+  color: var(--ink);
 }
 
 .btn:disabled {
@@ -122,14 +161,30 @@ body {
 }
 
 .btn.solid {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-  display: inline-block;
+  background: var(--ink);
+  border-color: transparent;
+  color: var(--bg);
+  font-weight: 600;
+  padding: 0 13px;
 }
 
-.btn.solid:hover {
-  background: #ff2ea6;
+.btn.solid:hover:not(:disabled) {
+  background: #fff;
+  color: var(--bg);
+}
+
+/* The amber fill is reserved for the one button that starts paid work. */
+.btn.accent {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--bg);
+  font-weight: 600;
+  padding: 0 13px;
+}
+
+.btn.accent:hover:not(:disabled) {
+  background: #ffb02e;
+  color: var(--bg);
 }
 
 .btn.solid input[type='file'] {
@@ -141,31 +196,37 @@ body {
 }
 
 .btn.sm {
-  padding: 4px 10px;
+  height: 24px;
+  padding: 0 8px;
   font-size: 11px;
+  border-radius: 6px;
 }
 
 /* ---------- rail ---------- */
 .rail {
   grid-area: rail;
+  display: flex;
+  flex-direction: column;
   border-right: 1px solid var(--line);
-  background: var(--panel);
+  background: var(--rail);
   overflow-y: auto;
-  padding: 6px 0 24px;
+  padding: 0 0 8px;
 }
 
+/* Sections are separated by space, not by rules. Hairlines between every
+   group turned the rail into a stack of boxes; the design uses one rule, at
+   the export block, where the rail genuinely changes purpose. */
 .group {
-  padding: 16px 18px 18px;
-  border-bottom: 1px solid var(--line);
+  padding: 18px 16px 22px;
+  border-bottom: none;
 }
 
 .group h2 {
-  font-family: var(--display);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.18em;
-  color: var(--accent);
+  letter-spacing: 0.07em;
+  color: var(--muted);
   margin-bottom: 14px;
 }
 
@@ -329,6 +390,78 @@ input[type='checkbox'] {
   color: var(--accent);
 }
 
+.export-grid[hidden] { display: none; }
+
+/* ---------- pinned export block ----------
+   Pushes the export to the bottom of the rail however short the controls
+   above it are, so its position never moves between Simple and Advanced. */
+.rail-spacer {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.export-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+  padding: 18px 16px;
+  border-top: 1px solid var(--line);
+  background: var(--bar);
+}
+
+/* White, not amber: on a near-black rail a light fill is the loudest thing
+   available, and this is the only button that spends a credit. */
+.btn-export {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  height: 48px;
+  width: 100%;
+  border: 0;
+  border-radius: 11px;
+  background: var(--ink);
+  color: var(--bg);
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  transition: background 120ms, opacity 120ms;
+}
+
+.btn-export:hover:not(:disabled) { background: #fff; }
+
+.btn-export:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.btn-export svg {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+}
+
+.export-caption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted-2);
+}
+
+.export-dot {
+  width: 2px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--tick);
+  flex-shrink: 0;
+}
+
 /* ---------- stage ---------- */
 .stage {
   grid-area: stage;
@@ -422,11 +555,43 @@ input[type='checkbox'] {
   outline-offset: -8px;
 }
 
+/* One stepper, not three loose buttons: zoom out, zoom in and fit are a
+   single control group, and grouping them into one bordered box stops them
+   reading as three unrelated floating chips over the artwork. */
 .stage-tools {
   position: absolute;
-  right: 14px;
+  right: 16px;
   top: 12px;
   z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line-panel);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.stage-tools .btn {
+  height: 24px;
+  min-width: 26px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.stage-tools .btn:hover:not(:disabled) {
+  background: var(--panel-2);
+  color: var(--ink);
+}
+
+#btn-fit {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
 }
 
 /* ---------- status bar ---------- */
@@ -434,18 +599,45 @@ input[type='checkbox'] {
   grid-area: status;
   display: flex;
   align-items: center;
-  gap: 26px;
-  padding: 0 16px;
-  border-top: 1px solid var(--line);
-  background: var(--panel);
-  color: var(--muted);
+  gap: 20px;
+  padding: 0 18px;
+  border-top: 1px solid var(--line-soft);
+  background: var(--bar);
+  color: var(--muted-2);
+  font-family: var(--mono);
   font-size: 11px;
   white-space: nowrap;
   overflow: hidden;
 }
 
-.status span:first-child {
-  color: var(--ink);
+/* The filename is the one thing here that is not a measurement, so it is the
+   one thing not set in mono. Targeted by id rather than :first-child, which
+   would follow whatever happens to lead the bar. */
+.status #st-file {
+  font-family: var(--display);
+  font-weight: 500;
+  color: var(--ink-2);
+}
+
+/* Says the geometry is computed and exportable — the answer to "is it done
+   yet" without the user having to infer it from the numbers next to it. */
+.st-ready {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--display);
+  font-weight: 500;
+  color: var(--ink-2);
+}
+
+.st-ready[hidden] { display: none; }
+
+.st-ready i {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--ok);
+  flex-shrink: 0;
 }
 
 .status #st-zoom {
@@ -623,32 +815,47 @@ input[type='checkbox'] {
 
 /* ---------------- simple / advanced ---------------- */
 
+/* A segmented control, not folder tabs. Simple and Advanced are two views of
+   one state, which a segment says and a tab stack does not. */
 .mode-tabs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2px;
-  padding: 10px 12px 0;
-  background: var(--panel);
+  display: flex;
+  gap: 0;
+  margin: 14px 16px 4px;
+  padding: 2px;
+  background: var(--segment);
+  border: 1px solid var(--line-panel);
+  border-radius: 9px;
 }
 
 .mode-tab {
-  font: inherit;
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  font-family: var(--display);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
   color: var(--muted);
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-bottom: 0;
-  border-radius: 6px 6px 0 0;
-  padding: 8px 10px;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  padding: 0;
   cursor: pointer;
+  transition: background 140ms, color 140ms;
+}
+
+.mode-tab:hover:not(.active) {
+  color: var(--ink-2);
 }
 
 .mode-tab.active {
-  color: var(--accent);
-  background: var(--panel);
-  border-color: var(--accent);
+  color: var(--ink);
+  font-weight: 600;
+  background: var(--segment-on);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 /* Advanced controls are hidden, not duplicated, so both modes read the same
@@ -661,88 +868,213 @@ body:not(.mode-simple) #panel-simple {
   display: none;
 }
 
-.preset-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+/* ---------- cut style slider ----------
+   The track, ticks and knob are drawn by us; the range input sits on top of
+   them, transparent, and does all the input handling. That keeps native
+   keyboard and assistive-tech behaviour while letting the knob look like the
+   design instead of like the browser's default. */
+.group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 14px;
 }
 
-.preset {
+.group-head h2 {
+  margin-bottom: 0;
+}
+
+.group-value {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent);
+}
+
+.cutslider {
+  position: relative;
+  height: 22px;
   display: flex;
-  flex-direction: column;
-  gap: 3px;
-  align-items: flex-start;
-  text-align: left;
-  font: inherit;
-  color: var(--text);
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 10px 12px;
+  align-items: center;
+  padding: 0 4px;
+}
+
+.cutslider-track {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line-strong);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cutslider-tick {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--tick);
+  flex-shrink: 0;
+}
+
+/* The input is invisible but still the thing you click and focus. */
+.cutslider input[type='range'] {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  margin: 0;
+  background: transparent;
+  appearance: none;
+  -webkit-appearance: none;
   cursor: pointer;
 }
 
-.preset:hover {
-  border-color: var(--accent);
+.cutslider input[type='range']::-webkit-slider-runnable-track {
+  height: 22px;
+  background: transparent;
 }
 
-.preset.active {
-  border-color: var(--accent);
-  background: var(--accent-soft);
+.cutslider input[type='range']::-moz-range-track {
+  height: 22px;
+  background: transparent;
 }
 
-.preset-name {
-  font-size: 14px;
+.cutslider input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 11px;
+  background: var(--ink);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.55);
+}
+
+.cutslider input[type='range']::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 11px;
+  background: var(--ink);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.55);
+}
+
+.cutslider input[type='range']:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.cutslider-labels {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 10px;
+}
+
+/* The stops are also buttons: the slider is the primary control, but a
+   direct click on "Sticker" is the faster path when you know what you want. */
+.cutstop {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 64px;
+  flex-shrink: 0;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  align-items: center;
+}
+
+.cutslider-labels .cutstop:first-child { align-items: flex-start; }
+.cutslider-labels .cutstop:last-child { align-items: flex-end; }
+
+.cutstop-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  transition: color 120ms;
+}
+
+.cutstop-sub {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted-3);
+  transition: color 120ms;
+}
+
+.cutstop:hover .cutstop-name { color: var(--ink-2); }
+
+.cutstop.active .cutstop-name {
+  color: var(--ink);
   font-weight: 600;
 }
 
-.preset-sub {
-  font-size: 11px;
-  color: var(--muted);
-}
+.cutstop.active .cutstop-sub { color: var(--muted-2); }
 
 #preset-hint {
-  margin-top: 10px;
+  margin-top: 12px;
   line-height: 1.5;
+  color: var(--muted-2);
+  font-size: 11px;
 }
 
 /* ---------- credit pill ---------- */
 
 .credit-pill {
   display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  padding: 6px 12px;
-  margin-right: 4px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 15px;
   background: var(--panel-2);
-  color: var(--text);
+  color: var(--ink);
   text-decoration: none;
-  font-size: 12px;
   white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 120ms, background 120ms;
 }
 
-.credit-pill:hover { border-color: var(--accent); }
+/* A small amber dot, so the pill reads as live state at a glance without
+   the number having to be coloured. */
+.credit-pill::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
+.credit-pill:hover { border-color: #3a3a40; }
 
 .credit-count {
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
 }
 
 .credit-label {
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-size: 10px;
+  letter-spacing: 0.06em;
+  font-size: 11px;
+  font-weight: 500;
 }
 
-/* Running low, or out, should be visible before a download fails. */
-.credit-pill.is-low { border-color: #d9822b; }
-.credit-pill.is-low .credit-count { color: #d9822b; }
-.credit-pill.is-empty { border-color: var(--accent); background: var(--accent-soft); }
-.credit-pill.is-empty .credit-count { color: var(--accent); }
+/* Running low, or out, should be visible before a download fails. The dot
+   carries the state; only an empty balance escalates to the whole pill,
+   because that is the one case where the next click will fail. */
+.credit-pill.is-low::before { background: #ffd60a; }
+.credit-pill.is-empty::before { background: #ff453a; }
+.credit-pill.is-empty {
+  border-color: rgba(255, 69, 58, 0.4);
+  background: rgba(255, 69, 58, 0.1);
+}
+.credit-pill.is-empty .credit-count { color: #ff453a; }
 
 /* ---------- confirm sheet ---------- */
 
@@ -752,9 +1084,9 @@ body:not(.mode-simple) #panel-simple {
      sheet pins to the top-left corner. */
   margin: auto;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 14px;
   background: var(--panel);
-  color: var(--text);
+  color: var(--ink);
   padding: 0;
   max-width: 380px;
   width: calc(100vw - 32px);
@@ -814,6 +1146,233 @@ body:not(.mode-simple) #panel-simple {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* ---------- export format dialog ---------- */
+.sheet-wide { max-width: 460px; }
+
+.fmt-head {
+  margin: 18px 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+
+.fmt-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* A row per format, described rather than abbreviated: "DXF" alone asks the
+   user to already know; "Plotter paths · cut only" tells them. */
+.fmt {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--line-panel);
+  border-radius: 10px;
+  background: var(--panel-2);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--ink);
+  transition: border-color 120ms, background 120ms;
+}
+
+.fmt:hover { border-color: var(--line-strong); }
+
+/* The row already shows selection as an amber border and a tick; the UA focus
+   ring on top of that reads as a second, contradicting selection. Keyboard
+   focus still gets a ring — just ours, and only when keyboard-driven. */
+.fmt:focus { outline: none; }
+
+.fmt:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.fmt.is-on {
+  border-color: var(--accent);
+  background: rgba(255, 159, 10, 0.07);
+}
+
+.fmt-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 7px;
+  background: #2a2a2e;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+
+.fmt.is-on .fmt-badge {
+  background: rgba(255, 159, 10, 0.18);
+  color: var(--accent);
+}
+
+.fmt-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.fmt-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.fmt-default {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(255, 159, 10, 0.16);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+}
+
+.fmt-detail {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.fmt-check {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: var(--accent);
+  opacity: 0;
+  transition: opacity 120ms;
+}
+
+.fmt-check svg { width: 100%; height: 100%; }
+
+.fmt.is-on .fmt-check { opacity: 1; }
+
+/* Cost, balance and what is left after — on the same screen as the choice,
+   so the price is never a surprise discovered after the click. */
+.fmt-cost {
+  display: flex;
+  gap: 0;
+  margin: 16px 0;
+  border-top: 1px solid var(--line-panel);
+  border-bottom: 1px solid var(--line-panel);
+  padding: 12px 0;
+}
+
+.fmt-cost > div {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.fmt-cost > div + div {
+  border-left: 1px solid var(--line-panel);
+  padding-left: 14px;
+}
+
+.fmt-cost span {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+
+.fmt-cost strong {
+  font-family: var(--mono);
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.fmt-cost .is-accent { color: var(--accent); }
+
+.fmt-save {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 18px;
+  cursor: pointer;
+}
+
+.fmt-save-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fmt-save-text strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.fmt-save-text span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* An iOS-style switch: this is a preference that takes effect later, which a
+   switch says and a checkbox does not. */
+/* Written as input.switch, not .switch: `input[type='checkbox']` above is
+   (0,1,1) — an attribute selector counts the same as a class — so a bare
+   .switch at (0,1,0) loses the width and collapses the track onto the knob. */
+input.switch {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  width: 42px;
+  height: 25px;
+  flex-shrink: 0;
+  margin: 0;
+  border-radius: 13px;
+  background: #3a3a40;
+  cursor: pointer;
+  transition: background 160ms;
+}
+
+input.switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 21px;
+  height: 21px;
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  transition: transform 160ms;
+}
+
+input.switch:checked { background: var(--accent); }
+input.switch:checked::after { transform: translateX(17px); }
+
+.btn-sub {
+  font-family: var(--mono);
+  font-size: 11px;
+  opacity: 0.6;
+  margin-left: 2px;
 }
 
 /* ---------- on-canvas job status ---------- */

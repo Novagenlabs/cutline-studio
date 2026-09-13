@@ -33,11 +33,13 @@ const read = (p: any, sel: string) => p.evaluate(`document.querySelector('${sel}
        .some(g => getComputedStyle(g).display !== 'none')`
   );
   check(advVisible === false, 'advanced sections are hidden in simple mode');
-  check(await p.evaluate(`getComputedStyle(document.querySelector('#btn-svg').closest('.group')).display`) !== 'none',
-    'the download buttons stay visible in simple mode');
+  // The export control the user actually sees is the pinned button, not the
+  // per-format buttons behind the dialog.
+  check(await p.evaluate(`getComputedStyle(document.querySelector('#btn-export')).display`) !== 'none',
+    'the export button stays visible in simple mode');
 
   console.log('\n--- Tight cuts on the edge ---');
-  await p.click('.preset[data-preset="tight"]');
+  await p.click('.cutstop[data-preset="tight"]');
   await new Promise((r) => setTimeout(r, 500));
   await p.click('#tab-advanced');
   await new Promise((r) => setTimeout(r, 300));
@@ -57,7 +59,7 @@ const read = (p: any, sel: string) => p.evaluate(`document.querySelector('${sel}
   for (const [preset, mm] of [['close', '1.0'], ['sticker', '3.0'], ['loose', '6.0']] as const) {
     await p.click('#tab-simple');
     await new Promise((r) => setTimeout(r, 200));
-    await p.click(`.preset[data-preset="${preset}"]`);
+    await p.click(`.cutstop[data-preset="${preset}"]`);
     await new Promise((r) => setTimeout(r, 400));
     await p.click('#tab-advanced');
     await new Promise((r) => setTimeout(r, 250));
@@ -92,7 +94,7 @@ const read = (p: any, sel: string) => p.evaluate(`document.querySelector('${sel}
   await new Promise((r) => setTimeout(r, 400));
   await p.click('#tab-simple');
   await new Promise((r) => setTimeout(r, 300));
-  const lit = await p.evaluate(`document.querySelectorAll('.preset.active').length`);
+  const lit = await p.evaluate(`document.querySelectorAll('.cutstop.active').length`);
   check(lit === 0, 'no preset is highlighted after a manual change');
   check(String(await read(p, '#preset-hint')).toLowerCase().includes('custom'),
     'the hint says the settings are custom');
