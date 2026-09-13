@@ -1,3 +1,4 @@
+/// <reference types="@webgpu/types" />
 declare module 'clipper-lib' {
   const ClipperLib: any;
   export default ClipperLib;
@@ -20,3 +21,12 @@ declare module 'simplify-js' {
   ): SimplifyPoint[];
 }
 
+
+/**
+ * WGSL shader sources, imported as text by the esbuild `--loader:.wgsl=text`
+ * rule. The vendored vgpu flare imports its four passes this way.
+ */
+declare module '*.wgsl' {
+  const source: string;
+  export default source;
+}

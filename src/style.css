@@ -2050,6 +2050,26 @@ body:not(.mode-simple) #panel-simple {
 
 .splash.is-leaving { opacity: 0; }
 
+/* The WebGPU flare (src/vendor/flare). It draws its own mark and wordmark, so
+   when it comes up the DOM copies are hidden rather than removed — if the GPU
+   path fails at any point, or the device is lost, the CSS splash underneath
+   is still there and still correct. */
+/* Laid out from the start, but invisible: the renderer measures the canvas
+   with getBoundingClientRect() during init, and `display: none` would hand it
+   a 0x0 surface. Opacity keeps the box real while the CSS splash shows. */
+.splash-gpu {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  touch-action: none;
+  transition: opacity 200ms ease-out;
+}
+
+.splash.is-gpu .splash-gpu { opacity: 1; }
+.splash.is-gpu .splash-box { visibility: hidden; }
+
 .splash-box {
   display: flex;
   flex-direction: column;

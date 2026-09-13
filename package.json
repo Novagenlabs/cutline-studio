@@ -15,7 +15,7 @@
     "verify:group": "tsx test/verify-group.ts",
     "verify:offset": "tsx test/verify-offset.ts",
     "verify:edge": "tsx test/verify-edge.ts",
-    "build:cutter": "esbuild src/main.ts --bundle --format=esm --outfile=public/cutline/app.js --target=es2022 --jsx=automatic --minify && cp src/style.css public/cutline/app.css && node scripts/build-cutter-html.mjs",
+    "build:cutter": "esbuild src/main.ts --bundle --format=esm --outdir=public/cutline --entry-names=app --target=es2022 --jsx=automatic --loader:.wgsl=text --splitting --minify && cp src/style.css public/cutline/app.css && node scripts/build-cutter-html.mjs",
     "verify:presets": "tsx test/verify-presets.ts",
     "verify:ui": "tsx test/verify-ui.ts",
     "verify:nav": "tsx test/verify-nav.ts",
@@ -47,6 +47,7 @@
     "react-dom": "^19.2.8",
     "simplify-js": "^1.2.4",
     "stripe": "^19.2.0",
+    "vgpu": "^0.4.1",
     "zod": "^4.3.5"
   },
   "devDependencies": {
@@ -54,6 +55,7 @@
     "@types/node": "^26.2.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
+    "@webgpu/types": "^0.1.72",
     "dialkit": "^2.0.2",
     "esbuild": "^0.25.0",
     "prisma": "^6.19.1",

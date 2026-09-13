@@ -24,3 +24,7 @@ public/motion-lab/dialkit.css
 
 # TypeScript incremental build cache
 tsconfig.tsbuildinfo
+
+# Scratch dir for `npx vgpu examples pull` — the example is vendored into
+# src/vendor/flare instead, so a re-pull here is only ever for diffing.
+/nextjs-flare

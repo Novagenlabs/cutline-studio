@@ -19,6 +19,9 @@
  * who use the tool all day.
  */
 import { createCutMark, DEFAULT_MOTION, type CutMarkMotion } from './cutmark';
+// No static import of the flare: a top-level import would pull vgpu, the WGSL
+// sources and the blue-noise table into the main bundle, which is the opposite
+// of what the dynamic import below is for.
 
 const SEEN_KEY = 'cutline.splashSeen';
 
@@ -106,6 +109,14 @@ export function createSplash(motion: SplashMotion = DEFAULT_SPLASH): Splash {
   // band clipped to its glyphs. Clipping to the text rather than overlaying a
   // rectangle is what makes the light look like it is ON the letters instead
   // of passing in front of them.
+  // The WebGPU flare draws its own mark and wordmark, so when it starts the
+  // DOM copies below are hidden rather than removed — if the GPU path fails
+  // at any point they are still there to show.
+  const canvas = document.createElement('canvas');
+  canvas.className = 'splash-gpu';
+  canvas.setAttribute('aria-hidden', 'true');
+  el.append(canvas);
+
   const word = document.createElement('div');
   word.className = 'splash-word';
 
@@ -154,8 +165,47 @@ export function createSplash(motion: SplashMotion = DEFAULT_SPLASH): Splash {
       document.body.append(el);
       mark.start();
 
+      // The flare is imported lazily: it pulls in vgpu, the WGSL sources and a
+      // 128x128 blue-noise table, none of which a browser without WebGPU
+      // should ever download, and none of which the cutter needs to trace.
+      let renderer: { dispose(): void } | undefined;
+      const gpuReady = (async () => {
+        if (!('gpu' in navigator)) return false;
+        if (matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+        const [{ createRenderer }, { setLogoGeometry: setGeometry }, raster] =
+          await Promise.all([
+            import('../vendor/flare/renderer'),
+            import('../vendor/flare/pipeline'),
+            import('../vendor/flare/logo-raster'),
+          ]);
+        // Fonts first: the aspect is measured from the loaded typeface, and
+        // measuring against a fallback would set the box to the wrong width.
+        await document.fonts?.ready?.catch?.(() => undefined);
+        setGeometry({
+          centerInBox: raster.CUTLINE_CENTER,
+          aspect: raster.measureCutlineAspect(),
+          // A wide lockup is sized off the canvas height here, and the
+          // example's 0.62 would run ours off both edges.
+          heightRatio: 0.16,
+        });
+        const r = createRenderer({ canvas });
+        await r.ready;
+        renderer = r;
+        return true;
+      })().catch(() => {
+        // A GPU that refuses to initialise is not an error worth showing
+        // anybody — the DOM splash underneath is already correct.
+        return false;
+      });
+
+      if (await gpuReady) el.classList.add('is-gpu');
+
       const skip = () => {
         el.classList.add('is-leaving');
+        // The GPU may still be initialising when the user skips, so disposal
+        // is also chained onto the init promise — whichever finishes last
+        // does the cleanup, and dispose() is idempotent by design.
+        void gpuReady.then(() => renderer?.dispose());
       };
       addEventListener('pointerdown', skip, { once: true, capture: true });
       addEventListener('keydown', skip, { once: true, capture: true });
@@ -172,6 +222,12 @@ export function createSplash(motion: SplashMotion = DEFAULT_SPLASH): Splash {
       await wait(current.fadeMs);
 
       mark.stop();
+      // The example's teardown, run at the one moment it matters: this
+      // cancels the frame loop, disconnects the ResizeObserver, drops the
+      // pointer listeners and disposes the GPU device. Skipping it would
+      // leave a render loop running for the life of the page, behind an
+      // element that is no longer on it.
+      renderer?.dispose();
       el.remove();
       markSeen();
     },
