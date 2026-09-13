@@ -22,7 +22,9 @@
     "verify:signin": "tsx test/verify-signin.ts",
     "verify:popup": "tsx test/verify-popup.ts",
     "verify:credits": "tsx test/verify-credits.ts",
-    "verify:loading": "tsx test/verify-loading.ts"
+    "verify:loading": "tsx test/verify-loading.ts",
+    "verify:cutmark": "tsx test/verify-cutmark.ts",
+    "motion-lab": "cp node_modules/dialkit/dist/vanilla/browser.global.js public/motion-lab/dialkit.js && cp node_modules/dialkit/dist/vanilla/styles.css public/motion-lab/dialkit.css && esbuild src/motion-lab.ts --bundle --format=esm --outfile=public/motion-lab/lab.js --target=es2022"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
@@ -48,11 +50,12 @@
     "@types/node": "^26.2.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
+    "dialkit": "^2.0.2",
+    "esbuild": "^0.25.0",
     "prisma": "^6.19.1",
     "puppeteer-core": "^25.6.0",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3",
-    "vitest": "^3.2.4",
-    "esbuild": "^0.25.0"
+    "vitest": "^3.2.4"
   }
 }

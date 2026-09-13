@@ -8,6 +8,7 @@ import { PRESETS, matchPreset } from './presets';
 import { toast } from './ui/toast';
 import { confirmSpend } from './ui/confirm';
 import { jobStart, jobStage, jobEnd } from './ui/job';
+import { showLoading, loadingText } from './ui/loading';
 import { promptSignIn } from './ui/signin';
 import { openCredits } from './ui/credits';
 import type { PresetId } from './presets';
@@ -544,10 +545,15 @@ aiCheckbox.addEventListener('change', async () => {
   }
   aiCheckbox.disabled = true;
   const hint = $('#hint-ai');
+  // The model is tens of megabytes and the first run can take minutes. A
+  // long-lived toast was the wrong instrument for that: it sits in the corner
+  // while the canvas appears frozen. The overlay says plainly that the app is
+  // busy, and carries the same progress messages as they arrive.
+  const closeLoading = showLoading('Loading the AI matting model');
   try {
     const matte = await computeAiMatte(state.workImg, (msg) => {
       hint.textContent = msg;
-      toast(msg, 'info', 60000);
+      loadingText(msg);
     });
     state.aiEngine = new CutlineEngine(matteToImage(state.workImg, matte), state.workScale);
     hint.textContent = 'AI matte active — threshold, denoise and regions now shape the neural edge.';
@@ -560,6 +566,7 @@ aiCheckbox.addEventListener('change', async () => {
     hint.textContent = 'AI matting failed on this device/browser — the classic pipeline still works.';
     toast(`AI matting failed: ${err instanceof Error ? err.message : err}`, 'error', 9000);
   } finally {
+    closeLoading();
     aiCheckbox.disabled = false;
   }
 });
@@ -749,10 +756,27 @@ function renderBalance() {
 
 // Advisory only — the export route re-checks the balance when it charges, so
 // a stale number here cannot buy anything.
-void fetchBalance().then((b) => {
-  state.balance = b;
-  renderBalance();
-});
+//
+// The overlay is on a grace timer rather than shown outright: this request is
+// usually tens of milliseconds, and a splash that flashes up and vanishes
+// makes a fast app feel slower than one that simply appeared ready. It only
+// takes over the screen if the wait is long enough to be worth explaining.
+{
+  let close: (() => void) | null = null;
+  const grace = window.setTimeout(() => {
+    close = showLoading('Loading your workspace');
+  }, 400);
+
+  void fetchBalance()
+    .then((b) => {
+      state.balance = b;
+      renderBalance();
+    })
+    .finally(() => {
+      clearTimeout(grace);
+      close?.();
+    });
+}
 
 /**
  * The credit pill opens a dialog rather than a page.

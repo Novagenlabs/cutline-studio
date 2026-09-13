@@ -8,6 +8,11 @@ next-env.d.ts
 # Built by `npm run build:cutter` from index.html + src/
 public/cutline/
 
+# Motion lab: index.html is source, the rest is built by `npm run motion-lab`
+public/motion-lab/lab.js
+public/motion-lab/dialkit.js
+public/motion-lab/dialkit.css
+
 # Secrets — never commit. Neon URLs and Stripe keys live here.
 .env
 .env.*

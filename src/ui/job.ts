@@ -11,6 +11,7 @@
  * several seconds of popup, session check and balance fetch, and leaving the
  * screen silent through all of it is what made a working sign-in look stuck.
  */
+import { createCutMark, type CutMark } from './cutmark';
 
 const STAGES: Record<string, { text: string; sub: string }> = {
   checking: {
@@ -41,6 +42,22 @@ const STAGES: Record<string, { text: string; sub: string }> = {
 
 let hideTimer: number | null = null;
 
+/**
+ * The banner's indicator is the brand mark cutting, not a generic ring.
+ * Built once and reused: the mark holds its own animation, so rebuilding it
+ * per job would restart the cut mid-stroke every time the stage changed.
+ */
+let mark: CutMark | null = null;
+
+function indicator(root: HTMLElement): CutMark | null {
+  if (mark) return mark;
+  const slot = root.querySelector('.job-spinner');
+  if (!slot) return null;
+  mark = createCutMark(16);
+  slot.replaceChildren(mark.el);
+  return mark;
+}
+
 function el(): HTMLElement | null {
   return document.getElementById('job');
 }
@@ -54,6 +71,7 @@ export function jobStart(format: string | null, stage: keyof typeof STAGES = 're
   }
   root.classList.remove('is-done', 'is-error');
   root.hidden = false;
+  indicator(root)?.start();
   jobStage(stage, format);
 }
 
@@ -84,4 +102,7 @@ export function jobEnd(): void {
   }
   root.hidden = true;
   root.classList.remove('is-done', 'is-error');
+  // Blades stop when the work does; a mark still cutting behind a hidden
+  // banner is wasted compositor work and a lie if the banner reappears.
+  mark?.stop();
 }

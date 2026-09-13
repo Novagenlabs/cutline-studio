@@ -848,36 +848,70 @@ body:not(.mode-simple) #panel-simple {
   to   { opacity: 1; transform: translate(-50%, 0); }
 }
 
+/* Holds the cut mark (src/ui/cutmark.ts). It is a bare slot: the indicator
+   is the brand mark cutting, and a ring drawn around it would read as a
+   second, competing spinner. */
 .job-spinner {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.18);
-  border-top-color: var(--accent);
-  animation: job-spin 700ms linear infinite;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--ink);
 }
-
-@keyframes job-spin { to { transform: rotate(360deg); } }
 
 .job-sub {
   color: var(--muted);
   font-size: 12px;
 }
 
-/* Finished states stop spinning — a spinner still turning after the work is
-   done is a lie about what the app is doing. */
-.job.is-done .job-spinner {
-  border-color: #2ecc71;
-  animation: none;
-}
+/* Finished states stop cutting — blades still working after the work is done
+   is a lie about what the app is doing. The mark's own stop() cancels the
+   animation; these just recolour the parked blades to carry the outcome. */
+.job.is-done .job-spinner { color: #2ecc71; }
 
-.job.is-error .job-spinner {
-  border-color: var(--accent);
-  animation: none;
-}
+.job.is-error .job-spinner { color: var(--accent); }
 
 .job.is-done .job-sub,
 .job.is-error .job-sub { display: none; }
+
+/* Full-surface loading (src/ui/loading.ts), for waits that block the whole
+   workspace rather than annotating a working one. Kept out of the layout
+   until it is needed: visibility alone would leave it intercepting clicks. */
+.loading {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(13, 13, 15, 0.82);
+  backdrop-filter: blur(8px);
+}
+
+.loading.is-on {
+  display: flex;
+  animation: loading-in 180ms ease-out;
+}
+
+@keyframes loading-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.loading-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  color: var(--ink);
+}
+
+.loading-text {
+  font-size: 13px;
+  color: var(--muted);
+  letter-spacing: 0.01em;
+}
 
 .sheet-note {
   font-size: 12px;

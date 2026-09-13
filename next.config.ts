@@ -40,8 +40,16 @@ const config: NextConfig = {
     ];
   },
   async rewrites() {
-    // The cutter is the product; it lives at the root.
-    return [{ source: '/', destination: '/cutline/index.html' }];
+    return [
+      // The cutter is the product; it lives at the root.
+      { source: '/', destination: '/cutline/index.html' },
+      // A static directory under public/ is not served at its bare path, so
+      // the motion lab needs the same treatment to answer on /motion-lab.
+      // Dev-only by intent, but harmless in production: it ships no secrets
+      // and the panel it loads is a devDependency that is never bundled into
+      // the cutter itself.
+      { source: '/motion-lab', destination: '/motion-lab/index.html' },
+    ];
   },
 };
 
