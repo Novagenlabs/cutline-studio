@@ -67,6 +67,43 @@ const check = (ok: boolean, msg: string) => {
     check(delta <= 0.75, `${names[i]}: knob sits on its tick (off by ${delta.toFixed(2)}px)`);
   });
 
+  console.log('\n--- the track begins and ends at the outer stops ---');
+  // Run full-width, the grey bar carries on past the knob at either end and
+  // the handle reads as pushed off the end of its own rail. It should stop
+  // exactly where the travel does.
+  const ends = await p.evaluate(`(() => {
+    const track = document.querySelector('.cutslider-track').getBoundingClientRect();
+    const input = document.getElementById('in-cutstyle').getBoundingClientRect();
+    const knob = parseFloat(getComputedStyle(document.querySelector('.cutslider')).getPropertyValue('--knob'));
+    return {
+      trackStart: track.x,
+      trackEnd: track.right,
+      firstStop: input.x + knob / 2,
+      lastStop: input.x + knob / 2 + (input.width - knob),
+    };
+  })()`) as Record<string, number>;
+
+  check(Math.abs(ends.trackStart - ends.firstStop) <= 0.75,
+    `the track starts at the first stop (off by ${Math.abs(ends.trackStart - ends.firstStop).toFixed(2)}px)`);
+  check(Math.abs(ends.trackEnd - ends.lastStop) <= 0.75,
+    `and ends at the last one (off by ${Math.abs(ends.trackEnd - ends.lastStop).toFixed(2)}px)`);
+
+  console.log('\n--- the end stops are not jammed against the panel ---');
+  // The knob's outer half overhangs the last stop; without an inset it sits
+  // flush to the rail gutter and reads as falling off the edge.
+  const gutter = await p.evaluate(`(() => {
+    const rail = document.querySelector('.rail').getBoundingClientRect();
+    const input = document.getElementById('in-cutstyle').getBoundingClientRect();
+    const knob = parseFloat(getComputedStyle(document.querySelector('.cutslider')).getPropertyValue('--knob'));
+    const lastKnobEdge = input.x + knob / 2 + (input.width - knob) + knob / 2;
+    const firstKnobEdge = input.x;
+    return { right: rail.right - lastKnobEdge, left: firstKnobEdge - rail.x };
+  })()`) as { right: number; left: number };
+
+  check(gutter.right >= 20, `the knob clears the right gutter (${gutter.right.toFixed(1)}px)`);
+  check(Math.abs(gutter.left - gutter.right) <= 1.5,
+    `and both ends are inset equally (${gutter.left.toFixed(1)}px / ${gutter.right.toFixed(1)}px)`);
+
   console.log('\n--- the thumb is centred on the track ---');
   const vert = await p.evaluate(`(() => {
     const input = document.getElementById('in-cutstyle').getBoundingClientRect();

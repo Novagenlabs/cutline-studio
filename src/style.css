@@ -1141,12 +1141,21 @@ body:not(.mode-simple) #panel-simple {
    --knob half-width here, so tick and thumb share one travel range. */
 .cutslider {
   --knob: 16px;
+  /* The knob's outer half sticks past the first and last stop. Without this
+     the end stops sit flush against the panel gutter and the handle reads as
+     falling off the edge, so the control is inset by that half-knob and the
+     stop labels are pulled in to match. */
+  margin: 0 calc(var(--knob) / 2);
 }
 
+/* Inset to the same range the knob travels, so the rail visibly starts at
+   the first stop and ends at the last one. Run full-width, the track carries
+   on past the knob at either end, and the handle reads as having been pushed
+   off the end of its own rail rather than parked at the end of it. */
 .cutslider-track {
   position: absolute;
-  left: 0;
-  right: 0;
+  left: calc(var(--knob) / 2);
+  right: calc(var(--knob) / 2);
   height: 4px;
   border-radius: 2px;
   background: var(--line-strong);
@@ -1232,11 +1241,12 @@ body:not(.mode-simple) #panel-simple {
 /* The stop labels are two lines tall and sit directly above the next
    control, so the block owns the space beneath it — without this the "0 mm"
    sub-labels are overlapped by whatever row follows. */
+/* Same inset as .cutslider, so each label stays under its own stop. */
 .cutslider-labels {
   display: flex;
   justify-content: space-between;
   padding-top: 10px;
-  margin-bottom: 14px;
+  margin: 0 8px 14px;
 }
 
 
