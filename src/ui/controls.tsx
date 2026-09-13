@@ -97,10 +97,19 @@ export interface ValueSliderOptions {
   onChange: (value: number) => void;
 }
 
+/**
+ * Uncontrolled on purpose.
+ *
+ * With `value`, the host has to re-render on every change to make the thumb
+ * move — and re-rendering mid-drag replaces the element the pointer is
+ * captured on, so the drag dies after one pixel. `defaultValue` lets Base UI
+ * own the position during the gesture and report it outwards; external writes
+ * (selecting a region, applying a preset) remount with a new `key` instead.
+ */
 function ValueSlider({ value, min, max, step, label, onChange }: ValueSliderOptions) {
   return (
     <Slider.Root
-      value={value}
+      defaultValue={value}
       min={min}
       max={max}
       step={step}
@@ -117,8 +126,14 @@ function ValueSlider({ value, min, max, step, label, onChange }: ValueSliderOpti
   );
 }
 
+/**
+ * `key` on the seed value: because the slider is uncontrolled, the only way
+ * an external write (region selected, preset applied) can move the thumb is
+ * to mount a fresh instance seeded with the new number. During a drag nobody
+ * calls this, so the gesture is never interrupted.
+ */
 export function mountValueSlider(host: Element, opts: ValueSliderOptions): void {
-  mount(host, <ValueSlider {...opts} />);
+  mount(host, <ValueSlider key={opts.value} {...opts} />);
 }
 
 /* ---------------- switch ---------------- */

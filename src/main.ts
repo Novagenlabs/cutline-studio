@@ -10,7 +10,7 @@ import { confirmSpend } from './ui/confirm';
 import { chooseExport, defaultFormat } from './ui/export-dialog';
 import { jobStart, jobStage, jobEnd } from './ui/job';
 import { showLoading, loadingText } from './ui/loading';
-import { mountCutSlider } from './ui/controls';
+import { mountCutSlider, mountValueSlider } from './ui/controls';
 import { promptSignIn } from './ui/signin';
 import { openCredits } from './ui/credits';
 import type { PresetId } from './presets';
@@ -561,6 +561,12 @@ function syncRegionControls() {
   const off = r?.offsetMm ?? state.params.offsetMm;
   ($('#in-offset') as HTMLInputElement).value = String(off);
   $('#out-offset').textContent = `${off.toFixed(1)} mm`;
+  // The mounted sliders read their input, so a write has to tell them to
+  // re-read it — otherwise selecting a region updates the numbers while the
+  // handles stay where the last region left them.
+  redrawSlider('#in-alpha');
+  redrawSlider('#in-denoise');
+  redrawSlider('#in-offset');
   $('#region-hint').textContent = r
     ? `R${state.activeRegion + 1}: threshold / denoise / hug-body / offset apply to this region only`
     : '';
@@ -591,6 +597,18 @@ window.addEventListener('keydown', (e) => {
 
 /* ---------------- controls ---------------- */
 
+/**
+ * Bind a rail slider.
+ *
+ * The markup still carries an <input type="range"> so the min/max/step and
+ * the current value live in one place, but it is never shown: a Base UI
+ * slider is mounted over it and the input becomes the model. That keeps every
+ * existing `input.value = x` write working — syncRegionControls does a dozen
+ * of them — while the thing on screen is a control whose thumb is a real
+ * element rather than an unmeasurable pseudo-element.
+ */
+const sliderRedraws = new Map<string, () => void>();
+
 function bindSlider(
   inputSel: string,
   outputSel: string,
@@ -599,12 +617,55 @@ function bindSlider(
 ) {
   const input = $(inputSel) as HTMLInputElement;
   const out = $(outputSel) as HTMLOutputElement;
+
+  const host = document.createElement('div');
+  host.className = 'bui-slider-host';
+  input.after(host);
+  input.hidden = true;
+
+  const draw = () => {
+    mountValueSlider(host, {
+      value: parseFloat(input.value),
+      min: parseFloat(input.min || '0'),
+      max: parseFloat(input.max || '100'),
+      step: parseFloat(input.step || '1'),
+      label: out.id.replace(/^out-/, ''),
+      onChange: (v) => {
+        // The input stays the source of truth, so anything that reads or
+        // writes it later still sees the value the user chose.
+        input.value = String(v);
+        out.textContent = format(v);
+        apply(v);
+        // Deliberately NOT re-mounting here. React re-renders the same tree
+        // from the new input value on the next redraw; calling draw() during
+        // a drag replaces the element the pointer is captured on, and the
+        // drag dies on the first move. Only external writes redraw.
+        recompute();
+      },
+    });
+  };
+
+  // The hidden input is still a real range input, so anything that sets its
+  // value and fires `input` — a test, a script, an automation — keeps working
+  // exactly as it did before the mount existed. Without this the model can
+  // only be seeded, never driven, and code that used to move a slider would
+  // silently do nothing.
   input.addEventListener('input', () => {
     const v = parseFloat(input.value);
+    if (Number.isNaN(v)) return;
     out.textContent = format(v);
     apply(v);
+    draw();
     recompute();
   });
+
+  sliderRedraws.set(inputSel, draw);
+  draw();
+}
+
+/** Re-read a slider from its input after code has written input.value. */
+function redrawSlider(inputSel: string): void {
+  sliderRedraws.get(inputSel)?.();
 }
 
 bindSlider('#in-offset', '#out-offset', (v) => `${v.toFixed(1)} mm`, (v) => {
@@ -819,6 +880,8 @@ function syncCutControls() {
     if (el) el.value = String(v);
     const o = $(out);
     if (o) o.textContent = fmt(v);
+    // The mounted slider reads its input, so it has to be told to re-read.
+    redrawSlider(sel);
   };
   set('#in-offset', '#out-offset', p.offsetMm, (v) => `${v.toFixed(1)} mm`);
   set('#in-corner', '#out-corner', p.minCornerRadiusMm, (v) => `${v.toFixed(1)} mm`);

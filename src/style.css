@@ -1217,9 +1217,20 @@ body:not(.mode-simple) #panel-simple {
    told to fill its container — otherwise the whole subtree collapses to 0x0
    and nothing below it has anything to lay out against. */
 .cutslider > [role='group'],
-.row.slider [role='group'] {
+.bui-slider-host > [role='group'] {
   display: block;
   width: 100%;
+}
+
+/* Holds a mounted slider where its hidden <input type="range"> used to sit. */
+.bui-slider-host {
+  display: block;
+  width: 100%;
+}
+
+/* The input stays in the DOM as the value model but is never shown. */
+.row.slider input[type='range'][hidden] {
+  display: none;
 }
 
 .bui-slider-control {
