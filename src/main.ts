@@ -1057,6 +1057,19 @@ upgradeSelects();
 setMode('simple');
 applyPreset('sticker');
 
+// role="tablist" promises arrow-key navigation to anyone using a screen
+// reader or the keyboard, so the tabs have to honour it. Left as two plain
+// buttons rather than rebuilt on a tab component: the roles and the styling
+// are already right, and this is the only behaviour that was missing.
+$('.mode-tabs').addEventListener('keydown', (e) => {
+  const key = (e as KeyboardEvent).key;
+  if (key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'Home' && key !== 'End') return;
+  e.preventDefault();
+  const simple = key === 'ArrowLeft' || key === 'Home';
+  setMode(simple ? 'simple' : 'advanced');
+  $(simple ? '#tab-simple' : '#tab-advanced').focus();
+});
+
 $('#tab-simple').addEventListener('click', () => setMode('simple'));
 $('#tab-advanced').addEventListener('click', () => setMode('advanced'));
 
