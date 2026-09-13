@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { verifyWebhook, WebhookError } from '@/lib/whop';
-import { applyMembershipEvent } from '@/lib/subscription';
+import {
+  applyMembershipEvent,
+  grantSubscriptionCredits,
+  PAYING_EVENTS,
+} from '@/lib/subscription';
 
 /**
  * Whop webhook: the only place a subscription becomes real.
@@ -75,6 +79,24 @@ export async function POST(req: Request) {
 
   try {
     const { subscriptionId } = await applyMembershipEvent(event.payload);
+
+    // Money received is the only thing that earns credits — not a membership
+    // going active, which also fires on a free trial and on a renewal that
+    // has not been paid yet. Granting on activation would hand out a month's
+    // credits to anyone who starts and cancels a trial.
+    if (PAYING_EVENTS.includes(event.type) && subscriptionId) {
+      const sub = await db.subscription.findUnique({
+        where: { id: subscriptionId },
+        select: { userId: true },
+      });
+      // No user yet means the buyer has not signed in. The event stays on
+      // record and claimSubscriptions() replays the grant at sign-in, so
+      // nothing is lost in that window.
+      if (sub?.userId) {
+        await grantSubscriptionCredits(sub.userId, event.id, `Whop ${event.type}`);
+      }
+    }
+
     await db.whopEvent.update({
       where: { id: event.id },
       // Clears any error from a previous failed attempt, so the row reads as

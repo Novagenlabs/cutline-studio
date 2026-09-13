@@ -158,5 +158,85 @@ export async function claimSubscriptions(
     where: { userId: null, whopUserEmail: email.toLowerCase() },
     data: { userId },
   });
+  // Any payment that landed before this account existed was recorded without
+  // credits, because there was nobody to credit. Now there is. Without this
+  // the buyer's first month is silently unpaid-for: the subscription shows as
+  // active and the balance does not move.
+  if (result.count > 0) await grantDeferredSubscriptionCredits(userId);
   return result.count;
+}
+
+/**
+ * Grant one period's credits for a paid subscription.
+ *
+ * Idempotency is delegated to the unique index on CreditEntry.whopEventId
+ * rather than to a read-then-write check. Whop delivers at least once and
+ * retries for ~71 hours, so duplicates are routine rather than exceptional,
+ * and two deliveries can be in flight at the same moment — a check-then-
+ * insert would let both pass the check before either inserted. Letting the
+ * insert fail is the only version that is safe under concurrency.
+ *
+ * Returns whether credits were actually granted, so a replay is visible in
+ * the webhook's response rather than looking identical to a first delivery.
+ */
+export async function grantSubscriptionCredits(
+  userId: string,
+  whopEventId: string,
+  note: string
+): Promise<boolean> {
+  try {
+    await db.creditEntry.create({
+      data: {
+        userId,
+        amount: SUBSCRIPTION_CREDITS,
+        reason: 'SUBSCRIPTION',
+        note,
+        whopEventId,
+      },
+    });
+    return true;
+  } catch (err) {
+    // P2002 is the unique violation, i.e. this exact payment already paid
+    // out. That is the expected outcome of a retry, not a failure: swallow it
+    // so the webhook can answer 200 and Whop stops redelivering. Anything
+    // else is a real problem and must surface.
+    if (isUniqueViolation(err)) return false;
+    throw err;
+  }
+}
+
+/**
+ * Pay out for payments that arrived before the buyer had an account.
+ *
+ * Those events were applied to the Subscription row with `userId: null`, so
+ * no credit entry could be written at the time. The events are still on
+ * record, so the grant is replayed from them at claim time — keyed on the
+ * same webhook id, so a payment that somehow did get credited is not
+ * credited twice.
+ */
+async function grantDeferredSubscriptionCredits(userId: string): Promise<void> {
+  const paid = await db.whopEvent.findMany({
+    where: {
+      type: { in: PAYING_EVENTS },
+      subscription: { userId },
+      // Only events that were handled: an event still carrying an error has
+      // not been applied, and its retry will grant through the normal path.
+      processedAt: { not: null },
+    },
+    select: { id: true, type: true },
+  });
+  for (const ev of paid) {
+    await grantSubscriptionCredits(userId, ev.id, `Whop ${ev.type} (claimed)`);
+  }
+}
+
+/** Events that represent money actually received, and so earn credits. */
+export const PAYING_EVENTS = ['payment.succeeded', 'payment_succeeded'];
+
+function isUniqueViolation(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    (err as { code?: string }).code === 'P2002'
+  );
 }

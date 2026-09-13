@@ -99,6 +99,14 @@ model CreditEntry {
   purchaseId String?
   purchase   Purchase? @relation(fields: [purchaseId], references: [id])
 
+  /// Set for SUBSCRIPTION entries: the Whop webhook id that paid for them.
+  /// Unique because Whop delivers at least once and retries for ~71 hours,
+  /// so the same payment arrives more than once as a matter of course. The
+  /// constraint is what makes the monthly grant idempotent — a replay loses
+  /// the insert race against the database rather than against a check we
+  /// remembered to write, and two racing deliveries cannot both succeed.
+  whopEventId String? @unique
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
