@@ -27,6 +27,16 @@ import { createCutMark, DEFAULT_MOTION, type CutMarkMotion } from './cutmark';
 
 const SEEN_KEY = 'cutline.splashSeen';
 
+/**
+ * The longest the splash may sit on screen, fade included.
+ *
+ * A ceiling rather than a suggestion: the animation is the first thing
+ * between someone and their work, and the dials are tuned while watching it
+ * deliberately, which is the one context where a slow splash feels good.
+ * Enforced in play(), so no combination of tuned values can exceed it.
+ */
+export const MAX_SPLASH_MS = 4000;
+
 export interface SplashMotion {
   /** How long the flare takes to cross the wordmark, ms. */
   sweepMs: number;
@@ -74,15 +84,18 @@ export const DEFAULT_SPLASH: SplashMotion = {
   bandWidth: 0.23,
   holdMs: 500,
   fadeMs: 600,
-  fontPx: 76,
+  // Smaller than it was. A splash that fills the screen is a poster; at 47px
+  // the lockup reads as a mark on a page, which is the right weight for
+  // something seen for six seconds and then gone.
+  fontPx: 47,
   // Near-zero tracking with a heavier stroke: the letters sit close and the
   // outline carries the weight, rather than air between them doing it.
   trackingEm: 0.01,
   strokePx: 2.3,
   restOpacity: 0.3,
-  // The mark is now most of the lockup's height rather than a bullet beside
-  // it, and sits flush against the type with no gap.
-  markPx: 95,
+  // Scaled with the type: the mark stays a little under the cap height and
+  // sits flush against the word with no gap.
+  markPx: 38,
   gapPx: 0,
   // The sheen, not the flare. It starts instantly, downloads nothing and
   // compiles no shaders, which on the first thing anyone sees is worth more
@@ -90,7 +103,10 @@ export const DEFAULT_SPLASH: SplashMotion = {
   // can draw a frame. The flare stays in the motion lab and stays one word
   // away — `variant: 'flare'` — if that trade ever looks wrong.
   variant: 'sheen',
-  sheenMs: 5650,
+  // 2900 + holdMs 500 + fadeMs 600 = 4.0s on screen, which is the ceiling.
+  // The tuned 3950 put it at 5.05s; the sheen is the only one of the three
+  // that can give time back, since hold and fade are already short.
+  sheenMs: 2900,
   mark: DEFAULT_MOTION,
 };
 
@@ -207,6 +223,9 @@ export function createSplash(motion: SplashMotion = DEFAULT_SPLASH): Splash {
       // front of the app. It is decoration on top of a live studio, so it
       // never takes pointer events (see .splash in the stylesheet) and any
       // real interaction dismisses it early.
+      // The clock starts here, before the GPU check, so everything that
+      // happens between now and the wait below comes out of the same budget.
+      const startedAt = performance.now();
       document.body.append(el);
       mark.start();
 
@@ -272,19 +291,25 @@ export function createSplash(motion: SplashMotion = DEFAULT_SPLASH): Splash {
       }
 
       const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
-      // The sheen repeats rather than ending, so it is held for two passes
-      // and then lifted — long enough to read as a loop rather than as a
-      // single pass that happened to be slow. The flare's sweep IS its
-      // length, so that one waits exactly as long as the animation runs.
-      // One pass, not two. At the old 2600ms sheen, holding for two reads as
-      // a loop; at 5650 it is nearly twelve seconds of splash, which is a
-      // long time to stand between someone and their work. One pass already
-      // shows the band travel the whole word and return to rest.
-      const onScreen =
-        current.variant === 'sheen'
-          ? current.sheenMs + current.holdMs
-          : current.sweepMs + current.holdMs;
-      await wait(reduced ? 400 : onScreen);
+
+      // One pass, not two: one already shows the band cross the whole word.
+      //
+      // Capped at MAX_SPLASH_MS regardless of what the dials say. The splash
+      // stands between someone and their work, and a tuning session is spent
+      // watching it deliberately — not opening the app forty times a day. A
+      // value that feels right in the motion lab can still be too long here.
+      //
+      // Measured from when play() was CALLED, not from here. Waiting on the
+      // GPU capability check above costs real time — a second or two while a
+      // device is requested — and starting the clock after it put the splash
+      // well past its ceiling even though the wait itself was correct.
+      const budget = Math.min(
+        MAX_SPLASH_MS - current.fadeMs,
+        (current.variant === 'sheen' ? current.sheenMs : current.sweepMs) +
+          current.holdMs
+      );
+      const spent = performance.now() - startedAt;
+      await wait(reduced ? 400 : Math.max(0, budget - spent));
 
       el.classList.add('is-leaving');
       await wait(current.fadeMs);
