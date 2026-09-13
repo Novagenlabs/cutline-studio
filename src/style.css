@@ -1302,6 +1302,77 @@ body:not(.mode-simple) #panel-simple {
   outline-offset: 2px;
 }
 
+/* ---------- Base UI button ----------
+   Taller and softer than the topbar `.btn`: a dialog's primary action is the
+   thing the whole sheet exists to get pressed, so it carries more weight than
+   a control in a chrome bar. */
+.bui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  height: 38px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  font-family: var(--display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  transition: background 130ms ease, border-color 130ms ease,
+    transform 130ms ease, opacity 130ms ease;
+}
+
+/* A press that moves is the cheapest way to make a button feel real. */
+.bui-btn:active:not([data-disabled]) { transform: scale(0.98); }
+
+.bui-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* data-disabled rather than :disabled — Base UI keeps the button focusable
+   while disabled (focusableWhenDisabled), so the native pseudo-class is not
+   the signal to style against. */
+.bui-btn[data-disabled] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.bui-btn-primary {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.bui-btn-primary:hover:not([data-disabled]) { background: #fff; }
+
+.bui-btn-ghost {
+  background: transparent;
+  border-color: var(--line-strong);
+  color: var(--ink-2);
+  font-weight: 500;
+}
+
+.bui-btn-ghost:hover:not([data-disabled]) {
+  border-color: #3a3a40;
+  color: var(--ink);
+}
+
+.bui-btn-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* A busy button keeps its width so the dialog does not reflow under the
+   cursor when the label changes to "Opening Google…". */
+.bui-btn[aria-busy='true'] .bui-btn-label {
+  min-width: 8.5em;
+}
+
 /* ---------- Base UI switch ----------
    A preference that takes effect later, which a switch says and a checkbox
    does not. The thumb is the library's own element, so the generic checkbox

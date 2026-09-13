@@ -22,6 +22,7 @@ import { Slider } from '@base-ui-components/react/slider';
 import { Switch } from '@base-ui-components/react/switch';
 import { Checkbox } from '@base-ui-components/react/checkbox';
 import { Select } from '@base-ui-components/react/select';
+import { Button } from '@base-ui-components/react/button';
 
 const roots = new WeakMap<Element, Root>();
 
@@ -249,5 +250,60 @@ export function mountSelect(host: Element, opts: SelectOptions): void {
         </Select.Positioner>
       </Select.Portal>
     </Select.Root>
+  );
+}
+
+/* ---------------- button ---------------- */
+
+export interface ButtonOptions {
+  label: string;
+  /** Optional leading icon, as raw SVG markup. */
+  iconSvg?: string;
+  variant?: 'primary' | 'ghost';
+  disabled?: boolean;
+  busy?: boolean;
+  /**
+   * A stable id for the rendered <button>.
+   *
+   * The element is re-created on every state change, so anything outside
+   * React needs a handle that survives a re-render — tests especially, which
+   * would otherwise have to match on a label that changes while busy.
+   */
+  id?: string;
+  onClick: () => void;
+}
+
+/**
+ * A Base UI button.
+ *
+ * Worth the mount rather than a styled <button> for what the library handles
+ * that hand-rolled markup routinely gets wrong: a disabled button that still
+ * takes focus when asked to, consistent `data-disabled` styling hooks, and
+ * correct behaviour for keyboard activation across browsers. The busy state
+ * is ours — it sets aria-busy so a screen reader announces the wait rather
+ * than reading a label that silently changed underneath it.
+ */
+export function mountButton(host: Element, opts: ButtonOptions): void {
+  mount(
+    host,
+    <Button
+      id={opts.id}
+      className={`bui-btn bui-btn-${opts.variant ?? 'primary'}`}
+      disabled={opts.disabled || opts.busy}
+      // Keeps the control reachable while it is working, so focus is not
+      // dumped back to the document mid-task.
+      focusableWhenDisabled
+      aria-busy={opts.busy || undefined}
+      onClick={opts.onClick}
+    >
+      {opts.iconSvg ? (
+        <span
+          className="bui-btn-icon"
+          aria-hidden="true"
+          dangerouslySetInnerHTML={{ __html: opts.iconSvg }}
+        />
+      ) : null}
+      <span className="bui-btn-label">{opts.label}</span>
+    </Button>
   );
 }
