@@ -750,6 +750,11 @@ spotInput.addEventListener('change', () => {
 
 const fileInput = $('#file-input') as HTMLInputElement;
 $('#btn-open').addEventListener('click', () => fileInput.click());
+
+// The empty canvas offers two ways in, and both have to work: drag a file, or
+// press the button. Before this, the only way to open an image from an empty
+// canvas was the top bar, which is a long way from where the user is looking.
+$('#btn-drop-open').addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', () => {
   const f = fileInput.files?.[0];
   if (f) loadFile(f);

@@ -276,11 +276,29 @@
 
       <main class="stage" id="stage">
         <div id="dropzone" class="dropzone">
-          <svg viewBox="0 0 24 24" class="drop-ico" aria-hidden="true">
-            <path d="M12 3 v12 m0 0 l-4.5 -4.5 M12 15 l4.5 -4.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/>
-            <path d="M4 17 v2.4 a1.6 1.6 0 0 0 1.6 1.6 h12.8 a1.6 1.6 0 0 0 1.6 -1.6 V17" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/>
-          </svg>
-          <p><strong>Drop a PNG here</strong> or open an image.</p>
+          <div class="drop-row">
+            <div class="drop-half">
+              <svg viewBox="0 0 24 24" class="drop-ico" aria-hidden="true">
+                <path d="M12 3 v12 m0 0 l-4.5 -4.5 M12 15 l4.5 -4.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+                <path d="M4 17 v2.4 a1.6 1.6 0 0 0 1.6 1.6 h12.8 a1.6 1.6 0 0 0 1.6 -1.6 V17" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+              </svg>
+              <p><strong>Drop a PNG here</strong></p>
+            </div>
+
+            <span class="drop-or">or</span>
+
+            <!-- The explicit way in, for anyone who does not want to drag a
+                 file: a real button rather than a clickable region, so it
+                 looks like the control it is. -->
+            <button id="btn-drop-open" class="drop-open" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="3" y="4.5" width="18" height="15" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.7"/>
+                <circle cx="8.6" cy="10" r="1.7" fill="currentColor"/>
+                <path d="M4 16.5l4.8-4.2a1.6 1.6 0 0 1 2.1 0l3.4 3 2-1.7a1.6 1.6 0 0 1 2.1 0L20 15.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span>Click to open an image</span>
+            </button>
+          </div>
           <p class="sub">Transparent PNGs trace from alpha. Flat JPGs get automatic background removal by flood fill.</p>
         </div>
         <svg id="preview" aria-label="Cutline preview">
