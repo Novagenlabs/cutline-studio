@@ -64,26 +64,33 @@ export interface SplashMotion {
 }
 
 export const DEFAULT_SPLASH: SplashMotion = {
+  // Tuned in the motion lab, not derived.
+  //
   // The sweep IS one full orbit of the flare (see setAutonomousRate below),
-  // so this number is the orbit's period, not just a fade length. 4200ms puts
-  // the light at about 1.5 rad/s — fast enough to feel deliberate, slow
-  // enough that the rays are legible as they travel. Below ~3s a full
-  // revolution reads as a spin rather than a pass.
-  sweepMs: 4200,
-  bandWidth: 0.22,
+  // so this is the orbit's period rather than a fade length: 6550ms puts the
+  // light at about 0.96 rad/s, a slow deliberate pass that gives the
+  // scattering time to be seen.
+  sweepMs: 6550,
+  bandWidth: 0.23,
   holdMs: 500,
   fadeMs: 600,
   fontPx: 76,
-  trackingEm: 0.16,
-  strokePx: 1.25,
+  // Near-zero tracking with a heavier stroke: the letters sit close and the
+  // outline carries the weight, rather than air between them doing it.
+  trackingEm: 0.01,
+  strokePx: 2.3,
   restOpacity: 0.3,
-  markPx: 40,
-  gapPx: 26,
-  variant: 'flare',
-  // Slower than the single pass: a repeating band that hurries reads as
-  // impatient, and this one is meant to sit under a wait rather than announce
-  // the end of one.
-  sheenMs: 2600,
+  // The mark is now most of the lockup's height rather than a bullet beside
+  // it, and sits flush against the type with no gap.
+  markPx: 95,
+  gapPx: 0,
+  // The sheen, not the flare. It starts instantly, downloads nothing and
+  // compiles no shaders, which on the first thing anyone sees is worth more
+  // than a ray-marched render that has to wait for a GPU device before it
+  // can draw a frame. The flare stays in the motion lab and stays one word
+  // away — `variant: 'flare'` — if that trade ever looks wrong.
+  variant: 'sheen',
+  sheenMs: 5650,
   mark: DEFAULT_MOTION,
 };
 
@@ -269,9 +276,13 @@ export function createSplash(motion: SplashMotion = DEFAULT_SPLASH): Splash {
       // and then lifted — long enough to read as a loop rather than as a
       // single pass that happened to be slow. The flare's sweep IS its
       // length, so that one waits exactly as long as the animation runs.
+      // One pass, not two. At the old 2600ms sheen, holding for two reads as
+      // a loop; at 5650 it is nearly twelve seconds of splash, which is a
+      // long time to stand between someone and their work. One pass already
+      // shows the band travel the whole word and return to rest.
       const onScreen =
         current.variant === 'sheen'
-          ? current.sheenMs * 2 + current.holdMs
+          ? current.sheenMs + current.holdMs
           : current.sweepMs + current.holdMs;
       await wait(reduced ? 400 : onScreen);
 

@@ -1108,8 +1108,12 @@ function renderBalance() {
     if (label) label.textContent = 'to download';
     el.title = 'Sign in to download cut files';
     el.classList.remove('is-empty', 'is-low');
+    // Swaps the live-state dot for a person, and drops the mono number
+    // styling that a balance wants and a prompt does not.
+    el.classList.add('is-signed-out');
     return;
   }
+  el.classList.remove('is-signed-out');
   if (count) count.textContent = String(state.balance);
   if (label) label.textContent = state.balance === 1 ? 'credit' : 'credits';
   // A balance that has run out, or is about to, is worth seeing before the
