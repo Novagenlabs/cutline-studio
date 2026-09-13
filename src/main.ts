@@ -10,6 +10,7 @@ import { confirmSpend } from './ui/confirm';
 import { chooseExport, defaultFormat } from './ui/export-dialog';
 import { jobStart, jobStage, jobEnd } from './ui/job';
 import { showLoading, loadingText } from './ui/loading';
+import { mountCutSlider } from './ui/controls';
 import { promptSignIn } from './ui/signin';
 import { openCredits } from './ui/credits';
 import type { PresetId } from './presets';
@@ -857,17 +858,20 @@ function syncPresetSelection() {
   // tweak that lands between presets leaves the stops unlit but must not
   // leave the knob somewhere that contradicts the numbers, so it parks at the
   // nearest stop by offset while the labels stay dark.
-  const slider = $('#in-cutstyle') as HTMLInputElement | null;
-  if (slider) {
+  const host = $('#mount-cutstyle');
+  if (host) {
     const idx = active
       ? PRESET_ORDER.indexOf(active)
       : nearestStopByOffset(state.params.offsetMm);
-    slider.value = String(idx);
-    const p = PRESETS[PRESET_ORDER[idx]];
-    slider.setAttribute(
-      'aria-valuetext',
-      active ? `${p.label}, ${p.params.offsetMm} mm` : `Custom, ${state.params.offsetMm.toFixed(2)} mm`
-    );
+    mountCutSlider(host, {
+      stops: PRESET_ORDER.map((id) => ({
+        id,
+        label: PRESETS[id].label,
+        sub: `${PRESETS[id].params.offsetMm} mm`,
+      })),
+      value: idx,
+      onChange: (i) => applyPreset(PRESET_ORDER[i] ?? 'tight'),
+    });
   }
 
   // The live offset, in the section header. This is the number the whole
@@ -894,13 +898,8 @@ $('#tab-simple').addEventListener('click', () => setMode('simple'));
 $('#tab-advanced').addEventListener('click', () => setMode('advanced'));
 
 // Two ways into the same four presets: drag the slider, or click a stop by
-// name. `input` rather than `change` so dragging retraces live instead of
-// waiting for the mouse to come up.
-($('#in-cutstyle') as HTMLInputElement).addEventListener('input', (e) => {
-  const i = Number((e.target as HTMLInputElement).value);
-  applyPreset(PRESET_ORDER[i] ?? 'tight');
-});
-
+// name. The slider's own handler is passed to the mount in
+// syncPresetSelection(); this is the by-name path.
 for (const btn of document.querySelectorAll<HTMLButtonElement>('.cutstop')) {
   btn.addEventListener('click', () => applyPreset(btn.dataset.preset as PresetId));
 }

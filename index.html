@@ -63,25 +63,10 @@
                arrow keys, Home/End and screen-reader semantics all come free,
                and the four presets are genuinely ordered by how much room they
                leave, which is what a slider says and a button grid does not. -->
-          <div class="cutslider">
-            <div class="cutslider-track" aria-hidden="true"></div>
-            <div class="cutslider-ticks" aria-hidden="true">
-              <span class="cutslider-tick"></span>
-              <span class="cutslider-tick"></span>
-              <span class="cutslider-tick"></span>
-              <span class="cutslider-tick"></span>
-            </div>
-            <input
-              id="in-cutstyle"
-              type="range"
-              min="0"
-              max="3"
-              step="1"
-              value="0"
-              aria-label="Cut style"
-              aria-valuetext="Tight, 0 mm"
-            />
-          </div>
+          <!-- Base UI Slider mounts here. The track, thumb and ticks are all
+               real elements it positions, which is why this stopped being a
+               hand-drawn approximation of a range input. -->
+          <div class="cutslider" id="mount-cutstyle"></div>
           <div class="cutslider-labels" aria-hidden="true">
             <button type="button" class="cutstop active" data-preset="tight">
               <span class="cutstop-name">Tight</span>

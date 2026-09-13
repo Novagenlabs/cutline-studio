@@ -15,7 +15,7 @@
     "verify:group": "tsx test/verify-group.ts",
     "verify:offset": "tsx test/verify-offset.ts",
     "verify:edge": "tsx test/verify-edge.ts",
-    "build:cutter": "esbuild src/main.ts --bundle --format=esm --outfile=public/cutline/app.js --target=es2022 && cp src/style.css public/cutline/app.css && node scripts/build-cutter-html.mjs",
+    "build:cutter": "esbuild src/main.ts --bundle --format=esm --outfile=public/cutline/app.js --target=es2022 --jsx=automatic --minify && cp src/style.css public/cutline/app.css && node scripts/build-cutter-html.mjs",
     "verify:presets": "tsx test/verify-presets.ts",
     "verify:ui": "tsx test/verify-ui.ts",
     "verify:nav": "tsx test/verify-nav.ts",
@@ -31,6 +31,7 @@
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
+    "@base-ui-components/react": "^1.0.0-rc.0",
     "@napi-rs/canvas": "^1.0.7",
     "@prisma/client": "^6.19.1",
     "clipper-lib": "^6.4.2",

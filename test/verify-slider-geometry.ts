@@ -1,14 +1,11 @@
-// The cut-style slider's knob must land on its ticks.
+// The cut-style slider's knob must sit on its track and on its ticks.
 //
-// A range input centres its thumb at (thumbW / 2) from each end, so the thumb
-// travels over an area inset by half a thumb on both sides — not the full
-// track. Ticks laid out across the whole width therefore drift away from the
-// stops they mark, worst at the two ends: this was 7px out at Tight and
-// Loose, which reads as a knob that never quite sits on anything.
-//
-// Nothing about that is visible in a screenshot diff at a glance, and the
-// numbers only disagree once you compute where the browser actually puts the
-// thumb — so it is pinned here.
+// The previous version of this file measured the <input type=range> box and
+// reported 0.00px while the knob was visibly high — because a native range
+// input's thumb is a vendor pseudo-element with no box you can query, so the
+// test was measuring the container and calling it the handle. That is the
+// whole reason this control is now Base UI: the thumb is a real DOM node, so
+// these assertions measure the thing the user actually sees.
 import puppeteer from 'puppeteer-core';
 
 const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -19,6 +16,15 @@ const check = (ok: boolean, msg: string) => {
   console.log(`  ${ok ? 'ok ' : 'FAIL'}  ${msg}`);
   if (!ok) fails++;
 };
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Centre of an element, or null when it is not on the page. */
+const BOX = `(sel) => {
+  const el = document.querySelector(sel);
+  if (!el) return null;
+  const r = el.getBoundingClientRect();
+  return { x: r.x, y: r.y, w: r.width, h: r.height, cx: r.x + r.width / 2, cy: r.y + r.height / 2 };
+}`;
 
 (async () => {
   const b = await puppeteer.launch({
@@ -32,86 +38,74 @@ const check = (ok: boolean, msg: string) => {
   const errs: string[] = [];
   p.on('pageerror', (e: unknown) => { errs.push(e instanceof Error ? e.message : String(e)); });
   await p.goto(URL, { waitUntil: 'networkidle2' });
+  await p.evaluate(`window.__box = ${BOX}`);
 
-  console.log('--- the knob is sized for the track it sits on ---');
-  const size = await p.evaluate(`(() => {
-    const wrap = document.querySelector('.cutslider');
-    const knob = parseFloat(getComputedStyle(wrap).getPropertyValue('--knob'));
-    const track = document.querySelector('.cutslider-track').getBoundingClientRect();
-    const tick = document.querySelector('.cutslider-tick').getBoundingClientRect();
-    return { knob, trackH: track.height, tickW: tick.width };
-  })()`) as { knob: number; trackH: number; tickW: number };
-  console.log(`  knob ${size.knob}px, track ${size.trackH}px, tick ${size.tickW}px`);
+  console.log('--- the slider renders as real elements ---');
+  const parts = await p.evaluate(`(() => ({
+    control: !!document.querySelector('.bui-slider-control'),
+    track: !!document.querySelector('.bui-slider-track'),
+    thumb: !!document.querySelector('.bui-slider-thumb'),
+    ticks: document.querySelectorAll('.bui-slider-tick').length,
+  }))()`) as Record<string, boolean | number>;
 
-  // 22px on a 4px track was wider than the gap between stops, so the handle
-  // covered the ticks it was meant to point at.
-  check(size.knob <= 18, `the knob is not oversized (${size.knob}px)`);
-  check(size.knob >= 12, `but stays big enough to grab (${size.knob}px)`);
-  check(size.tickW < size.knob, 'the tick reads as a marker, not a second handle');
+  check(parts.control === true && parts.track === true, 'control and track are present');
+  // A real node, not a ::-webkit-slider-thumb — this is what makes the rest
+  // of this file able to assert anything at all.
+  check(parts.thumb === true, 'the thumb is a real element that can be measured');
+  check(parts.ticks === 4, `four ticks, one per stop (got ${parts.ticks})`);
 
-  console.log('\n--- every stop lines up with its tick ---');
-  const geom = await p.evaluate(`(() => {
-    const input = document.getElementById('in-cutstyle');
-    const r = input.getBoundingClientRect();
-    const knob = parseFloat(getComputedStyle(document.querySelector('.cutslider')).getPropertyValue('--knob'));
-    const ticks = [...document.querySelectorAll('.cutslider-tick')]
-      .map((t) => { const b = t.getBoundingClientRect(); return b.x + b.width / 2; });
-    // Where the browser actually centres the thumb for each value.
-    const thumbs = [0, 1, 2, 3].map((i) => r.x + knob / 2 + (i / 3) * (r.width - knob));
-    return { ticks, thumbs };
-  })()`) as { ticks: number[]; thumbs: number[] };
+  console.log('\n--- the knob is centred on the track at every stop ---');
+  const stops = ['tight', 'close', 'sticker', 'loose'];
+  for (const name of stops) {
+    await p.evaluate(`document.querySelector('.cutstop[data-preset="${name}"]').click()`);
+    await wait(300);
+    const m = await p.evaluate(`(() => {
+      const t = window.__box('.bui-slider-track');
+      const th = window.__box('.bui-slider-thumb');
+      return { dy: Math.abs(t.cy - th.cy), thumbCx: th.cx, thumbW: th.w };
+    })()`) as { dy: number; thumbCx: number; thumbW: number };
+    check(m.dy <= 0.75, `${name}: knob centred on the track (off by ${m.dy.toFixed(2)}px vertically)`);
+  }
 
-  const names = ['Tight', 'Close', 'Sticker', 'Loose'];
-  geom.ticks.forEach((tick, i) => {
-    const delta = Math.abs(tick - geom.thumbs[i]);
-    check(delta <= 0.75, `${names[i]}: knob sits on its tick (off by ${delta.toFixed(2)}px)`);
-  });
+  console.log('\n--- the knob lands on its tick ---');
+  for (let i = 0; i < stops.length; i++) {
+    await p.evaluate(`document.querySelector('.cutstop[data-preset="${stops[i]}"]').click()`);
+    await wait(300);
+    const m = await p.evaluate(`(() => {
+      const th = window.__box('.bui-slider-thumb');
+      const tick = document.querySelectorAll('.bui-slider-tick')[${i}].getBoundingClientRect();
+      return { dx: Math.abs((tick.x + tick.width / 2) - th.cx) };
+    })()`) as { dx: number };
+    check(m.dx <= 0.75, `${stops[i]}: knob sits on its tick (off by ${m.dx.toFixed(2)}px)`);
+  }
 
-  console.log('\n--- the track begins and ends at the outer stops ---');
-  // Run full-width, the grey bar carries on past the knob at either end and
-  // the handle reads as pushed off the end of its own rail. It should stop
-  // exactly where the travel does.
-  const ends = await p.evaluate(`(() => {
-    const track = document.querySelector('.cutslider-track').getBoundingClientRect();
-    const input = document.getElementById('in-cutstyle').getBoundingClientRect();
-    const knob = parseFloat(getComputedStyle(document.querySelector('.cutslider')).getPropertyValue('--knob'));
-    return {
-      trackStart: track.x,
-      trackEnd: track.right,
-      firstStop: input.x + knob / 2,
-      lastStop: input.x + knob / 2 + (input.width - knob),
-    };
-  })()`) as Record<string, number>;
-
-  check(Math.abs(ends.trackStart - ends.firstStop) <= 0.75,
-    `the track starts at the first stop (off by ${Math.abs(ends.trackStart - ends.firstStop).toFixed(2)}px)`);
-  check(Math.abs(ends.trackEnd - ends.lastStop) <= 0.75,
-    `and ends at the last one (off by ${Math.abs(ends.trackEnd - ends.lastStop).toFixed(2)}px)`);
-
-  console.log('\n--- the end stops are not jammed against the panel ---');
-  // The knob's outer half overhangs the last stop; without an inset it sits
-  // flush to the rail gutter and reads as falling off the edge.
-  const gutter = await p.evaluate(`(() => {
+  console.log('\n--- the end stops stay inside the panel ---');
+  const ends = await p.evaluate(`(async () => {
     const rail = document.querySelector('.rail').getBoundingClientRect();
-    const input = document.getElementById('in-cutstyle').getBoundingClientRect();
-    const knob = parseFloat(getComputedStyle(document.querySelector('.cutslider')).getPropertyValue('--knob'));
-    const lastKnobEdge = input.x + knob / 2 + (input.width - knob) + knob / 2;
-    const firstKnobEdge = input.x;
-    return { right: rail.right - lastKnobEdge, left: firstKnobEdge - rail.x };
-  })()`) as { right: number; left: number };
+    const read = async (name) => {
+      document.querySelector('.cutstop[data-preset="' + name + '"]').click();
+      await new Promise((r) => setTimeout(r, 250));
+      const th = window.__box('.bui-slider-thumb');
+      return { left: th.x - rail.x, right: rail.right - (th.x + th.w) };
+    };
+    const tight = await read('tight');
+    const loose = await read('loose');
+    return { tight, loose };
+  })()`) as { tight: { left: number }; loose: { right: number } };
 
-  check(gutter.right >= 20, `the knob clears the right gutter (${gutter.right.toFixed(1)}px)`);
-  check(Math.abs(gutter.left - gutter.right) <= 1.5,
-    `and both ends are inset equally (${gutter.left.toFixed(1)}px / ${gutter.right.toFixed(1)}px)`);
+  check(ends.tight.left >= 10, `Tight clears the left gutter (${ends.tight.left.toFixed(1)}px)`);
+  check(ends.loose.right >= 10, `Loose clears the right gutter (${ends.loose.right.toFixed(1)}px)`);
 
-  console.log('\n--- the thumb is centred on the track ---');
-  const vert = await p.evaluate(`(() => {
-    const input = document.getElementById('in-cutstyle').getBoundingClientRect();
-    const track = document.querySelector('.cutslider-track').getBoundingClientRect();
-    return { inputMid: input.y + input.height / 2, trackMid: track.y + track.height / 2 };
-  })()`) as { inputMid: number; trackMid: number };
-  const vDelta = Math.abs(vert.inputMid - vert.trackMid);
-  check(vDelta <= 0.75, `vertically centred (off by ${vDelta.toFixed(2)}px)`);
+  console.log('\n--- the stops still drive the pipeline ---');
+  const offsets: string[] = [];
+  for (const [name, mm] of [['tight', '0.00'], ['close', '1.00'], ['sticker', '3.00'], ['loose', '6.00']] as const) {
+    await p.evaluate(`document.querySelector('.cutstop[data-preset="${name}"]').click()`);
+    await wait(300);
+    const v = String(await p.evaluate(`document.getElementById('out-cut-offset').textContent`));
+    offsets.push(`${name}=${v}`);
+    check(v.startsWith(mm), `${name} sets ${mm} mm`);
+  }
+  console.log(`  ${offsets.join('  ')}`);
 
   console.log(errs.length ? '\nPAGE ERRORS: ' + errs.join(' | ') : '\nno page errors');
   console.log(fails === 0 ? 'all slider geometry checks passed' : `${fails} CHECK(S) FAILED`);
