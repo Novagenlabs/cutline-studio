@@ -190,6 +190,7 @@ document.getElementById('hold-splash')?.addEventListener('click', () => {
   }
   liveSplash = createSplash(splashMotion);
   document.body.append(liveSplash.el);
+  liveSplash.startMark();
   liveSplash.el.classList.add('is-sweeping');
 });
 
@@ -364,6 +365,7 @@ document.getElementById('hold-sheen')?.addEventListener('click', () => {
   }
   liveSplash = createSplash({ ...splashMotion, variant: 'sheen' });
   document.body.append(liveSplash.el);
+  liveSplash.startMark();
   liveSplash.el.classList.add('is-sheen');
 });
 

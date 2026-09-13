@@ -2232,18 +2232,34 @@ body:not(.mode-simple) #panel-simple {
   100% { background-position: -150% 0; }
 }
 
-/* Outfit for this variant.
-   Its geometric, near-circular O and single-storey construction hold up far
-   better as an outline than Inter's, whose subtler curves and larger x-height
-   need the fill to read correctly. The flare keeps Inter because the rim pass
-   lights edges and rewards the extra detail. */
+/* Outfit for this variant, at a light weight.
+   Its geometric, near-circular O and single-storey construction are the point
+   — the letterforms carry themselves without needing an outline to give them
+   shape. The flare keeps Inter because its rim pass lights edges and rewards
+   the extra detail. */
 .splash.is-sheen .splash-word {
   font-family: 'Outfit', var(--display);
-  font-weight: 500;
+  font-weight: 300;
   /* Outfit runs wider than Inter at the same tracking, so it is pulled in to
      keep the lockup the same overall width. */
   letter-spacing: calc(var(--splash-track, 0.16em) * 0.8);
   text-indent: calc(var(--splash-track, 0.16em) * 0.8);
+}
+
+/* FILLED, not stroked.
+   -webkit-text-stroke centres its line on the glyph path, so at 1.25px on a
+   light face the inner and outer edges resolve as two separate lines — the
+   doubled strokes that showed inside T, L, E and U. A translucent fill has
+   one edge by definition, and the sheen reads the same way over it: the band
+   raises the letters from dim to bright rather than tracing their outline. */
+.splash.is-sheen .splash-word-base {
+  -webkit-text-stroke: 0;
+  color: rgba(245, 245, 247, var(--splash-rest, 0.3));
+  -webkit-text-fill-color: rgba(245, 245, 247, var(--splash-rest, 0.3));
+}
+
+.splash.is-sheen .splash-word-flare {
+  -webkit-text-stroke: 0;
 }
 
 /* The mark keeps cutting under the sheen, which is the whole reason this

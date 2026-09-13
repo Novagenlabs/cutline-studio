@@ -26,6 +26,7 @@ All of these go in Dokploy's **Environment** tab for the application.
 | Variable | What it is |
 |---|---|
 | `WHOP_WEBHOOK_SECRET` | Signing secret for the Whop webhook endpoint (`whsec_...` or `ws_...`). **Subscriptions are only recorded by the webhook**, so without this a paying customer gets nothing. The route answers 503 while it is unset, which keeps Whop retrying rather than discarding the delivery. |
+| `WHOP_API_KEY` | `apik_...` from the Whop dashboard. Not needed to receive webhooks — it is for reading memberships back, which is what a reconciliation job needs to repair state after a missed or undelivered event. |
 | `EMAIL_SERVER` | SMTP URL, only if you want email magic-link sign-in alongside Google. |
 | `EMAIL_FROM` | Sender address for those emails. Both must be set or neither — the provider is skipped unless both are present. |
 

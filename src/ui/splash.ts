@@ -91,6 +91,15 @@ export interface Splash {
   el: HTMLElement;
   /** Run the sequence. Resolves when the splash has finished fading. */
   play(): Promise<void>;
+  /**
+   * Start the blades without running the sequence.
+   *
+   * For a held preview: `play()` starts the mark and then times itself out,
+   * which is no use when the point is to leave the thing on screen. Without
+   * this the motion lab showed a frozen mark, because appending `el` by hand
+   * never reached the `mark.start()` inside play().
+   */
+  startMark(): void;
   /** Re-time without rebuilding (the motion lab drives this). */
   apply(motion: SplashMotion): void;
 }
@@ -177,6 +186,9 @@ export function createSplash(motion: SplashMotion = DEFAULT_SPLASH): Splash {
 
   return {
     el,
+    startMark() {
+      mark.start();
+    },
     apply(m) {
       current = m;
       vars(m);
