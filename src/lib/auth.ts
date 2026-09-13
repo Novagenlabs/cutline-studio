@@ -3,6 +3,7 @@ import { PrismaAdapter } from '@auth/prisma-adapter';
 import Google from 'next-auth/providers/google';
 import { db } from './db';
 import { SIGNUP_GRANT, grantCredits } from './credits';
+import { claimSubscriptions } from './subscription';
 
 /**
  * Providers are assembled from what is actually configured.
@@ -62,6 +63,30 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       await grantCredits(db, user.id, SIGNUP_GRANT, 'SIGNUP_GRANT', {
         note: 'welcome grant',
       });
+    },
+
+    /**
+     * Attach Whop memberships bought before this account existed.
+     *
+     * A Whop checkout can complete before the buyer has ever signed in here,
+     * so the webhook records the membership with no user attached. This is
+     * where it finds its owner — matched on the email they paid with.
+     *
+     * On every sign-in rather than only on createUser: someone can buy on
+     * Whop weeks after making a Cutline account, and that purchase should
+     * attach on their next visit rather than never.
+     *
+     * Deliberately non-fatal. A failure here must not block sign-in — the
+     * subscription is still recorded and will attach on the next attempt,
+     * whereas a thrown error locks a paying customer out of the app.
+     */
+    async signIn({ user }) {
+      if (!user.id || !user.email) return;
+      try {
+        await claimSubscriptions(user.id, user.email);
+      } catch (error) {
+        console.error('Could not claim Whop subscriptions', error);
+      }
     },
   },
 });

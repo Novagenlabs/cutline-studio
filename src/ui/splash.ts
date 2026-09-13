@@ -6,14 +6,16 @@
  * mark at the same size in the same place, so the splash resolves into the
  * wait rather than cutting to it.
  *
- * Deliberately CSS, not WebGPU. The reference (vgpu's flare) is a 48-step ray
- * march with volumetric scattering over a Gaussian blur chain, which is a
- * beautiful thing to spend a GPU on and the wrong thing to spend one on here:
- * WebGPU is absent in Safari and in plenty of the browsers a print shop runs,
- * so it would need a fallback that looks like this anyway. A moving gradient
- * clipped to text is the same read — light crossing a surface — at no
- * dependency, no fallback, and no cost to the machines that have to trace
- * artwork a moment later.
+ * Two implementations, one of which is a fallback. Where WebGPU exists the
+ * splash is vgpu's nextjs-flare (src/vendor/flare): a rim-lit lockup with
+ * volumetric scattering, lazily imported so nothing downloads it otherwise.
+ * Where it does not — Safari, and plenty of the browsers a print shop runs —
+ * the DOM splash below shows instead: a gradient clipped to outlined caps,
+ * which is the same read (light crossing a surface) at no dependency.
+ *
+ * The fallback is not deleted once the GPU path starts, only hidden. A device
+ * can be lost mid-frame, and the thing underneath should be correct rather
+ * than absent.
  *
  * It shows once per session. A splash on every navigation is a tax on people
  * who use the tool all day.
@@ -121,20 +123,33 @@ export function createSplash(motion: SplashMotion = DEFAULT_SPLASH): Splash {
   canvas.setAttribute('aria-hidden', 'true');
   el.append(canvas);
 
-  const word = document.createElement('div');
-  word.className = 'splash-word';
+  // Two lines, matching the GPU lockup: CUTLINE beside the mark, STUDIO
+  // beneath it in smaller type. Each line is drawn twice — the resting
+  // outline, and a copy carrying the light band clipped to its glyphs.
+  const lines = document.createElement('div');
+  lines.className = 'splash-lines';
 
-  const base = document.createElement('span');
-  base.className = 'splash-word-base';
-  base.textContent = 'Cutline Studio';
+  for (const [text, cls] of [
+    ['Cutline', 'splash-word'],
+    ['Studio', 'splash-word splash-word-sub'],
+  ] as const) {
+    const word = document.createElement('div');
+    word.className = cls;
 
-  const flare = document.createElement('span');
-  flare.className = 'splash-word-flare';
-  flare.textContent = 'Cutline Studio';
-  flare.setAttribute('aria-hidden', 'true');
+    const base = document.createElement('span');
+    base.className = 'splash-word-base';
+    base.textContent = text;
 
-  word.append(base, flare);
-  box.append(word);
+    const flare = document.createElement('span');
+    flare.className = 'splash-word-flare';
+    flare.textContent = text;
+    flare.setAttribute('aria-hidden', 'true');
+
+    word.append(base, flare);
+    lines.append(word);
+  }
+
+  box.append(lines);
   el.append(box);
 
   function vars(m: SplashMotion) {
@@ -185,15 +200,15 @@ export function createSplash(motion: SplashMotion = DEFAULT_SPLASH): Splash {
         // Fonts first: the aspect is measured from the loaded typeface, and
         // measuring against a fallback would set the box to the wrong width.
         await document.fonts?.ready?.catch?.(() => undefined);
-        // Roughly a quarter-orbit over the splash's length, so the light has
-        // demonstrably moved by the time it lifts without racing.
-        pipelineMod.setAutonomousRate((Math.PI / 2) / (current.sweepMs / 1000));
+        // The orbit rate is left at DEFAULT_LOOK's tuned value rather than
+        // derived from the splash length: it was chosen by eye against this
+        // artwork, and a computed rate would silently override that.
         pipelineMod.setLogoGeometry({
           centerInBox: raster.CUTLINE_CENTER,
           aspect: raster.measureCutlineAspect(),
           // A wide lockup is sized off the canvas height here, and the
           // example's 0.62 would run ours off both edges.
-          heightRatio: 0.16,
+          heightRatio: 0.3,
         });
         const r = createRenderer({ canvas });
         await r.ready;

@@ -25,24 +25,50 @@ import { logoPixelSize } from "./pipeline";
  * it at runtime, because a font that falls back to system-ui sets wider than
  * Inter and would crop again.
  */
-const BOX_H = 260;
-const MARK_SIZE = 96;
+/**
+ * A two-line lockup: the mark and CUTLINE on the first line, STUDIO beneath
+ * it in smaller type. Stacking makes the whole thing far less wide, which
+ * lets it sit bigger on screen without running off the edges — the single
+ * line had to shrink to fit and read as a strip.
+ */
+const MARK_SIZE = 108;
 const MARK_X = 8;
-const TEXT_GAP = 54;
+const TEXT_GAP = 44;
 const FONT_PX = 132;
+/** The second line is deliberately smaller and tracked wider. */
+const SUB_FONT_PX = 62;
 const TRACKING = 9;
-const TEXT = 'CUTLINE STUDIO';
+const SUB_TRACKING = 18;
+const LINE_GAP = 22;
+const TEXT = 'CUTLINE';
+const SUB_TEXT = 'STUDIO';
+
+const BOX_H = FONT_PX + LINE_GAP + SUB_FONT_PX + 40;
+
+function trackedWidth(
+  context: CanvasRenderingContext2D,
+  text: string,
+  tracking: number
+): number {
+  let width = 0;
+  for (const glyph of text) width += context.measureText(glyph).width + tracking;
+  return width - tracking;
+}
 
 /** Width the artwork actually needs, in box units, for the current font. */
 function measuredWidth(context: CanvasRenderingContext2D): number {
   context.font = `700 ${FONT_PX}px Inter, system-ui, sans-serif`;
-  let width = 0;
-  for (const glyph of TEXT) width += context.measureText(glyph).width + TRACKING;
-  return MARK_X + MARK_SIZE + TEXT_GAP + width + MARK_X;
+  const line1 = MARK_X + MARK_SIZE + TEXT_GAP + trackedWidth(context, TEXT, TRACKING);
+  context.font = `600 ${SUB_FONT_PX}px Inter, system-ui, sans-serif`;
+  // The second line is indented to the first line's text, so the lockup has
+  // one left edge for its type rather than two.
+  const line2 =
+    MARK_X + MARK_SIZE + TEXT_GAP + trackedWidth(context, SUB_TEXT, SUB_TRACKING);
+  return Math.max(line1, line2) + MARK_X;
 }
 
 /** Fallback aspect, used if measurement is unavailable. */
-export const CUTLINE_ASPECT = 1420 / BOX_H;
+export const CUTLINE_ASPECT = 900 / BOX_H;
 
 /**
  * The lockup's true aspect for the font that actually loaded.
@@ -132,19 +158,36 @@ export async function rasterizeLogo(
   context.strokeStyle = "#ffffff";
   context.fillStyle = "#ffffff";
 
-  drawMark(context, MARK_X, (BOX_H - MARK_SIZE) / 2, MARK_SIZE, 7);
+  // Line 1 sits on the upper half, line 2 below it. The mark is centred on
+  // the first line rather than on the whole box, so it reads as belonging to
+  // "CUTLINE" rather than floating beside the pair.
+  const line1Y = 20 + FONT_PX / 2;
+  const line2Y = 20 + FONT_PX + LINE_GAP + SUB_FONT_PX / 2;
+  const textX = MARK_X + MARK_SIZE + TEXT_GAP;
 
-  context.font = `700 ${FONT_PX}px Inter, system-ui, sans-serif`;
+  drawMark(context, MARK_X, line1Y - MARK_SIZE / 2, MARK_SIZE, 7);
+
   context.textBaseline = "middle";
-  context.lineWidth = 4.5;
   context.lineJoin = "round";
 
   // Tracked out by hand: canvas has no letter-spacing, and outlined caps set
   // solid read as a fence rather than as a word.
-  let cursor = MARK_X + MARK_SIZE + TEXT_GAP;
+  context.font = `700 ${FONT_PX}px Inter, system-ui, sans-serif`;
+  context.lineWidth = 4.5;
+  let cursor = textX;
   for (const glyph of TEXT) {
-    context.strokeText(glyph, cursor, BOX_H / 2);
+    context.strokeText(glyph, cursor, line1Y);
     cursor += context.measureText(glyph).width + TRACKING;
+  }
+
+  // Thinner stroke on the smaller line: the same 4.5 would make it read as
+  // heavier than the line above it despite being half the size.
+  context.font = `600 ${SUB_FONT_PX}px Inter, system-ui, sans-serif`;
+  context.lineWidth = 3;
+  cursor = textX;
+  for (const glyph of SUB_TEXT) {
+    context.strokeText(glyph, cursor, line2Y);
+    cursor += context.measureText(glyph).width + SUB_TRACKING;
   }
   context.restore();
 

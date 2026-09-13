@@ -25,12 +25,13 @@ model User {
   image         String?
   createdAt     DateTime  @default(now())
 
-  accounts     Account[]
-  sessions     Session[]
-  ledger       CreditEntry[]
-  downloads    Download[]
-  purchases    Purchase[]
-  exportTokens ExportToken[]
+  accounts      Account[]
+  sessions      Session[]
+  ledger        CreditEntry[]
+  downloads     Download[]
+  purchases     Purchase[]
+  exportTokens  ExportToken[]
+  subscriptions Subscription[]
 }
 
 model Account {

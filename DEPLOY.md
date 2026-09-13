@@ -25,6 +25,7 @@ All of these go in Dokploy's **Environment** tab for the application.
 
 | Variable | What it is |
 |---|---|
+| `WHOP_WEBHOOK_SECRET` | Signing secret for the Whop webhook endpoint (`whsec_...` or `ws_...`). **Subscriptions are only recorded by the webhook**, so without this a paying customer gets nothing. The route answers 503 while it is unset, which keeps Whop retrying rather than discarding the delivery. |
 | `EMAIL_SERVER` | SMTP URL, only if you want email magic-link sign-in alongside Google. |
 | `EMAIL_FROM` | Sender address for those emails. Both must be set or neither — the provider is skipped unless both are present. |
 
@@ -69,6 +70,28 @@ verification and no credits are ever granted.
 
 **4. Publish the OAuth consent screen** if it is still in Testing mode, or only
 accounts on the test-user list can sign in.
+
+**5. Create the Whop webhook.** In the Whop dashboard for Cutline Studio, add
+an endpoint at:
+
+```
+https://<your domain>/api/whop/webhook
+```
+
+subscribed to the membership events — `membership.activated`,
+`membership.deactivated`, `membership.cancel_at_period_end_changed` — and
+`payment.succeeded`. Copy its signing secret into `WHOP_WEBHOOK_SECRET`.
+
+Two things worth knowing about how this behaves:
+
+- **A buyer does not need a Cutline account first.** Whop checkout can finish
+  before they have ever signed in here, so the membership is stored with no
+  user attached and claimed on their next sign-in, matched on the email they
+  paid with. Nothing is lost in that window.
+- **Whop retries for ~71 hours.** Every delivery is recorded by its
+  `webhook-id` before it is handled, so a replay is a no-op and a handler
+  that fails keeps the payload for the retry. Sending a test event twice from
+  the dashboard is a safe way to confirm that.
 
 ## After deploying
 

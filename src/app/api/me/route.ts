@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getBalance, getDownloadCount, SIGNUP_GRANT } from '@/lib/credits';
 import { PACKS } from '@/lib/packs';
+import { describeSubscription } from '@/lib/subscription';
 
 /**
  * Who am I, and what can I spend?
@@ -24,13 +25,21 @@ export async function GET() {
     );
   }
 
-  const [balance, downloads] = await Promise.all([
+  const [balance, downloads, subscription] = await Promise.all([
     getBalance(db, session.user.id),
     getDownloadCount(db, session.user.id),
+    describeSubscription(session.user.id),
   ]);
 
   return NextResponse.json(
-    { signedIn: true, email: session.user.email, balance, downloads, packs: PACKS },
+    {
+      signedIn: true,
+      email: session.user.email,
+      balance,
+      downloads,
+      packs: PACKS,
+      subscription,
+    },
     { headers: NO_STORE }
   );
 }

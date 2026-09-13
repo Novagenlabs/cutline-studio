@@ -127,14 +127,17 @@ export interface FlareLook {
   readonly filmGrain: number;
 }
 
+/** Tuned in the motion lab, not derived: brighter beams reaching further,
+ *  through a thinner medium, from a much tighter hotspot. The low scatter
+ *  with high beam intensity is what gives defined rays rather than haze. */
 export const DEFAULT_LOOK: FlareLook = {
   color: [179 / 255, 191 / 255, 1],
-  rimIntensity: 1,
-  beamIntensity: 0.8,
-  extension: 0.6,
-  scatter: 1,
-  spotFocus: 0.08,
-  filmGrain: 0.03,
+  rimIntensity: 0.65,
+  beamIntensity: 2.55,
+  extension: 0.9,
+  scatter: 0.5,
+  spotFocus: 0.01,
+  filmGrain: 0.025,
 };
 
 let LOOK: FlareLook = DEFAULT_LOOK;
@@ -456,7 +459,7 @@ export function centeredPlacement(
  * can afford a leisurely drift, whereas a few seconds of splash wants the
  * light to have visibly travelled by the time it lifts.
  */
-let AUTONOMOUS_RATE = 0.32;
+let AUTONOMOUS_RATE = 0.24;
 
 export function setAutonomousRate(radiansPerSecond: number): void {
   AUTONOMOUS_RATE = radiansPerSecond;

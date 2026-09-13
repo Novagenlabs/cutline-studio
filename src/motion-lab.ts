@@ -191,16 +191,18 @@ document.getElementById('hold-splash')?.addEventListener('click', () => {
  * bundling its dials into the splash panel would show controls that do
  * nothing on half the machines that open this page.
  */
+// Defaults are the tuned values now shipping in DEFAULT_LOOK, so the panel
+// opens on what the app actually shows rather than on the example's starting
+// point — otherwise every session begins by undoing a change nobody made.
 const flareDial = DialKit.createDialKit('WebGPU flare', {
-  rimIntensity: [1, 0, 3, 0.05],
-  beamIntensity: [0.8, 0, 3, 0.05],
-  extension: [0.6, 0, 2, 0.05],
-  scatter: [1, 0, 3, 0.05],
-  spotFocus: [0.08, 0.01, 0.5, 0.01],
-  filmGrain: [0.03, 0, 0.2, 0.005],
-  // Radians per second for the autonomous light. The example's own value is
-  // 0.32; the splash overrides it to about a quarter-turn per sweep.
-  orbitRate: [0.32, 0.02, 2, 0.02],
+  rimIntensity: [0.65, 0, 3, 0.05],
+  beamIntensity: [2.55, 0, 3, 0.05],
+  extension: [0.9, 0, 2, 0.05],
+  scatter: [0.5, 0, 3, 0.05],
+  spotFocus: [0.01, 0.01, 0.5, 0.01],
+  filmGrain: [0.025, 0, 0.2, 0.005],
+  /** Radians per second for the autonomous light. */
+  orbitRate: [0.24, 0.02, 2, 0.02],
 });
 
 let flareRenderer: { dispose(): void } | undefined;
@@ -259,7 +261,7 @@ document.getElementById('hold-flare')?.addEventListener('click', async () => {
     pipeline.setLogoGeometry({
       centerInBox: raster.CUTLINE_CENTER,
       aspect: raster.measureCutlineAspect(),
-      heightRatio: 0.16,
+      heightRatio: 0.3,
     });
     const r = createRenderer({ canvas });
     await r.ready;
