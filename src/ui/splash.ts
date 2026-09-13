@@ -197,7 +197,7 @@ export function createSplash(motion: SplashMotion = DEFAULT_SPLASH): Splash {
         // closes, which a hardcoded rad/s value could not do.
         pipelineMod.setAutonomousRate((2 * Math.PI) / (current.sweepMs / 1000));
         pipelineMod.setLogoGeometry({
-          centerInBox: raster.CUTLINE_CENTER,
+          centerInBox: raster.measureCutlineCenter(),
           aspect: raster.measureCutlineAspect(),
           // A wide lockup is sized off the canvas height here, and the
           // example's 0.62 would run ours off both edges.

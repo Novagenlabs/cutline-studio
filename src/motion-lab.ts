@@ -14,6 +14,7 @@
  */
 import { createCutMark, DEFAULT_MOTION, type CutMarkMotion } from './ui/cutmark';
 import { createSplash, DEFAULT_SPLASH, type SplashMotion } from './ui/splash';
+import { DEFAULT_LOCKUP } from './vendor/flare/logo-raster';
 import { showLoading } from './ui/loading';
 
 declare const DialKit: {
@@ -211,10 +212,18 @@ const flareDial = DialKit.createDialKit('WebGPU flare', {
    * to judge a speed, then set sweepMs to 2π / (the rate you liked).
    */
   orbitRate: [(2 * Math.PI) / 4.2, 0.02, 3, 0.02],
+  // The lockup itself. Changing these re-rasterises the artwork, which is why
+  // they live here rather than with the composite pass's look dials.
+  markSize: [DEFAULT_LOCKUP.markSize, 48, 320, 4],
+  markStroke: [DEFAULT_LOCKUP.markStroke, 1, 20, 0.5],
+  textStroke: [DEFAULT_LOCKUP.textStroke, 0.5, 10, 0.25],
 });
 
 let flareRenderer: { dispose(): void } | undefined;
 let flareEl: HTMLElement | undefined;
+
+/** Current lockup values, so a subscriber can tell what actually changed. */
+let lockup = { ...DEFAULT_LOCKUP };
 
 flareDial.subscribe(async (v) => {
   // Only reachable once the flare chunk has loaded, which needs WebGPU.
@@ -229,7 +238,43 @@ flareDial.subscribe(async (v) => {
     filmGrain: v.filmGrain,
   });
   pipeline.setAutonomousRate(v.orbitRate);
+
+  // The look dials feed uniforms the next frame picks up on its own. The
+  // lockup dials change the ARTWORK, which lives in a GPU texture rasterised
+  // once at the current size — so they need the renderer to redraw it. A
+  // resize with the same dimensions is a no-op inside the example, hence the
+  // deliberate nudge through a different size and back.
+  const raster = await import('./vendor/flare/logo-raster');
+  const changed =
+    v.markSize !== lockup.markSize ||
+    v.markStroke !== lockup.markStroke ||
+    v.textStroke !== lockup.textStroke;
+  lockup = { markSize: v.markSize, markStroke: v.markStroke, textStroke: v.textStroke };
+  raster.setLockupStyle(lockup);
+
+  if (changed && flareEl) {
+    pipeline.setLogoGeometry({ aspect: raster.measureCutlineAspect() });
+    reraster();
+  }
 });
+
+/**
+ * Force the held flare to rebuild its logo texture.
+ *
+ * The renderer only re-rasterises on a size change, so the canvas is nudged
+ * by a pixel and back. Cheaper and far less disruptive than tearing the whole
+ * renderer down and losing the light's position mid-orbit.
+ */
+function reraster(): void {
+  const canvas = flareEl?.querySelector('canvas');
+  if (!canvas) return;
+  // setTimeout rather than requestAnimationFrame: rAF does not fire in a
+  // background tab, which would leave the canvas stuck a pixel narrow.
+  canvas.style.width = 'calc(100% - 1px)';
+  setTimeout(() => {
+    canvas.style.width = '';
+  }, 32);
+}
 
 const flareStatus = document.getElementById('flare-status');
 
@@ -267,7 +312,7 @@ document.getElementById('hold-flare')?.addEventListener('click', async () => {
     ]);
     await document.fonts?.ready;
     pipeline.setLogoGeometry({
-      centerInBox: raster.CUTLINE_CENTER,
+      centerInBox: raster.measureCutlineCenter(),
       aspect: raster.measureCutlineAspect(),
       heightRatio: 0.16,
     });
