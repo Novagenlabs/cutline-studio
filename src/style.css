@@ -2074,32 +2074,10 @@ body:not(.mode-simple) #panel-simple {
    first line rather than sitting above the pair. */
 .splash-box {
   display: flex;
-  flex-direction: row;
-  /* Top-aligned, then nudged onto the first line's optical centre: centring
-     against both lines would float the mark between them. */
-  align-items: flex-start;
+  flex-direction: column;
+  align-items: center;
   gap: var(--splash-gap, 26px);
   color: var(--ink);
-}
-
-.splash-box > .cutmark {
-  margin-top: calc(var(--splash-font, 76px) * 0.16);
-  flex-shrink: 0;
-}
-
-.splash-lines {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.08em;
-}
-
-/* The second line is smaller and tracked wider, so the two lines share a
-   left edge and read as one lockup rather than two words. */
-.splash-word-sub {
-  font-size: calc(var(--splash-font, 76px) * 0.47);
-  letter-spacing: calc(var(--splash-track, 0.16em) * 1.9);
-  text-indent: calc(var(--splash-track, 0.16em) * 1.9);
 }
 
 /* Large, uppercase, and hollow. Outlined glyphs are the point: an unlit

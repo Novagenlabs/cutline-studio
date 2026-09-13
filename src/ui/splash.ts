@@ -53,11 +53,12 @@ export interface SplashMotion {
 }
 
 export const DEFAULT_SPLASH: SplashMotion = {
-  // ~3.5s end to end (2400 + 500 + 600). The previous 1780ms read as a flash
-  // rather than an arrival: the ray-marched flare needs time to travel for
-  // the scattering to be visible at all, and a light pass that is over before
-  // the eye finds it is just a flicker.
-  sweepMs: 2400,
+  // The sweep IS one full orbit of the flare (see setAutonomousRate below),
+  // so this number is the orbit's period, not just a fade length. 4200ms puts
+  // the light at about 1.5 rad/s — fast enough to feel deliberate, slow
+  // enough that the rays are legible as they travel. Below ~3s a full
+  // revolution reads as a spin rather than a pass.
+  sweepMs: 4200,
   bandWidth: 0.22,
   holdMs: 500,
   fadeMs: 600,
@@ -123,33 +124,22 @@ export function createSplash(motion: SplashMotion = DEFAULT_SPLASH): Splash {
   canvas.setAttribute('aria-hidden', 'true');
   el.append(canvas);
 
-  // Two lines, matching the GPU lockup: CUTLINE beside the mark, STUDIO
-  // beneath it in smaller type. Each line is drawn twice — the resting
-  // outline, and a copy carrying the light band clipped to its glyphs.
-  const lines = document.createElement('div');
-  lines.className = 'splash-lines';
+  // One line, matching the GPU lockup. Drawn twice: the resting outline, and
+  // a copy carrying the light band clipped to its glyphs.
+  const word = document.createElement('div');
+  word.className = 'splash-word';
 
-  for (const [text, cls] of [
-    ['Cutline', 'splash-word'],
-    ['Studio', 'splash-word splash-word-sub'],
-  ] as const) {
-    const word = document.createElement('div');
-    word.className = cls;
+  const base = document.createElement('span');
+  base.className = 'splash-word-base';
+  base.textContent = 'Cutline Studio';
 
-    const base = document.createElement('span');
-    base.className = 'splash-word-base';
-    base.textContent = text;
+  const flare = document.createElement('span');
+  flare.className = 'splash-word-flare';
+  flare.textContent = 'Cutline Studio';
+  flare.setAttribute('aria-hidden', 'true');
 
-    const flare = document.createElement('span');
-    flare.className = 'splash-word-flare';
-    flare.textContent = text;
-    flare.setAttribute('aria-hidden', 'true');
-
-    word.append(base, flare);
-    lines.append(word);
-  }
-
-  box.append(lines);
+  word.append(base, flare);
+  box.append(word);
   el.append(box);
 
   function vars(m: SplashMotion) {
@@ -200,15 +190,18 @@ export function createSplash(motion: SplashMotion = DEFAULT_SPLASH): Splash {
         // Fonts first: the aspect is measured from the loaded typeface, and
         // measuring against a fallback would set the box to the wrong width.
         await document.fonts?.ready?.catch?.(() => undefined);
-        // The orbit rate is left at DEFAULT_LOOK's tuned value rather than
-        // derived from the splash length: it was chosen by eye against this
-        // artwork, and a computed rate would silently override that.
+        // Exactly one revolution over the sweep, so the light starts and
+        // finishes in the same place and the splash reads as a complete
+        // motion rather than an arbitrary slice of a longer loop. The rate is
+        // derived rather than fixed: change sweepMs and the orbit still
+        // closes, which a hardcoded rad/s value could not do.
+        pipelineMod.setAutonomousRate((2 * Math.PI) / (current.sweepMs / 1000));
         pipelineMod.setLogoGeometry({
           centerInBox: raster.CUTLINE_CENTER,
           aspect: raster.measureCutlineAspect(),
           // A wide lockup is sized off the canvas height here, and the
           // example's 0.62 would run ours off both edges.
-          heightRatio: 0.3,
+          heightRatio: 0.16,
         });
         const r = createRenderer({ canvas });
         await r.ready;

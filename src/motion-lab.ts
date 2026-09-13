@@ -106,7 +106,9 @@ document.getElementById('toggle')?.addEventListener('click', () => {
 // numbers in one panel makes it unclear which control affects what.
 const splashDial = DialKit.createDialKit('Startup splash', {
   // Timing.
-  sweepMs: [DEFAULT_SPLASH.sweepMs, 300, 3000, 20],
+  // Up to 8s: the sweep is one full orbit of the flare, so this is the
+  // orbit's period and the old 3000 ceiling sat below the default.
+  sweepMs: [DEFAULT_SPLASH.sweepMs, 300, 8000, 50],
   bandWidth: [DEFAULT_SPLASH.bandWidth, 0.05, 0.6, 0.01],
   holdMs: [DEFAULT_SPLASH.holdMs, 0, 1200, 20],
   fadeMs: [DEFAULT_SPLASH.fadeMs, 120, 1200, 20],
@@ -201,8 +203,14 @@ const flareDial = DialKit.createDialKit('WebGPU flare', {
   scatter: [0.5, 0, 3, 0.05],
   spotFocus: [0.01, 0.01, 0.5, 0.01],
   filmGrain: [0.025, 0, 0.2, 0.005],
-  /** Radians per second for the autonomous light. */
-  orbitRate: [0.24, 0.02, 2, 0.02],
+  /**
+   * Radians per second for the autonomous light, for the held preview only.
+   *
+   * The splash does NOT use this: it derives the rate from sweepMs so the
+   * light completes exactly one revolution over the animation. Turn it here
+   * to judge a speed, then set sweepMs to 2π / (the rate you liked).
+   */
+  orbitRate: [(2 * Math.PI) / 4.2, 0.02, 3, 0.02],
 });
 
 let flareRenderer: { dispose(): void } | undefined;
@@ -261,7 +269,7 @@ document.getElementById('hold-flare')?.addEventListener('click', async () => {
     pipeline.setLogoGeometry({
       centerInBox: raster.CUTLINE_CENTER,
       aspect: raster.measureCutlineAspect(),
-      heightRatio: 0.3,
+      heightRatio: 0.16,
     });
     const r = createRenderer({ canvas });
     await r.ready;
