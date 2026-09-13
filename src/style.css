@@ -1394,6 +1394,94 @@ body:not(.mode-simple) #panel-simple {
   flex-shrink: 0;
 }
 
+/* ---------- Base UI select ----------
+   The popup is ours now, so it can be dark. A native select draws its list
+   with the OS and opens bright white on this interface. */
+.row select[hidden] { display: none; }
+
+.bui-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 30px;
+  width: 150px;
+  padding: 0 10px;
+  border: 1px solid var(--line-panel);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 120ms;
+}
+
+.bui-select-trigger:hover { border-color: var(--line-strong); }
+
+.bui-select-trigger:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.bui-select-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bui-select-icon {
+  display: flex;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.bui-select-icon svg { width: 100%; height: 100%; }
+
+.bui-select-positioner { z-index: 95; }
+
+.bui-select-popup {
+  min-width: 180px;
+  padding: 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+}
+
+.bui-select-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-2);
+  cursor: pointer;
+  outline: none;
+}
+
+.bui-select-item[data-highlighted] {
+  background: var(--panel-2);
+  color: var(--ink);
+}
+
+.bui-select-item[data-selected] { color: var(--ink); }
+
+.bui-select-item-check {
+  display: flex;
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.bui-select-item-check svg { width: 100%; height: 100%; }
+
 .row.check input[type='checkbox'][hidden] {
   display: none;
 }

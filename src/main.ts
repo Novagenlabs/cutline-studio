@@ -10,7 +10,7 @@ import { confirmSpend } from './ui/confirm';
 import { chooseExport, defaultFormat } from './ui/export-dialog';
 import { jobStart, jobStage, jobEnd } from './ui/job';
 import { showLoading, loadingText } from './ui/loading';
-import { mountCutSlider, mountValueSlider, mountCheckbox } from './ui/controls';
+import { mountCutSlider, mountValueSlider, mountCheckbox, mountSelect } from './ui/controls';
 import { promptSignIn } from './ui/signin';
 import { openCredits } from './ui/credits';
 import type { PresetId } from './presets';
@@ -717,6 +717,41 @@ function redrawCheckboxes(): void {
   for (const draw of checkboxRedraws.values()) draw();
 }
 
+/**
+ * Upgrade the native selects.
+ *
+ * A native <select> draws its popup with the OS, so on a near-black interface
+ * it opens as a bright system list no stylesheet can reach — the old one had
+ * a background-image chevron painted on to disguise half the problem. Same
+ * model-behind-a-mount shape as the other controls: the <select> keeps the
+ * value and the change handlers, the mounted control is what the user sees.
+ */
+function upgradeSelects(): void {
+  for (const el of document.querySelectorAll<HTMLSelectElement>('.row select')) {
+    const host = document.createElement('span');
+    host.className = 'bui-select-host';
+    el.after(host);
+    el.hidden = true;
+
+    const options = [...el.options].map((o) => ({ value: o.value, label: o.textContent ?? o.value }));
+    const label = el.closest('.row')?.querySelector('label')?.textContent?.trim() ?? el.id;
+
+    const draw = () => {
+      mountSelect(host, {
+        value: el.value,
+        options,
+        label,
+        onChange: (v) => {
+          el.value = v;
+          draw();
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        },
+      });
+    };
+    draw();
+  }
+}
+
 bindSlider('#in-offset', '#out-offset', (v) => `${v.toFixed(1)} mm`, (v) => {
   // With an element selected the offset applies to that element alone, so a
   // heavy mark and a fine strapline can each carry the border their scale
@@ -1018,6 +1053,7 @@ function syncPresetSelection() {
 // Upgrade the option checkboxes before the first sync, so nothing draws the
 // native control even briefly.
 upgradeCheckboxes();
+upgradeSelects();
 setMode('simple');
 applyPreset('sticker');
 

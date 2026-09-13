@@ -21,6 +21,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { Slider } from '@base-ui-components/react/slider';
 import { Switch } from '@base-ui-components/react/switch';
 import { Checkbox } from '@base-ui-components/react/checkbox';
+import { Select } from '@base-ui-components/react/select';
 
 const roots = new WeakMap<Element, Root>();
 
@@ -188,5 +189,65 @@ export function mountCheckbox(host: Element, opts: CheckboxOptions): void {
         </svg>
       </Checkbox.Indicator>
     </Checkbox.Root>
+  );
+}
+
+/* ---------------- select ---------------- */
+
+export interface SelectOption {
+  value: string;
+  label: string;
+}
+
+export interface SelectOptions {
+  value: string;
+  options: SelectOption[];
+  label: string;
+  onChange: (value: string) => void;
+}
+
+/**
+ * A native <select> cannot be themed: the popup is drawn by the OS, so on a
+ * near-black interface it opens as a bright system list. The trigger here is
+ * ours and so is the list, which is the whole reason to replace it — the old
+ * one had a background-image arrow painted over it to hide half the problem.
+ */
+export function mountSelect(host: Element, opts: SelectOptions): void {
+  mount(
+    host,
+    <Select.Root
+      value={opts.value}
+      onValueChange={(v) => opts.onChange(String(v))}
+    >
+      <Select.Trigger className="bui-select-trigger" aria-label={opts.label}>
+        {/* The label, not the value. Select.Value renders the raw value when
+            it cannot resolve a label from the items, which showed "kiss"
+            where the list says "Kiss cut · CutContour". */}
+        <span className="bui-select-value">
+          {opts.options.find((o) => o.value === opts.value)?.label ?? opts.value}
+        </span>
+        <Select.Icon className="bui-select-icon">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </Select.Icon>
+      </Select.Trigger>
+      <Select.Portal>
+        <Select.Positioner className="bui-select-positioner" sideOffset={6}>
+          <Select.Popup className="bui-select-popup">
+            {opts.options.map((o) => (
+              <Select.Item key={o.value} value={o.value} className="bui-select-item">
+                <Select.ItemText className="bui-select-item-text">{o.label}</Select.ItemText>
+                <Select.ItemIndicator className="bui-select-item-check">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </Select.ItemIndicator>
+              </Select.Item>
+            ))}
+          </Select.Popup>
+        </Select.Positioner>
+      </Select.Portal>
+    </Select.Root>
   );
 }
