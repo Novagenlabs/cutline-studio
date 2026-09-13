@@ -33,7 +33,13 @@ const workers = new Map<string, Worker>();
 function getWorker(device: 'webgpu' | 'wasm'): Worker {
   let w = workers.get(device);
   if (!w) {
-    w = new Worker(new URL('./matte.worker.ts', import.meta.url), { type: 'module' });
+    // A literal built path, not `new URL('./matte.worker.ts', import.meta.url)`:
+    // that is a Vite/webpack convention, and esbuild neither compiles the
+    // referenced file nor rewrites the URL, so the browser was asking for raw
+    // TypeScript at /cutline/matte.worker.ts and getting a 404. Both backends
+    // then reported "worker crashed" and the feature looked unsupported on
+    // every device. build:matte-worker emits the file this points at.
+    w = new Worker('/cutline/matte.worker.js', { type: 'module' });
     workers.set(device, w);
   }
   return w;

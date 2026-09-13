@@ -17,13 +17,13 @@ ort.env.wasm.numThreads = self.crossOriginIsolated
   ? Math.min(8, navigator.hardwareConcurrency || 4)
   : 1;
 
-// In production the bundler only emits ort's .wasm, not the .mjs loader it
-// fetches at runtime (the name is built dynamically, so Rollup can't trace
-// it) — serve both from public/ort/ (same pinned version). Dev resolves them
-// from node_modules natively.
-if (import.meta.env.PROD) {
-  ort.env.wasm.wasmPaths = '/ort/';
-}
+// The bundler only emits ort's .wasm, not the .mjs loader it fetches at
+// runtime (the name is built dynamically, so no bundler can trace it) —
+// both are served from public/ort/ at the same pinned version. This worker
+// only ever runs as a built bundle, so the path is unconditional; it used to
+// be guarded by `import.meta.env.PROD`, which is a Vite construct that this
+// esbuild build leaves in place as a runtime error.
+ort.env.wasm.wasmPaths = '/ort/';
 
 let modelBytes: Uint8Array | null = null;
 const sessions = new Map<string, ort.InferenceSession>();
