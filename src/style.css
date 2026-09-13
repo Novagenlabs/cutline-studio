@@ -2210,6 +2210,48 @@ body:not(.mode-simple) #panel-simple {
   to   { background-position: -150% 0; }
 }
 
+/* ---------- sheen variant ----------
+   The alternate splash: the same lockup, but the band simply repeats rather
+   than crossing once and handing over to a ray-marched render. Cheaper on
+   every axis — no GPU, no shader compile, nothing to download — and on a
+   machine without WebGPU it is what runs anyway, so this is that path made
+   deliberate rather than a consolation prize.
+
+   `infinite` with a pause between passes: a band that restarts the instant it
+   leaves reads as a barber pole. The gap is bought with a keyframe that holds
+   the band off-screen for the back half of each cycle. */
+.splash.is-sheen .splash-word-flare {
+  animation: splash-sheen var(--sheen, 2600ms) ease-in-out infinite;
+}
+
+@keyframes splash-sheen {
+  0%   { background-position: 150% 0; }
+  45%  { background-position: -150% 0; }
+  /* Parked off the far edge, waiting. Same value at both stops, so the band
+     holds rather than easing back across the word. */
+  100% { background-position: -150% 0; }
+}
+
+/* Outfit for this variant.
+   Its geometric, near-circular O and single-storey construction hold up far
+   better as an outline than Inter's, whose subtler curves and larger x-height
+   need the fill to read correctly. The flare keeps Inter because the rim pass
+   lights edges and rewards the extra detail. */
+.splash.is-sheen .splash-word {
+  font-family: 'Outfit', var(--display);
+  font-weight: 500;
+  /* Outfit runs wider than Inter at the same tracking, so it is pulled in to
+     keep the lockup the same overall width. */
+  letter-spacing: calc(var(--splash-track, 0.16em) * 0.8);
+  text-indent: calc(var(--splash-track, 0.16em) * 0.8);
+}
+
+/* The mark keeps cutting under the sheen, which is the whole reason this
+   variant still reads as Cutline rather than as a generic shimmer. */
+.splash.is-sheen .splash-box {
+  gap: var(--splash-gap, 26px);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .splash-word-flare { animation: none; }
 }

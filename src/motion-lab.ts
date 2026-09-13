@@ -122,6 +122,8 @@ const splashDial = DialKit.createDialKit('Startup splash', {
   restOpacity: [DEFAULT_SPLASH.restOpacity, 0, 1, 0.01],
   markPx: [DEFAULT_SPLASH.markPx, 16, 120, 1],
   gapPx: [DEFAULT_SPLASH.gapPx, 0, 80, 1],
+  /** One sheen pass plus its pause. Only the sheen variant uses it. */
+  sheenMs: [DEFAULT_SPLASH.sheenMs, 600, 6000, 50],
 });
 
 let splashMotion: SplashMotion = { ...DEFAULT_SPLASH };
@@ -140,6 +142,11 @@ splashDial.subscribe((v) => {
     restOpacity: v.restOpacity,
     markPx: v.markPx,
     gapPx: v.gapPx,
+    sheenMs: v.sheenMs,
+    // Set per play button rather than by a dial: it selects which animation
+    // runs, not how it looks, and a toggle buried among ten sliders is a
+    // worse control than two buttons that say what they do.
+    variant: splashMotion.variant,
     // The blades follow the cut-mark panel, so tuning one tunes both and the
     // splash cannot drift away from the loading state it hands over to.
     mark: latest,
@@ -161,6 +168,8 @@ function splashSource(m: SplashMotion): string {
     `  restOpacity: ${round(m.restOpacity)},`,
     `  markPx: ${m.markPx},`,
     `  gapPx: ${m.gapPx},`,
+    `  variant: '${m.variant}',`,
+    `  sheenMs: ${m.sheenMs},`,
     '  mark: DEFAULT_MOTION,',
     '};',
   ].join('\n');
@@ -337,7 +346,25 @@ document.getElementById('hold-flare')?.addEventListener('click', async () => {
 });
 
 document.getElementById('play-splash')?.addEventListener('click', () => {
-  void createSplash(splashMotion).play();
+  void createSplash({ ...splashMotion, variant: 'flare' }).play();
+});
+
+// The alternate: same lockup, repeating sheen, no GPU. Worth watching back to
+// back with the flare — the question is whether the cheaper one is actually
+// worse, and on a tool people open all day that is not obvious.
+document.getElementById('play-sheen')?.addEventListener('click', () => {
+  void createSplash({ ...splashMotion, variant: 'sheen' }).play();
+});
+
+document.getElementById('hold-sheen')?.addEventListener('click', () => {
+  if (liveSplash) {
+    liveSplash.el.remove();
+    liveSplash = null;
+    return;
+  }
+  liveSplash = createSplash({ ...splashMotion, variant: 'sheen' });
+  document.body.append(liveSplash.el);
+  liveSplash.el.classList.add('is-sheen');
 });
 
 // The real question is not whether either looks good alone — it is whether

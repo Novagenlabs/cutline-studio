@@ -48,6 +48,17 @@ export interface SplashMotion {
   markPx: number;
   /** Gap between mark and wordmark, px. */
   gapPx: number;
+  /**
+   * Which splash to run.
+   *
+   * `flare` is the WebGPU render with the CSS sheen as its fallback; `sheen`
+   * is the CSS sheen on purpose, repeating rather than passing once. The
+   * second is not a lesser version — it costs nothing to start, which on a
+   * tool people open all day is a real argument.
+   */
+  variant: 'flare' | 'sheen';
+  /** One sheen pass plus its pause, ms. Only used by the sheen variant. */
+  sheenMs: number;
   /** Blade motion under the splash. */
   mark: CutMarkMotion;
 }
@@ -68,6 +79,11 @@ export const DEFAULT_SPLASH: SplashMotion = {
   restOpacity: 0.3,
   markPx: 40,
   gapPx: 26,
+  variant: 'flare',
+  // Slower than the single pass: a repeating band that hurries reads as
+  // impatient, and this one is meant to sit under a wait rather than announce
+  // the end of one.
+  sheenMs: 2600,
   mark: DEFAULT_MOTION,
 };
 
@@ -146,6 +162,7 @@ export function createSplash(motion: SplashMotion = DEFAULT_SPLASH): Splash {
     el.style.setProperty('--sweep', `${m.sweepMs}ms`);
     el.style.setProperty('--band', `${Math.round(m.bandWidth * 100)}%`);
     el.style.setProperty('--fade', `${m.fadeMs}ms`);
+    el.style.setProperty('--sheen', `${m.sheenMs}ms`);
     // Clamped against the viewport as well as the dial: the wordmark is wide
     // in caps, and a size chosen on a desktop would run off a phone.
     el.style.setProperty('--splash-font', `min(${m.fontPx}px, 11vw)`);
@@ -179,6 +196,9 @@ export function createSplash(motion: SplashMotion = DEFAULT_SPLASH): Splash {
       // should ever download, and none of which the cutter needs to trace.
       let renderer: { dispose(): void } | undefined;
       const gpuReady = (async () => {
+        // The sheen variant is a deliberate choice, not a fallback, so it
+        // must not quietly load a renderer it has no intention of showing.
+        if (current.variant === 'sheen') return false;
         if (!('gpu' in navigator)) return false;
         if (matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
         const [{ createRenderer }, pipelineMod, raster] =
@@ -228,10 +248,20 @@ export function createSplash(motion: SplashMotion = DEFAULT_SPLASH): Splash {
       const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
       // Reduced motion still gets the splash, just without the travelling
       // light: the brand moment is information, the sweep is decoration.
-      if (!reduced) el.classList.add('is-sweeping');
+      if (!reduced) {
+        el.classList.add(current.variant === 'sheen' ? 'is-sheen' : 'is-sweeping');
+      }
 
       const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
-      await wait(reduced ? 400 : current.sweepMs + current.holdMs);
+      // The sheen repeats rather than ending, so it is held for two passes
+      // and then lifted — long enough to read as a loop rather than as a
+      // single pass that happened to be slow. The flare's sweep IS its
+      // length, so that one waits exactly as long as the animation runs.
+      const onScreen =
+        current.variant === 'sheen'
+          ? current.sheenMs * 2 + current.holdMs
+          : current.sweepMs + current.holdMs;
+      await wait(reduced ? 400 : onScreen);
 
       el.classList.add('is-leaving');
       await wait(current.fadeMs);
