@@ -86,10 +86,16 @@ export async function chooseExport(balance: number | null): Promise<PaidFormat |
           <svg viewBox="0 0 24 24"><path d="M6 12.4l4 4 8-8.6" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </span>`;
       row.addEventListener('click', () => {
+        if (picked === f.id) return;
         picked = f.id;
         for (const el of list.querySelectorAll('.fmt')) {
           el.classList.toggle('is-on', el === row);
         }
+        // Switching format is the one moment the toggle should re-derive:
+        // "make PDF my default" is a different question from "make SVG my
+        // default", so it reflects whether THIS format is the stored one.
+        const box = dlg?.querySelector('#export-save-default') as HTMLInputElement | null;
+        if (box) box.checked = saved !== null && saved === picked;
         paint();
       });
       return row;
@@ -104,12 +110,20 @@ export async function chooseExport(balance: number | null): Promise<PaidFormat |
     if (el) el.textContent = s;
   };
 
+  /**
+   * Redraw the parts that depend on the chosen format.
+   *
+   * Deliberately does NOT touch the switch. It used to, which meant every
+   * repaint reset the toggle from the stored default — so a user could turn
+   * "make this my default" on, and the next click of the same format row
+   * silently turned it back off. The switch is the user's input; only a
+   * change of format may reset it, which happens in the row handler.
+   */
   function paint() {
     text('export-balance', balance === null ? '—' : String(balance));
     text('export-after', balance === null ? '—' : String(Math.max(0, balance - 1)));
     const label = dlg?.querySelector('#export-save-label');
     if (label) label.textContent = `Make ${picked} my default`;
-    if (save) save.checked = saved !== null && saved === picked;
   }
 
   paint();

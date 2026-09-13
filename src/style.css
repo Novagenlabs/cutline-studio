@@ -475,7 +475,7 @@ input[type='range']:focus-visible::-webkit-slider-thumb {
 /* Drawn rather than accent-coloured: `accent-color` still renders the
    platform checkbox, which on a near-black panel is a bright filled square
    that does not belong to this interface. */
-input[type='checkbox'] {
+input[type='checkbox']:not(.switch) {
   appearance: none;
   -webkit-appearance: none;
   width: 16px;
@@ -489,16 +489,16 @@ input[type='checkbox'] {
   transition: background 120ms, border-color 120ms;
 }
 
-input[type='checkbox']:hover { border-color: #3a3a40; }
+input[type='checkbox']:not(.switch):hover { border-color: #3a3a40; }
 
-input[type='checkbox']:checked {
+input[type='checkbox']:not(.switch):checked {
   background: var(--accent);
   border-color: var(--accent);
 }
 
 /* The tick is drawn with two borders rotated into an L — no glyph, so it
    cannot be affected by the font stack or fail to load. */
-input[type='checkbox']:checked::after {
+input[type='checkbox']:not(.switch):checked::after {
   content: '';
   position: absolute;
   left: 5px;
@@ -510,7 +510,7 @@ input[type='checkbox']:checked::after {
   transform: rotate(45deg);
 }
 
-input[type='checkbox']:focus-visible {
+input[type='checkbox']:not(.switch):focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
