@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { verifyWebhook, WebhookError } from '@/lib/whop';
 import {
   applyMembershipEvent,
+  grantPackCredits,
   grantSubscriptionCredits,
   PAYING_EVENTS,
 } from '@/lib/subscription';
@@ -84,16 +85,26 @@ export async function POST(req: Request) {
     // going active, which also fires on a free trial and on a renewal that
     // has not been paid yet. Granting on activation would hand out a month's
     // credits to anyone who starts and cancels a trial.
-    if (PAYING_EVENTS.includes(event.type) && subscriptionId) {
-      const sub = await db.subscription.findUnique({
-        where: { id: subscriptionId },
-        select: { userId: true },
-      });
-      // No user yet means the buyer has not signed in. The event stays on
-      // record and claimSubscriptions() replays the grant at sign-in, so
-      // nothing is lost in that window.
-      if (sub?.userId) {
-        await grantSubscriptionCredits(sub.userId, event.id, `Whop ${event.type}`);
+    if (PAYING_EVENTS.includes(event.type)) {
+      // A pack purchase and a subscription payment arrive as the same event
+      // type; the metadata our checkout route attached is what tells them
+      // apart. Packs are checked first and are exclusive: a one-time plan has
+      // no membership to renew, and treating it as one would grant the
+      // subscription allowance on top of the pack.
+      const meta = event.payload.data?.metadata ?? null;
+      const pack = await grantPackCredits(event.id, meta);
+
+      if (!pack.granted && pack.reason === 'not a pack purchase' && subscriptionId) {
+        const sub = await db.subscription.findUnique({
+          where: { id: subscriptionId },
+          select: { userId: true },
+        });
+        // No user yet means the buyer has not signed in. The event stays on
+        // record and claimSubscriptions() replays the grant at sign-in, so
+        // nothing is lost in that window.
+        if (sub?.userId) {
+          await grantSubscriptionCredits(sub.userId, event.id, `Whop ${event.type}`);
+        }
       }
     }
 

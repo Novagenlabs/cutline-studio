@@ -26,7 +26,7 @@ All of these go in Dokploy's **Environment** tab for the application.
 | Variable | What it is |
 |---|---|
 | `WHOP_WEBHOOK_SECRET` | Signing secret for the Whop webhook endpoint (`whsec_...` or `ws_...`). **Subscriptions are only recorded by the webhook**, so without this a paying customer gets nothing. The route answers 503 while it is unset, which keeps Whop retrying rather than discarding the delivery. |
-| `WHOP_API_KEY` | `apik_...` from the Whop dashboard. Not needed to receive webhooks — it is for reading memberships back, which is what a reconciliation job needs to repair state after a missed or undelivered event. |
+| `WHOP_API_KEY` | `apik_...` from the Whop dashboard. **Now required to sell credits**, not optional: `/api/whop/checkout` uses it to create the checkout session for a credit pack, and answers 503 without it. Also what a reconciliation job would use to read memberships back. |
 | `EMAIL_SERVER` | SMTP URL, only if you want email magic-link sign-in alongside Google. |
 | `EMAIL_FROM` | Sender address for those emails. Both must be set or neither — the provider is skipped unless both are present. |
 
@@ -82,6 +82,25 @@ https://<your domain>/api/whop/webhook
 subscribed to the membership events — `membership.activated`,
 `membership.deactivated`, `membership.cancel_at_period_end_changed` — and
 `payment.succeeded`. Copy its signing secret into `WHOP_WEBHOOK_SECRET`.
+
+`payment.succeeded` is the one that moves credits, and it carries both kinds
+of purchase: a credit pack and a subscription payment arrive as the same
+event. They are told apart by the metadata `/api/whop/checkout` attached —
+a pack payment carries `pack` and `userId`, a subscription payment does not.
+Without this event subscribed, **nobody is ever credited for anything**.
+
+**Check the plans after changing a price.** The credit packs are hidden
+one-time Whop plans, and Whop charges what its plan says rather than what
+`PACKS` says:
+
+```sh
+npm run whop:plans           # compare Whop against src/lib/packs.ts
+npm run whop:plans -- --create   # create a plan for a pack that has none
+```
+
+A drift between the two means the buyer is charged one number while the
+dialog promised another, which no test can catch because the truth lives in
+Whop rather than in this repo.
 
 Two things worth knowing about how this behaves:
 

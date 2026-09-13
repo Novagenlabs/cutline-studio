@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { PACKS } from '@/lib/packs';
 import { grantsAccess, mapStatus, type WhopWebhookBody } from '@/lib/whop';
 
 /**
@@ -232,6 +233,53 @@ async function grantDeferredSubscriptionCredits(userId: string): Promise<void> {
 
 /** Events that represent money actually received, and so earn credits. */
 export const PAYING_EVENTS = ['payment.succeeded', 'payment_succeeded'];
+
+/**
+ * Grant credits for a one-off pack purchase.
+ *
+ * A pack and a subscription both arrive as payment.succeeded, and the
+ * difference is the metadata our own checkout route attached: a pack payment
+ * carries `pack` and `credits`, a subscription payment does not. Reading the
+ * amount from metadata rather than from the payload's price means the credits
+ * granted are the credits PACKS promised, not whatever number happens to be
+ * on the payment.
+ *
+ * The credits value is still re-derived from PACKS rather than trusted from
+ * the metadata: metadata survives a round trip through Whop, and while our
+ * own route is the only thing that sets it today, a grant that reads its
+ * amount from an echoed field is one integration away from paying out
+ * whatever someone puts there.
+ *
+ * Shares whopEventId with the subscription grant, so a replay of either is
+ * refused by the same unique index.
+ */
+export async function grantPackCredits(
+  whopEventId: string,
+  metadata: Record<string, unknown> | null | undefined
+): Promise<{ granted: boolean; reason: string }> {
+  const userId = typeof metadata?.userId === 'string' ? metadata.userId : null;
+  const packId = typeof metadata?.pack === 'string' ? metadata.pack : null;
+  if (!userId || !packId) return { granted: false, reason: 'not a pack purchase' };
+
+  const pack = PACKS[packId as keyof typeof PACKS];
+  if (!pack) return { granted: false, reason: `unknown pack "${packId}"` };
+
+  try {
+    await db.creditEntry.create({
+      data: {
+        userId,
+        amount: pack.credits,
+        reason: 'PURCHASE',
+        note: `Whop ${pack.label}`,
+        whopEventId,
+      },
+    });
+    return { granted: true, reason: `granted ${pack.credits}` };
+  } catch (err) {
+    if (isUniqueViolation(err)) return { granted: false, reason: 'already granted' };
+    throw err;
+  }
+}
 
 function isUniqueViolation(err: unknown): boolean {
   return (

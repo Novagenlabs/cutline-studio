@@ -34,10 +34,12 @@ vi.mock('@/lib/db', () => ({
 
 const {
   grantSubscriptionCredits,
+  grantPackCredits,
   claimSubscriptions,
   SUBSCRIPTION_CREDITS,
   PAYING_EVENTS,
 } = await import('../src/lib/subscription');
+const { PACKS } = await import('../src/lib/packs');
 
 /** What Prisma throws when a unique index rejects a duplicate insert. */
 function uniqueViolation() {
@@ -93,6 +95,74 @@ describe('granting a period of credits', () => {
     // If this were swallowed like a duplicate, the webhook would answer 200,
     // Whop would stop retrying, and the customer would never get the month.
     await expect(grantSubscriptionCredits('u', 'e', 'n')).rejects.toThrow('connection reset');
+  });
+});
+
+describe('buying a credit pack', () => {
+  it('grants the credits the pack promises', async () => {
+    create.mockResolvedValue({});
+    const r = await grantPackCredits('evt_1', {
+      userId: 'user_1',
+      pack: 'pro',
+      credits: '50',
+    });
+
+    expect(r.granted).toBe(true);
+    const { data } = create.mock.calls[0][0];
+    expect(data.amount).toBe(PACKS.pro.credits);
+    expect(data.userId).toBe('user_1');
+    expect(data.reason).toBe('PURCHASE');
+  });
+
+  it('takes the amount from PACKS, not from the metadata it was handed', async () => {
+    create.mockResolvedValue({});
+    // A payment claiming 99999 credits for the 10-credit pack must pay out 10.
+    // Metadata makes a round trip through Whop, so treating it as the source
+    // of truth for an amount is one integration away from being exploitable.
+    await grantPackCredits('evt_1', {
+      userId: 'user_1',
+      pack: 'starter',
+      credits: '99999',
+    });
+    expect(create.mock.calls[0][0].data.amount).toBe(PACKS.starter.credits);
+    expect(create.mock.calls[0][0].data.amount).toBe(10);
+  });
+
+  it('refuses a pack id it does not recognise', async () => {
+    const r = await grantPackCredits('evt_1', { userId: 'u', pack: 'enterprise' });
+    expect(r.granted).toBe(false);
+    expect(r.reason).toContain('unknown pack');
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('ignores a payment with no pack metadata — that is a subscription', async () => {
+    const r = await grantPackCredits('evt_1', { userId: 'u' });
+    expect(r.granted).toBe(false);
+    // The webhook keys off this exact reason to decide whether to fall
+    // through to the subscription grant, so it is load-bearing.
+    expect(r.reason).toBe('not a pack purchase');
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('ignores metadata with no user, rather than crediting nobody', async () => {
+    const r = await grantPackCredits('evt_1', { pack: 'pro' });
+    expect(r.granted).toBe(false);
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('does not pay out twice for a redelivered purchase', async () => {
+    create.mockRejectedValueOnce(uniqueViolation());
+    const r = await grantPackCredits('evt_1', { userId: 'u', pack: 'pro' });
+    expect(r.granted).toBe(false);
+    expect(r.reason).toBe('already granted');
+  });
+
+  it('shares the idempotency key with the subscription grant', async () => {
+    // Both write whopEventId, so one webhook id can never pay out as both a
+    // pack and a subscription.
+    create.mockResolvedValue({});
+    await grantPackCredits('evt_shared', { userId: 'u', pack: 'pro' });
+    expect(create.mock.calls[0][0].data.whopEventId).toBe('evt_shared');
   });
 });
 

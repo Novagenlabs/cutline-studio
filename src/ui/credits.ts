@@ -3,8 +3,8 @@
  *
  * Buying credits is the only thing the account page was for, and sending
  * someone to another screen to do it means abandoning the artwork and
- * settings they have already set up. The dialog keeps them here; Stripe
- * Checkout opens in a popup and returns them to this same page.
+ * settings they have already set up. The dialog keeps them here; Whop
+ * checkout opens in a popup and returns them to this same page.
  */
 
 import { jobStart, jobEnd } from './job';
@@ -75,9 +75,9 @@ export async function openCredits(onSignOut?: () => void): Promise<number | null
       if (!pack) return;
       btn.disabled = true;
       const note = document.getElementById('credits-note');
-      if (note) note.textContent = 'Opening Stripe…';
+      if (note) note.textContent = 'Opening checkout…';
       try {
-        const res = await fetch('/api/stripe/checkout', {
+        const res = await fetch('/api/whop/checkout', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           credentials: 'include',
@@ -91,7 +91,7 @@ export async function openCredits(onSignOut?: () => void): Promise<number | null
           window.location.href = url;
           return;
         }
-        if (note) note.textContent = 'Complete your purchase in the Stripe window…';
+        if (note) note.textContent = 'Complete your purchase in the checkout window…';
         // Same reason as sign-in: the studio would otherwise sit silent for
         // however long checkout takes.
         jobStart(null, 'signing');
