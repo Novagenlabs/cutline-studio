@@ -21,12 +21,21 @@ All of these go in Dokploy's **Environment** tab for the application.
 | `STRIPE_SECRET_KEY` | `sk_live_...` in production. |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_...` from the webhook endpoint you create below. **Credits are granted only by the webhook**, so if this is wrong, payments succeed and nobody gets credits. |
 
+### Required to take money
+
+Both of these were once listed as optional, which is how a deploy reached
+production where every purchase answered "Buying credits is not available
+yet". They are not optional if anyone is meant to pay.
+
+| Variable | What it is |
+|---|---|
+| `WHOP_API_KEY` | `apik_...` from the Whop dashboard. `/api/whop/checkout` uses it to create the checkout session when someone picks a pack, and answers **503 with that "not available yet" message** without it. Note that a signed-out request 401s before this is ever checked, so "the route responds" is not evidence the key is set — only a signed-in purchase attempt tests it. |
+| `WHOP_WEBHOOK_SECRET` | Signing secret for the webhook endpoint (`whsec_...` or `ws_...`). **Credits are only ever granted by the webhook**, so without this a customer pays and receives nothing. The route answers 503 while it is unset, which keeps Whop retrying rather than discarding the delivery. |
+
 ### Optional
 
 | Variable | What it is |
 |---|---|
-| `WHOP_WEBHOOK_SECRET` | Signing secret for the Whop webhook endpoint (`whsec_...` or `ws_...`). **Subscriptions are only recorded by the webhook**, so without this a paying customer gets nothing. The route answers 503 while it is unset, which keeps Whop retrying rather than discarding the delivery. |
-| `WHOP_API_KEY` | `apik_...` from the Whop dashboard. **Now required to sell credits**, not optional: `/api/whop/checkout` uses it to create the checkout session for a credit pack, and answers 503 without it. Also what a reconciliation job would use to read memberships back. |
 | `EMAIL_SERVER` | SMTP URL, only if you want email magic-link sign-in alongside Google. |
 | `EMAIL_FROM` | Sender address for those emails. Both must be set or neither — the provider is skipped unless both are present. |
 

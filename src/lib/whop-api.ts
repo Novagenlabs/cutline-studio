@@ -5,6 +5,23 @@
  * separate because the trust direction is opposite: everything there is
  * untrusted input to be authenticated, everything here is our own request
  * carrying a secret that must never reach the browser.
+ *
+ * Why the integration needs both a webhook AND an API key, since they look
+ * redundant from a distance:
+ *
+ * The webhook is Whop telling us a payment happened. It is the only thing
+ * that grants credits, and it is trusted because it is signed.
+ *
+ * The API key exists for one job: creating a checkout session so that
+ * `userId` can be attached to it as metadata. Whop hands that metadata back
+ * on the payment webhook, and it is the entire binding between a payment and
+ * an account. The alternative — static checkout links in the browser — would
+ * work for taking money and fail at knowing whose balance to credit, leaving
+ * email matching as the only link and anyone who paid with a different
+ * address uncredited.
+ *
+ * So: the key creates the binding, the webhook acts on it. Neither replaces
+ * the other, and the whole of the key's job is the one call below.
  */
 
 const API = 'https://api.whop.com/api';

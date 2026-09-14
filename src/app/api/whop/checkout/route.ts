@@ -37,6 +37,13 @@ export async function POST(req: Request) {
   // the free signup credits work without it. Say so plainly rather than
   // failing with a stack trace.
   if (!process.env.WHOP_API_KEY) {
+    // Logged, not just returned: the user-facing copy cannot say "an
+    // environment variable is missing", so without this line the only signal
+    // is a vague message with no way to tell an unconfigured deploy from a
+    // broken one. It cost a live debugging session to learn that the hard way.
+    console.error(
+      'WHOP_API_KEY is not set — /api/whop/checkout cannot create checkout sessions'
+    );
     return NextResponse.json(
       { error: 'Buying credits is not available yet. Please contact us.' },
       { status: 503 }
