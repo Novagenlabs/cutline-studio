@@ -2854,21 +2854,121 @@ body.is-tracing #st-time {
 /* ---------------- background removal ---------------- */
 
 /* Lives in the canvas toolbar, with the other controls that act on the image
-   in view rather than on the cut settings. */
+   in view rather than on the cut settings.
+
+   The refine controls are behind a popover, not inline. Laid out in a row
+   they measured 498px against 128px for the entire zoom cluster, crowded it
+   off the right edge, and put a slider next to its own readout where the two
+   collided. A toolbar's job here is quiet view controls; anything that needs
+   four inputs needs a surface of its own. */
 .ct-bg {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.ct-bg-review {
+.ct-pop-wrap {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.ct-bg-review[hidden] {
+.ct-pop-wrap[hidden] {
   display: none;
+}
+
+.ct-caret {
+  fill: currentColor;
+  opacity: 0.6;
+  transition: transform 140ms ease;
+}
+
+#btn-bg-refine[aria-expanded='true'] .ct-caret {
+  transform: rotate(180deg);
+}
+
+.ct-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  width: 250px;
+  padding: 12px;
+  background: var(--rail);
+  border: 1px solid var(--line-panel);
+  border-radius: 10px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+}
+
+.ct-pop[hidden] {
+  display: none;
+}
+
+.ct-pop-hint {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin: 0 0 10px;
+}
+
+.ct-pop-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 9px;
+}
+
+.ct-pop-row:last-child {
+  margin-bottom: 0;
+}
+
+.ct-pop-row.end {
+  justify-content: flex-end;
+  margin-top: 11px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.ct-pop-row > label {
+  font-size: 11px;
+  color: var(--muted);
+  flex: none;
+}
+
+.ct-pop-row input[type='range'] {
+  flex: 1;
+  min-width: 0;
+}
+
+.ct-pop-row output {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  flex: none;
+  min-width: 40px;
+  text-align: right;
+}
+
+/* The two mode buttons share the row equally, so neither reads as primary. */
+.ct-pop-row .bg-mode {
+  flex: 1;
+  justify-content: center;
+}
+
+.ct-check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.ct-check input {
+  margin: 0;
+  flex: none;
 }
 
 .ct-sep {
@@ -2888,42 +2988,6 @@ body.is-tracing #st-time {
   background: color-mix(in srgb, var(--accent) 18%, transparent);
   border-color: color-mix(in srgb, var(--accent) 50%, transparent);
   color: var(--accent);
-}
-
-.ct-brush {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.ct-brush input[type='range'] {
-  width: 74px;
-}
-
-.ct-brush output {
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--muted);
-  min-width: 42px;
-}
-
-.ct-toggle {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-family: var(--display);
-  font-size: 11px;
-  color: var(--muted);
-  cursor: pointer;
-  user-select: none;
-}
-
-.ct-toggle:hover {
-  color: var(--ink-2);
-}
-
-.ct-toggle input {
-  margin: 0;
 }
 
 /* A crosshair says "this click does something to the pixel under it", which

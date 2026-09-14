@@ -1425,7 +1425,35 @@ $('#in-bg-all').addEventListener('change', () => {
   if (state.bgOriginal) void removeBackground();
 });
 
+/* The refine popover. */
+const bgPop = $('#bg-pop');
+const bgRefineBtn = $('#btn-bg-refine') as HTMLButtonElement;
+
+function setRefineOpen(open: boolean): void {
+  bgPop.hidden = !open;
+  bgRefineBtn.setAttribute('aria-expanded', String(open));
+}
+
+bgRefineBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  setRefineOpen(bgPop.hidden);
+});
+
+// Clicking the canvas is how corrections are made, so the popover must not
+// eat that click — but it should close when the user is plainly done with it.
+document.addEventListener('click', (e) => {
+  if (bgPop.hidden) return;
+  const t = e.target as Node;
+  if (bgPop.contains(t) || bgRefineBtn.contains(t)) return;
+  setRefineOpen(false);
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !bgPop.hidden) setRefineOpen(false);
+});
+
 $('#btn-bg-keep').addEventListener('click', () => {
+  setRefineOpen(false);
   state.bgReviewing = false;
   syncBackgroundUi();
   rebuildEngineFromCanvas();

@@ -438,29 +438,42 @@
                 <span id="bg-btn-label">Remove background</span>
               </button>
 
-              <!-- Whether enclosed white counts as background.
-                   Off, only background the border can reach is removed, so a
-                   letter counter and the ball's white panels stay — right for
-                   a sticker, where those are part of the design. On, every
-                   pixel matching the background colour goes, which is what
-                   "remove the white inside the letters too" means. -->
-              <label class="ct-toggle" title="Also remove white inside letters and shapes">
-                <input id="in-bg-all" type="checkbox" />
-                <span>Inside too</span>
-              </label>
-
-              <!-- Only while a removal is being reviewed. -->
-              <span class="ct-bg-review" id="ct-bg-review" hidden>
-                <span class="ct-sep" aria-hidden="true"></span>
-                <button id="btn-bg-mode-drop" class="btn ghost sm bg-mode active" type="button" data-mode="drop" title="Click the canvas to remove more">Remove</button>
-                <button id="btn-bg-mode-keep" class="btn ghost sm bg-mode" type="button" data-mode="keep" title="Click the canvas to bring artwork back">Restore</button>
-                <label class="ct-brush" for="in-bg-brush" title="Brush size">
-                  <input id="in-bg-brush" type="range" min="8" max="200" step="4" value="40" />
-                  <output id="out-bg-brush">40 px</output>
-                </label>
+              <!-- The refine controls live in a popover rather than inline.
+                   Seven controls in a row crowded the zoom cluster off the
+                   edge of the bar — the background tools were 498px against
+                   128px for everything else, which is the wrong emphasis for
+                   a bar whose job is quiet view controls. -->
+              <div class="ct-pop-wrap" id="ct-bg-review" hidden>
+                <button id="btn-bg-refine" class="btn ghost sm" type="button" aria-expanded="false" aria-controls="bg-pop">
+                  Refine
+                  <svg class="ct-caret" viewBox="0 0 256 256" aria-hidden="true" width="10" height="10">
+                    <path d="M213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80A8 8 0 0 1 53.66 90.34L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32Z"/>
+                  </svg>
+                </button>
                 <button id="btn-bg-keep" class="btn solid sm" type="button">Done</button>
-                <button id="btn-bg-undo" class="btn ghost sm" type="button">Undo</button>
-              </span>
+
+                <div class="ct-pop" id="bg-pop" hidden>
+                  <p class="ct-pop-hint">Click the canvas to fix what the removal missed.</p>
+                  <div class="ct-pop-row">
+                    <button id="btn-bg-mode-drop" class="btn ghost sm bg-mode active" type="button" data-mode="drop">Remove</button>
+                    <button id="btn-bg-mode-keep" class="btn ghost sm bg-mode" type="button" data-mode="keep">Restore</button>
+                  </div>
+                  <div class="ct-pop-row">
+                    <label for="in-bg-brush">Brush</label>
+                    <input id="in-bg-brush" type="range" min="8" max="200" step="4" value="40" />
+                    <output id="out-bg-brush">40 px</output>
+                  </div>
+                  <div class="ct-pop-row">
+                    <label class="ct-check" for="in-bg-all" title="Also remove white inside letters and shapes">
+                      <input id="in-bg-all" type="checkbox" />
+                      <span>Remove white inside shapes too</span>
+                    </label>
+                  </div>
+                  <div class="ct-pop-row end">
+                    <button id="btn-bg-undo" class="btn ghost sm" type="button">Undo removal</button>
+                  </div>
+                </div>
+              </div>
             </div>
             <span class="ct-sep" aria-hidden="true"></span>
             <button id="btn-zoom-out" class="btn ghost sm" type="button" title="Zoom out (-)">−</button>
