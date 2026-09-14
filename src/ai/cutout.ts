@@ -20,7 +20,11 @@ export interface Stroke {
   /** Centre, in SOURCE image pixels. */
   x: number;
   y: number;
-  /** Radius in source pixels. */
+  /**
+   * Brush size in source pixels. Drives the colour tolerance rather than a
+   * hard radius — a bigger brush accepts a looser range of colour, the way
+   * Quick Select's sizing behaves.
+   */
   r: number;
   mode: 'keep' | 'drop';
 }
@@ -66,16 +70,21 @@ export function upsampleMatte(
 }
 
 /**
- * Apply the user's corrections to a matte.
+ * Apply the user's corrections to a matte, Quick Select style.
  *
- * Colour-aware rather than a plain circular stamp: a hard disc would cut a
- * visible round bite out of an edge the model got right, and someone
- * correcting a missed corner wants the corner, not a circle. So the stroke
- * samples the colour under its centre and only affects nearby pixels that
- * look similar — a flood fill bounded by the brush rather than a paint dab.
+ * Each click samples the colour under it and grows through CONNECTED pixels
+ * of a similar colour, with no radius limit. That is what "remove this bit"
+ * means in practice: the region ends where the colour changes, not where the
+ * cursor stopped. The previous version clamped to the brush radius, so
+ * clearing a large area meant clicking across it repeatedly and a stroke
+ * could bite a round hole out of an edge it overlapped.
  *
- * Strokes are applied in order, so a later correction wins over an earlier
- * one and undo is just dropping the last entry.
+ * Connectivity is the safety property. A pixel matching the sampled colour
+ * on the far side of the artwork is never reached, so removing a white
+ * background does not also punch out white lettering somewhere else.
+ *
+ * Strokes are applied in order over an unmodified base matte, so a later
+ * correction wins over an earlier one and undo is dropping the last entry.
  */
 export function applyStrokes(
   matte: Float32Array,
@@ -97,38 +106,55 @@ export function applyStrokes(
     const cb = data[ci + 2];
     const target = s.mode === 'keep' ? 255 : 0;
 
-    const r = Math.max(1, Math.round(s.r));
-    const r2 = r * r;
-    // Generous but not unbounded: far enough that a stroke feels like it
-    // grabbed "that colour there", tight enough that it cannot leak across a
-    // real edge into the subject.
-    const tol = 60 * 60 * 3;
+    // Tolerance from the brush size, so one control does the job people
+    // expect it to: a bigger brush grabs a looser range of colour, the way
+    // Quick Select's own sizing behaves. Squared, because the distance test
+    // below is squared and taking a square root per pixel over a few million
+    // pixels is the difference between instant and sluggish.
+    const tol = Math.max(12, s.r * 0.9);
+    const tol2 = tol * tol * 3;
 
-    const x0 = Math.max(0, cx - r);
-    const x1 = Math.min(w - 1, cx + r);
-    const y0 = Math.max(0, cy - r);
-    const y1 = Math.min(h - 1, cy + r);
+    // Flood from the click, not a disc around it.
+    //
+    // The old version clamped to the brush radius, so clearing a large area
+    // meant clicking across it repeatedly — and a stroke could bite a round
+    // hole out of an edge it overlapped. Quick Select grows through connected
+    // pixels of a similar colour instead, which is what "remove this bit"
+    // actually means: the region ends where the colour changes, not where the
+    // cursor stopped.
+    //
+    // Connectivity is what keeps it safe. A pixel matching the sampled colour
+    // on the far side of the artwork is not reached, so removing a white
+    // background does not also punch out white lettering elsewhere.
+    const seen = new Uint8Array(w * h);
+    const stack: number[] = [cy * w + cx];
+    seen[cy * w + cx] = 1;
+    // A hard cap, so a click on a near-uniform image cannot walk the entire
+    // frame and freeze the tab. Generous enough that a real background region
+    // completes; small enough that a runaway is bounded.
+    const budget = Math.min(w * h, 4_000_000);
+    let visited = 0;
 
-    for (let y = y0; y <= y1; y++) {
-      const dy = y - cy;
-      for (let x = x0; x <= x1; x++) {
-        const dx = x - cx;
-        const d2 = dx * dx + dy * dy;
-        if (d2 > r2) continue;
+    while (stack.length && visited < budget) {
+      const p = stack.pop()!;
+      visited++;
+      out[p] = target;
 
-        const i = (y * w + x) * 4;
+      const px = p % w;
+      const py = (p / w) | 0;
+      for (let k = 0; k < 4; k++) {
+        const nx = px + (k === 0 ? -1 : k === 1 ? 1 : 0);
+        const ny = py + (k === 2 ? -1 : k === 3 ? 1 : 0);
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const np = ny * w + nx;
+        if (seen[np]) continue;
+        const i = np * 4;
         const dr = data[i] - cr;
         const dg = data[i + 1] - cg;
         const db = data[i + 2] - cb;
-        const colourDist = dr * dr + dg * dg + db * db;
-        if (colourDist > tol) continue;
-
-        // Feathered at the rim so a stroke does not leave a hard circular
-        // seam where it stops.
-        const edge = 1 - Math.sqrt(d2) / r;
-        const strength = Math.min(1, edge * 2);
-        const p = y * w + x;
-        out[p] = out[p] + (target - out[p]) * strength;
+        if (dr * dr + dg * dg + db * db > tol2) continue;
+        seen[np] = 1;
+        stack.push(np);
       }
     }
   }

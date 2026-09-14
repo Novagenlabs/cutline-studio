@@ -108,45 +108,107 @@ describe('flood removal, for devices without the model', () => {
 describe('correcting what the model got wrong', () => {
   const img = scene(40, 40, [255, 255, 255], { x: 10, y: 10, w: 20, h: 20 }, [20, 20, 20]);
 
-  it('a drop stroke removes what it lands on', () => {
-    const m = new Float32Array(1600).fill(255); // nothing removed yet
-    const out = applyStrokes(m, img, [{ x: 2, y: 2, r: 6, mode: 'drop' }]);
-    expect(out[2 * 40 + 2]).toBeLessThan(40);
-  });
-
-  it('a keep stroke restores what it lands on', () => {
-    const m = new Float32Array(1600).fill(0); // everything removed
-    const out = applyStrokes(m, img, [{ x: 20, y: 20, r: 6, mode: 'keep' }]);
-    expect(out[20 * 40 + 20]).toBeGreaterThan(215);
-  });
-
-  it('does not bleed across a colour edge', () => {
-    // The whole point of sampling colour: a stroke on the white background
-    // must not eat into the dark subject beside it, even within its radius.
+  it('a drop stroke removes the whole connected region, not a disc', () => {
+    // The point of the rewrite: one click on the background clears all of it,
+    // rather than a circle the size of the brush. The old version left the
+    // far corner untouched.
     const m = new Float32Array(1600).fill(255);
-    const out = applyStrokes(m, img, [{ x: 8, y: 20, r: 10, mode: 'drop' }]);
-    expect(out[20 * 40 + 8]).toBeLessThan(40); // background: removed
-    expect(out[20 * 40 + 20]).toBeGreaterThan(215); // subject: untouched
+    const out = applyStrokes(m, img, [{ x: 2, y: 2, r: 20, mode: 'drop' }]);
+    expect(out[2 * 40 + 2]).toBe(0);
+    expect(out[37 * 40 + 37]).toBe(0); // opposite corner, far beyond any radius
+  });
+
+  it('a keep stroke restores the region it lands on', () => {
+    const m = new Float32Array(1600).fill(0);
+    const out = applyStrokes(m, img, [{ x: 20, y: 20, r: 20, mode: 'keep' }]);
+    expect(out[20 * 40 + 20]).toBe(255);
+  });
+
+  it('stops at the colour edge', () => {
+    // The safety property: flooding the white background must not cross into
+    // the dark square, however large the brush.
+    const m = new Float32Array(1600).fill(255);
+    const out = applyStrokes(m, img, [{ x: 2, y: 2, r: 60, mode: 'drop' }]);
+    expect(out[2 * 40 + 2]).toBe(0); // background: gone
+    expect(out[20 * 40 + 20]).toBe(255); // subject: untouched
+  });
+
+  it('only reaches CONNECTED pixels of that colour', () => {
+    // Two separate white areas split by a dark band. Clicking one must not
+    // clear the other — otherwise removing a background would punch out white
+    // lettering elsewhere in the artwork.
+    const w = 40, h = 40;
+    const data = new Uint8ClampedArray(w * h * 4);
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const band = x >= 18 && x < 22; // dark divider
+        const i = (y * w + x) * 4;
+        const c = band ? 10 : 255;
+        data[i] = data[i + 1] = data[i + 2] = c;
+        data[i + 3] = 255;
+      }
+    const split = { data, width: w, height: h };
+    const m = new Float32Array(1600).fill(255);
+    const out = applyStrokes(m, split, [{ x: 5, y: 20, r: 30, mode: 'drop' }]);
+    expect(out[20 * 40 + 5]).toBe(0); // clicked side: cleared
+    expect(out[20 * 40 + 35]).toBe(255); // other side: survives
+  });
+
+  it('a bigger brush accepts more colour variation', () => {
+    // Size drives tolerance now, so a gentle gradient is crossed by a large
+    // brush and not by a small one.
+    const w = 60, h = 10;
+    const data = new Uint8ClampedArray(w * h * 4);
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const c = 255 - x * 2; // 255 down to 137
+        data[i] = data[i + 1] = data[i + 2] = c;
+        data[i + 3] = 255;
+      }
+    const ramp = { data, width: w, height: h };
+    const small = applyStrokes(new Float32Array(w * h).fill(255), ramp, [
+      { x: 0, y: 5, r: 8, mode: 'drop' },
+    ]);
+    const large = applyStrokes(new Float32Array(w * h).fill(255), ramp, [
+      { x: 0, y: 5, r: 120, mode: 'drop' },
+    ]);
+    const reach = (m: Float32Array) => {
+      let far = 0;
+      for (let x = 0; x < w; x++) if (m[5 * w + x] === 0) far = x;
+      return far;
+    };
+    expect(reach(large)).toBeGreaterThan(reach(small));
   });
 
   it('applies strokes in order, so the last correction wins', () => {
     const m = new Float32Array(1600).fill(255);
     const out = applyStrokes(m, img, [
-      { x: 2, y: 2, r: 6, mode: 'drop' },
-      { x: 2, y: 2, r: 6, mode: 'keep' },
+      { x: 2, y: 2, r: 20, mode: 'drop' },
+      { x: 2, y: 2, r: 20, mode: 'keep' },
     ]);
-    expect(out[2 * 40 + 2]).toBeGreaterThan(215);
+    expect(out[2 * 40 + 2]).toBe(255);
   });
 
   it('leaves the original matte untouched, so undo is dropping a stroke', () => {
     const m = new Float32Array(1600).fill(255);
-    applyStrokes(m, img, [{ x: 2, y: 2, r: 6, mode: 'drop' }]);
+    applyStrokes(m, img, [{ x: 2, y: 2, r: 20, mode: 'drop' }]);
     expect(m[2 * 40 + 2]).toBe(255);
   });
 
   it('ignores a stroke outside the image', () => {
     const m = new Float32Array(1600).fill(255);
-    expect(() => applyStrokes(m, img, [{ x: -5, y: 900, r: 6, mode: 'drop' }])).not.toThrow();
+    expect(() => applyStrokes(m, img, [{ x: -5, y: 900, r: 20, mode: 'drop' }])).not.toThrow();
+  });
+
+  it('terminates on a uniform image rather than running away', () => {
+    // A click on an image with no colour edges could otherwise walk every
+    // pixel; the budget bounds it.
+    const flat = scene(200, 200, [255, 255, 255], { x: 0, y: 0, w: 0, h: 0 }, [0, 0, 0]);
+    const m = new Float32Array(40000).fill(255);
+    const t0 = Date.now();
+    applyStrokes(m, flat, [{ x: 100, y: 100, r: 200, mode: 'drop' }]);
+    expect(Date.now() - t0).toBeLessThan(5000);
   });
 });
 
