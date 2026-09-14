@@ -122,10 +122,19 @@ export async function promptSignIn(grant?: number): Promise<SigninOutcome> {
         if (dlg.open) dlg.close();
         jobStart(null, 'signing');
 
-        // The popup posts a message when Google returns, then closes itself.
-        // Waiting on the message rather than on `popup.closed` matters
-        // because a browser can refuse to close the popup — polling alone
-        // would hang forever on a sign-in that actually succeeded.
+        // Three ways to learn the sign-in finished, because on Safari the
+        // first two do not fire at all.
+        //
+        // The popup navigates to Google and back, and that cross-origin round
+        // trip is enough for Safari to sever window.opener — so signin-done
+        // has nobody to postMessage. `popup.closed` is no better: it reads
+        // false indefinitely for a popup the opener no longer owns. With only
+        // those two exits the promise never settled, and the studio sat
+        // showing "Sign in to download" until the user reloaded by hand.
+        //
+        // Asking our own server is the check that cannot be severed: it needs
+        // no handle on the popup and no cross-window messaging, only the
+        // session cookie the browser already has.
         await new Promise<void>((done) => {
           let settled = false;
           const stop = () => {
@@ -133,6 +142,7 @@ export async function promptSignIn(grant?: number): Promise<SigninOutcome> {
             settled = true;
             window.removeEventListener('message', onMessage);
             clearInterval(poll);
+            clearInterval(ask);
             done();
           };
           const onMessage = (ev: MessageEvent) => {
@@ -141,12 +151,29 @@ export async function promptSignIn(grant?: number): Promise<SigninOutcome> {
           };
           window.addEventListener('message', onMessage);
           // Still watch for a manual close, which is how a cancelled sign-in
-          // ends — no message is ever posted in that case.
+          // ends in the browsers where this works at all.
           const poll = window.setInterval(() => {
             if (popup.closed) stop();
           }, 400);
+          // The authority. Polled rather than raced against a timeout so a
+          // slow consent screen is not mistaken for a failure; the user can
+          // still dismiss the banner, and a sign-in that never happens simply
+          // never resolves this, exactly as before.
+          const ask = window.setInterval(async () => {
+            try {
+              const res = await fetch('/api/me', { credentials: 'include' });
+              if (res.ok && (await res.json()).signedIn === true) stop();
+            } catch {
+              // Offline or a blip: keep waiting rather than declaring failure.
+            }
+          }, 1200);
         });
-        finish('signed-in');
+        // Ask rather than assume. The wait above ends for three different
+        // reasons and only one of them means a session exists — closing the
+        // popup without consenting ends it too. Reporting 'signed-in' either
+        // way made the caller fetch a null balance and tell the user sign-in
+        // had failed, which is the right outcome reached by the wrong route.
+        finish((await currentlySignedIn()) ? 'signed-in' : 'dismissed');
       } finally {
         jobEnd();
         busy = false;
@@ -168,6 +195,16 @@ export async function promptSignIn(grant?: number): Promise<SigninOutcome> {
  * Auth.js requires a CSRF token and a POST to start a provider sign-in, so the
  * popup is handed a generated form rather than a bare URL.
  */
+/** Does the server think there is a session right now? */
+async function currentlySignedIn(): Promise<boolean> {
+  try {
+    const res = await fetch('/api/me', { credentials: 'include' });
+    return res.ok && (await res.json()).signedIn === true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Sign out, for real.
  *
