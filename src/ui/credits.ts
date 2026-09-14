@@ -114,60 +114,58 @@ export async function openCredits(
       onSignIn?.();
     };
 
-    const onBuy = async (ev: Event) => {
+    const onBuy = (ev: Event) => {
       const btn = ev.currentTarget as HTMLButtonElement;
       // The subscription tile and the pack tiles go through one path: the
       // server decides which plan and what metadata, so the only difference
       // here is the id sent.
       const pack = btn.dataset.pack ?? (btn.id === 'credits-plan-offer' ? 'subscription' : null);
       if (!pack) return;
-      btn.disabled = true;
-      const note = document.getElementById('credits-note');
-      if (note) note.textContent = 'Opening checkout…';
-      try {
-        const res = await fetch('/api/whop/checkout', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ pack }),
-        });
-        const { url, error } = await res.json();
-        if (!url) throw new Error(error ?? 'Could not start checkout.');
-        // Checkout in a popup, so the studio and its artwork stay loaded.
-        const w = window.open(url, 'cutline-checkout', 'width=520,height=760');
-        if (!w) {
-          window.location.href = url;
-          return;
-        }
-        if (note) note.textContent = 'Complete your purchase in the checkout window…';
-        // Same reason as sign-in: the studio would otherwise sit silent for
-        // however long checkout takes.
-        jobStart(null, 'signing');
-        await new Promise<void>((done) => {
-          const poll = window.setInterval(() => {
-            if (w.closed) {
-              clearInterval(poll);
-              done();
-            }
-          }, 500);
-        });
-        // Re-read rather than assume: the webhook is what grants credits, and
-        // it may not have arrived by the time the window closes.
-        const after = await fetchAccount();
-        render(after);
-        if (note) {
-          note.textContent =
-            after.balance !== null && info.balance !== null && after.balance > info.balance
-              ? 'Credits added.'
-              : 'If your credits do not appear in a moment, refresh — payment confirmation can lag slightly.';
-        }
-      } catch (err) {
-        if (note) note.textContent = err instanceof Error ? err.message : 'Checkout failed.';
-      } finally {
-        jobEnd();
-        btn.disabled = false;
-      }
+
+      // A full navigation to a checkout page, not a popup.
+      //
+      // The popup this replaces could be blocked outright — some browsers
+      // refuse them by default, and the buyer then clicked Buy and watched
+      // nothing happen. It also could not report back: COOP: same-origin on
+      // the studio severs window.opener, so the old code polled for the
+      // window to close and then guessed whether anything had been bought.
+      //
+      // Embedding checkout in this dialog is not an option either: the studio
+      // is cross-origin isolated for AI matting, and Whop's checkout answers
+      // ERR_BLOCKED_BY_RESPONSE inside an isolated page. /checkout is
+      // deliberately outside that scope and carries the embed there.
+      //
+      // The studio is stateless across this hop — artwork lives in memory, so
+      // it is lost either way — which is why the tour and the dialog both
+      // point at doing this before loading a file rather than mid-job.
+      lockForCheckout(btn, pack);
+      window.location.href = `/checkout?pack=${encodeURIComponent(pack)}`;
     };
+
+    /**
+     * Freeze the dialog while the browser navigates.
+     *
+     * Navigation is not instant, and a dialog that stays fully interactive
+     * during it invites a second click on a different pack — which would
+     * queue a second navigation and, on a slow connection, look like the
+     * first one failed.
+     */
+    function lockForCheckout(clicked: HTMLButtonElement, pack: string): void {
+      for (const b of [...packButtons(), document.getElementById('credits-plan-offer')]) {
+        if (b instanceof HTMLButtonElement) b.disabled = true;
+      }
+      clicked.classList.add('is-busy');
+      const note = document.getElementById('credits-note');
+      if (note) {
+        note.textContent =
+          pack === 'subscription'
+            ? 'Taking you to checkout for the subscription…'
+            : 'Taking you to secure checkout…';
+      }
+      // The studio's own wait indicator, so the hop is narrated in the place
+      // the user is already looking rather than only inside this dialog.
+      jobStart(null, 'signing');
+    }
 
     const offer = document.getElementById('credits-plan-offer') as HTMLButtonElement | null;
 

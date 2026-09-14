@@ -2785,3 +2785,68 @@ body:not(.mode-simple) #panel-simple {
 .btn.icon-only svg {
   fill: currentColor;
 }
+
+/* The tile that was clicked, while the browser navigates to checkout. The
+   others are merely disabled; this one says which purchase is underway. */
+.pack.is-busy {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  opacity: 1;
+}
+
+.pack.is-busy .pack-per {
+  color: var(--accent);
+}
+
+/* ---------------- tracing indicator ---------------- */
+
+/* Switching a cut style re-traces the whole outline, which on a large image
+   is over a second of synchronous work. Without this the studio simply sat
+   there and the click looked ignored.
+
+   The transition delay is the point: a fast trace finishes before the
+   indicator is ever visible, so quick edits stay silent and only the slow
+   ones — the ones that actually need explaining — announce themselves. */
+#stage {
+  position: relative;
+}
+
+#stage::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-image: linear-gradient(90deg, transparent, var(--accent), transparent);
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 5;
+  transition: opacity 90ms ease;
+}
+
+body.is-tracing #stage::before {
+  opacity: 1;
+  animation: cutline-trace 900ms linear infinite;
+  /* Held back so a 20ms retrace never flickers a bar onto the screen. */
+  transition: opacity 90ms ease 240ms;
+}
+
+@keyframes cutline-trace {
+  from { background-position: -40% 0; }
+  to { background-position: 140% 0; }
+}
+
+/* The existing line dims while it is being replaced, so what is on screen
+   reads as stale rather than current. */
+body.is-tracing #cut-path,
+body.is-tracing #cut-shadow {
+  opacity: 0.4;
+  transition: opacity 120ms ease 240ms;
+}
+
+body.is-tracing #st-time {
+  color: var(--accent);
+}

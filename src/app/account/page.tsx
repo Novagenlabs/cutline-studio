@@ -1,8 +1,7 @@
-import { redirect } from 'next/navigation';
 import { auth, signIn, signOut } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getBalance, getDownloadCount, SIGNUP_GRANT } from '@/lib/credits';
-import { PACKS } from '../api/stripe/checkout/route';
+import { PACKS } from '@/lib/packs';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,25 +60,15 @@ export default async function Page() {
 
       <h2 style={S.h2}>Buy credits</h2>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        {/* Plain links to the checkout page rather than a server action that
+            POSTed to the old Stripe route — which no longer exists, and could
+            not have carried the session cookie anyway. /checkout creates the
+            Whop session with the right metadata and renders the embed. */}
         {Object.entries(PACKS).map(([id, p]) => (
-          <form
-            key={id}
-            action={async () => {
-              'use server';
-              const res = await fetch(`${process.env.APP_URL}/api/stripe/checkout`, {
-                method: 'POST',
-                headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ pack: id }),
-              });
-              const { url } = await res.json();
-              if (url) redirect(url);
-            }}
-          >
-            <button type="submit" style={S.pack}>
-              <div style={{ fontSize: 18 }}>{p.label}</div>
-              <div style={S.dim}>${(p.amount / 100).toFixed(2)} CAD</div>
-            </button>
-          </form>
+          <a key={id} href={`/checkout?pack=${id}`} style={S.pack}>
+            <div style={{ fontSize: 18 }}>{p.label}</div>
+            <div style={S.dim}>${(p.amount / 100).toFixed(2)}</div>
+          </a>
         ))}
       </div>
 

@@ -199,6 +199,21 @@ function recompute(immediate = false) {
   const engine = state.useAi && state.aiEngine ? state.aiEngine : state.engine;
   if (!engine) return;
   if (pending !== null) clearTimeout(pending);
+
+  // Say that work is happening BEFORE it starts.
+  //
+  // engine.compute() is synchronous and can run for well over a second on a
+  // large image, and a blocked main thread paints nothing — so setting a flag
+  // and calling compute() in the same task shows the flag only after the work
+  // it was meant to announce has finished. Switching a preset therefore
+  // looked like nothing happened at all, for as long as it took.
+  //
+  // Marking the canvas here and yielding below is what gets the state on
+  // screen first. The mark is cheap enough to leave on for fast recomputes;
+  // the CSS holds it back with a transition delay so a 20ms trace does not
+  // flicker.
+  document.body.classList.add('is-tracing');
+
   pending = window.setTimeout(
     () => {
       pending = null;
@@ -215,8 +230,13 @@ function recompute(immediate = false) {
       } else {
         v1El.setAttribute('d', '');
       }
+      document.body.classList.remove('is-tracing');
     },
-    immediate ? 0 : 60
+    // Never 0, even when immediate: a zero-delay timeout can be serviced
+    // before the browser has painted the is-tracing state, which puts us back
+    // to showing the indicator only after the work it announces is done.
+    // One frame is enough to get it on screen and is imperceptible.
+    immediate ? 16 : 60
   );
 }
 
@@ -1302,6 +1322,39 @@ function renderBalance() {
       close?.();
     });
   });
+
+  // Coming back from checkout.
+  //
+  // Credits are granted by the webhook, not by the redirect, so the balance
+  // in hand may predate the payment by a second or two. Rather than claim a
+  // number we cannot vouch for, poll briefly for it to move and say which
+  // happened. The URL is cleaned either way so a refresh does not re-announce
+  // a purchase that already landed.
+  const returned = new URLSearchParams(location.search).get('purchase');
+  if (returned === 'success') {
+    history.replaceState(null, '', location.pathname);
+    void balance.then(async () => {
+      const before = state.balance ?? 0;
+      for (let i = 0; i < 10; i++) {
+        const now = await fetchBalance();
+        if (now !== null && now > before) {
+          state.balance = now;
+          renderBalance();
+          toast(`Payment received · ${now} credits`, 'success', 5000);
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 1200));
+      }
+      // Twelve seconds without the balance moving. The payment is almost
+      // certainly fine — Whop retries for ~71 hours — so this reassures
+      // rather than alarms.
+      toast(
+        'Payment received. Your credits will appear here shortly.',
+        'info',
+        8000
+      );
+    });
+  }
 
   // The tour waits for both the splash and the balance: starting it while the
   // loading overlay is still up would put a bubble on top of a screen that is
