@@ -282,6 +282,8 @@ function renderResult(r: CutlineResult, ms: number) {
   $('#st-dims').textContent =
     `${state.srcW}×${state.srcH}px · ${mm(state.srcW)}×${mm(state.srcH)}mm @ ${state.params.dpi}dpi`;
   $('#st-geom').textContent = `${r.rings.length} path${r.rings.length === 1 ? '' : 's'} · ${r.nodeCount} nodes`;
+  syncNodeWarning(r);
+  syncHolesAvailability();
   // "Cut ready" means there is geometry to export — which is exactly the
   // condition under which the export button does anything, so it is read
   // from the same fact rather than set optimistically alongside it.
@@ -1189,6 +1191,82 @@ function syncPresetSelection() {
   const holes = $('#in-holes-simple') as HTMLInputElement | null;
   if (holes) holes.checked = state.params.keepHoles;
   redrawCheckboxes();
+  syncHolesAvailability();
+}
+
+/**
+ * Warn when the path carries far more nodes than the artwork justifies.
+ *
+ * A plotter runs the path node by node, so an inflated count is slower,
+ * rougher and can make the blade chatter on curves. The usual cause is an
+ * upscaled source: the same crest at 1369px traced to 3208 nodes and at
+ * 2738px to 9848 — three times the data for no extra detail, because the
+ * upscaler invented texture along every edge and the tracer faithfully
+ * followed it.
+ *
+ * Measured against the artwork's own size rather than a flat number, since
+ * 9848 nodes is excessive on a logo and reasonable on a detailed map. The
+ * threshold is nodes per mm of bounding-box perimeter: the clean source runs
+ * at 8.3 and the upscale at 12.7, so 11 separates them without crying wolf on
+ * legitimately detailed work.
+ */
+function syncNodeWarning(r: CutlineResult): void {
+  const el = $('#st-nodes-warn');
+  if (!el) return;
+  const perimeterMm = (2 * (r.bbox.w + r.bbox.h) / state.params.dpi) * 25.4;
+  const density = perimeterMm > 0 ? r.nodeCount / perimeterMm : 0;
+  // 11, not 8: measured on the same artwork, the clean 1369px source runs at
+  // 8.3 nodes/mm and the 2738px upscale at 12.7. A threshold of 8 would flag
+  // the good file too, which teaches the user to ignore the warning.
+  const busy = density > 11 && r.nodeCount > 2000;
+  el.hidden = !busy;
+  if (busy) {
+    el.title =
+      `${Math.round(density)} nodes per mm of outline. Smoothing, or a ` +
+      `smaller source image, will cut more cleanly.`;
+  }
+}
+
+/**
+ * Say when there is nothing for "cut interior holes" to do.
+ *
+ * The control is not broken — on artwork with real enclosed transparency it
+ * adds the holes correctly. But after a background removal that only took the
+ * OUTER background, every enclosed area is still opaque artwork, so there are
+ * no holes to keep and the checkbox produces byte-identical output either
+ * way. Measured on the upscaled crest: 46 rings and 9848 nodes with the flag
+ * on or off, against 66 rings and 12,587 once the enclosed white was actually
+ * removed.
+ *
+ * A control that silently does nothing is worse than one that is absent, so
+ * this names the reason and points at the fix rather than leaving the user to
+ * toggle it and wonder.
+ */
+function syncHolesAvailability(): void {
+  const hint = $('#holes-hint');
+  if (!hint) return;
+  const r = state.result;
+  // A hole winds opposite to its parent. Which sign that is depends on the
+  // coordinate system — in screen space (y down) an outline comes out
+  // negative — so this compares against the majority rather than assuming:
+  // outlines always outnumber holes, so the minority sign is the holes.
+  const hasHoles = r != null && (() => {
+    let pos = 0;
+    let neg = 0;
+    for (const ring of r.rings) {
+      let a = 0;
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++)
+        a += (ring[j].x + ring[i].x) * (ring[j].y - ring[i].y);
+      if (a > 0) pos++;
+      else if (a < 0) neg++;
+    }
+    return pos > 0 && neg > 0;
+  })();
+
+  // Only meaningful once artwork is open AND the option is on: with it off
+  // there are no holes by definition, and saying so would be noise.
+  const inert = state.imageEl !== null && state.params.keepHoles && !hasHoles;
+  hint.hidden = !inert;
 }
 
 // Simple is the default: it is the mode that answers the question most

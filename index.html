@@ -182,6 +182,14 @@
               Cuts the enclosed gaps too — the middle of an O, or a window in
               a shape. Leave off for stickers.
             </p>
+            <!-- Shown only when the option is on and the artwork has no
+                 enclosed transparency for it to act on, which is the state
+                 that made it look broken. -->
+            <p class="hint sub-setting-hint warn" id="holes-hint" hidden>
+              Nothing to cut here — the gaps inside this artwork are still
+              filled. Use <strong>Remove background → Refine → “Remove white
+              inside shapes too”</strong> to open them up.
+            </p>
           </div>
         </section>
 
@@ -631,6 +639,9 @@
         <span id="st-file">no file</span>
         <span id="st-dims">—</span>
         <span id="st-geom">—</span>
+        <!-- Only when the node count is disproportionate to the artwork's
+             size; the title carries the number and what to do about it. -->
+        <span id="st-nodes-warn" class="st-warn" hidden>⚠ dense path</span>
         <span id="st-time">—</span>
         <span id="st-zoom">100%</span>
       </footer>

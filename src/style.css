@@ -2995,3 +2995,25 @@ body.is-tracing #st-time {
 body.is-refining-bg #stage {
   cursor: crosshair;
 }
+
+/* A quiet flag in the status bar, not a toast: the path still works, it is
+   just heavier than the artwork warrants, and interrupting for that would be
+   out of proportion. */
+.st-warn {
+  color: #ffb02e;
+  font-size: 11px;
+  cursor: help;
+}
+
+.st-warn[hidden] {
+  display: none;
+}
+
+/* The hint that explains why "cut interior holes" has nothing to do. */
+.hint.warn {
+  color: #ffb02e;
+}
+
+.hint.warn[hidden] {
+  display: none;
+}
