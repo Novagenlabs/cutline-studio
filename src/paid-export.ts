@@ -16,6 +16,36 @@ import type { CutlineResult } from './pipeline/types';
 
 export type PaidFormat = 'SVG' | 'PDF' | 'DXF' | 'PNG';
 
+/**
+ * Make a filename the export route will accept.
+ *
+ * The name comes from whatever file the user opened, and the server validates
+ * it against /^[\w. -]+$/ — so "logo (1).png", "Müller.png" or "design#2.png"
+ * all produced a flat "Malformed export request." with nothing to say which
+ * field was wrong. The paid path failing on a perfectly ordinary filename is
+ * as bad as a bug gets: the user has already decided to pay.
+ *
+ * Sanitised here rather than loosening the server's rule, because that rule is
+ * what keeps a filename out of a Content-Disposition header it could break.
+ * Runs of rejected characters collapse to a single dash so "a (1)" does not
+ * become "a---1-".
+ */
+export function safeFilenameBase(base: string): string {
+  const cleaned = base
+    .normalize('NFKD')
+    // Strip combining marks, so accented letters degrade to their base form
+    // rather than to a dash: "Müller" reads better as "Muller" than "M-ller".
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^\w. -]+/g, '-')
+    // Spaces are legal, but a space that ends up beside a substituted dash
+    // reads as a typo: "logo (1)" would otherwise become "logo -1". Collapse
+    // any run of spaces and dashes into the single dash it stands for.
+    .replace(/[-\s]{2,}/g, '-')
+    .replace(/^[-.\s]+|[-.\s]+$/g, '')
+    .slice(0, 100);
+  return `${cleaned || 'cutline'}-cut`;
+}
+
 export interface ExportContext {
   result: CutlineResult;
   srcW: number;
@@ -71,7 +101,7 @@ export async function requestExport(
       dpi: ctx.dpi,
       spotName: ctx.spotName,
       halo: ctx.halo,
-      filenameBase: `${ctx.fileBase}-cut`,
+      filenameBase: safeFilenameBase(ctx.fileBase),
       imageDataUrl: needsArtwork ? ctx.imageDataUrl : undefined,
     }),
   });
@@ -84,6 +114,18 @@ export async function requestExport(
       throw new ExportError(msg, 'credits', typeof body.balance === 'number' ? body.balance : 0);
     }
     if (res.status === 429) throw new ExportError(msg, 'rate');
+    // A 400 is never the user's fault: the browser builds this body itself,
+    // so a rejected one means the client sent something the server's schema
+    // does not allow — which is a bug here, not a problem with their file.
+    // Saying "malformed request" to someone who just clicked Export tells
+    // them nothing they can act on, and nothing was charged either way.
+    if (res.status === 400) {
+      console.error('Export request rejected by the server schema', body);
+      throw new ExportError(
+        'Something went wrong preparing that export. Nothing was charged — please try again.',
+        'server'
+      );
+    }
     throw new ExportError(msg, 'server');
   }
 

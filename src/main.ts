@@ -1330,7 +1330,21 @@ function renderBalance() {
   // number we cannot vouch for, poll briefly for it to move and say which
   // happened. The URL is cleaned either way so a refresh does not re-announce
   // a purchase that already landed.
-  const returned = new URLSearchParams(location.search).get('purchase');
+  // Sent here by /checkout because there was nobody signed in to attach a
+  // purchase to. Open the sheet that actually works, and resume the purchase
+  // once they are through it.
+  const params = new URLSearchParams(location.search);
+  if (params.get('signin') === '1') {
+    const wanted = params.get('pack');
+    history.replaceState(null, '', location.pathname);
+    void promptSignIn(signupGrant).then((outcome) => {
+      if (outcome !== 'signed-in') return;
+      if (wanted) window.location.href = `/checkout?pack=${encodeURIComponent(wanted)}`;
+      else void signInThenRefresh();
+    });
+  }
+
+  const returned = params.get('purchase');
   if (returned === 'success') {
     history.replaceState(null, '', location.pathname);
     void balance.then(async () => {

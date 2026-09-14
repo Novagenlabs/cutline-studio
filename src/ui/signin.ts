@@ -105,8 +105,13 @@ export async function promptSignIn(grant?: number): Promise<SigninOutcome> {
       try {
         const popup = await openSignInPopup();
         if (!popup) {
-          // Popups blocked — a same-tab redirect is better than a dead button.
-          window.location.href = '/api/auth/signin/google';
+          // Popups blocked — sign in in this tab instead of leaving a dead
+          // button. It must be a POST with a CSRF token: navigating to
+          // /api/auth/signin/google with a GET is an "UnknownAction" as far
+          // as Auth.js is concerned, which is what this used to do and why
+          // the fallback path reported a configuration error rather than
+          // signing anyone in.
+          await postToSignIn();
           return;
         }
 
@@ -163,6 +168,38 @@ export async function promptSignIn(grant?: number): Promise<SigninOutcome> {
  * Auth.js requires a CSRF token and a POST to start a provider sign-in, so the
  * popup is handed a generated form rather than a bare URL.
  */
+/**
+ * Sign in in this tab, for when a popup is refused.
+ *
+ * Auth.js accepts sign-in only as a POST carrying a CSRF token — a plain
+ * navigation to the same URL is rejected as an unknown action, which is what
+ * this fallback used to do. Submitting a real form is the same thing the
+ * popup path does, minus the popup.
+ *
+ * The callback is the studio rather than /signin-done: there is no opener to
+ * report back to, so the browser should simply land back where it started.
+ */
+async function postToSignIn(): Promise<void> {
+  const res = await fetch('/api/auth/csrf', { credentials: 'include' });
+  const { csrfToken } = (await res.json()) as { csrfToken: string };
+
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = '/api/auth/signin/google';
+  for (const [name, value] of [
+    ['csrfToken', csrfToken],
+    ['callbackUrl', window.location.href],
+  ]) {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = name;
+    input.value = value;
+    form.appendChild(input);
+  }
+  document.body.appendChild(form);
+  form.submit();
+}
+
 async function openSignInPopup(): Promise<Window | null> {
   const res = await fetch('/api/auth/csrf', { credentials: 'include' });
   const { csrfToken } = (await res.json()) as { csrfToken: string };

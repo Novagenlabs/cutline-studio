@@ -36,9 +36,13 @@ export default async function Page({
   const session = await auth();
   const { pack } = await searchParams;
 
-  // Nothing to attach a purchase to. Bounce through sign-in and come back.
+  // Nothing to attach a purchase to. Send them to the studio rather than to
+  // /api/auth/signin: that endpoint answers a GET with Auth.js's own sign-in
+  // page only in some configurations, and rejects it as an unknown action in
+  // others. The studio's sign-in sheet is the path that is actually tested,
+  // and it returns here afterwards.
   if (!session?.user?.id) {
-    redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/checkout?pack=${pack ?? ''}`)}`);
+    redirect(`/?signin=1&pack=${encodeURIComponent(pack ?? '')}`);
   }
 
   const isSubscription = pack === 'subscription';
