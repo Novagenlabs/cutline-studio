@@ -2853,57 +2853,58 @@ body.is-tracing #st-time {
 
 /* ---------------- background removal ---------------- */
 
-.btn.wide {
-  width: 100%;
-  justify-content: center;
-  margin-bottom: 10px;
+/* Lives in the canvas toolbar, with the other controls that act on the image
+   in view rather than on the cut settings. */
+.ct-bg {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.bg-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin: 12px 0 4px;
+.ct-bg-review {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.bg-actions .btn {
-  width: 100%;
-  justify-content: center;
+.ct-bg-review[hidden] {
+  display: none;
 }
 
-/* Two states of one choice, so they read as a pair rather than two buttons
-   that happen to sit together. */
-.bg-modes {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
-  padding: 3px;
-  margin: 8px 0 12px;
-  background: var(--line-soft);
-  border-radius: 8px;
+.ct-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--line);
+  margin: 0 2px;
 }
 
-.bg-mode {
-  padding: 6px 10px;
-  border: 0;
-  border-radius: 6px;
-  background: none;
-  font-family: var(--display);
-  font-size: 12px;
-  font-weight: 500;
+.btn.sm svg {
+  fill: currentColor;
+}
+
+/* Two states of one choice, so the active one has to be unmistakable — these
+   sit among other ghost buttons that look the same at rest. */
+.btn.bg-mode.active {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  color: var(--accent);
+}
+
+.ct-brush {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ct-brush input[type='range'] {
+  width: 74px;
+}
+
+.ct-brush output {
+  font-family: var(--mono);
+  font-size: 11px;
   color: var(--muted);
-  cursor: pointer;
-}
-
-.bg-mode.active {
-  background: var(--rail);
-  color: var(--ink);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-}
-
-.bg-mode:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  min-width: 42px;
 }
 
 /* A crosshair says "this click does something to the pixel under it", which
@@ -2911,4 +2912,3 @@ body.is-tracing #st-time {
 body.is-refining-bg #stage {
   cursor: crosshair;
 }
-

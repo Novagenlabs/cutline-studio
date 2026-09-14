@@ -1283,6 +1283,21 @@ async function removeBackground(): Promise<void> {
 
   // Remember the original before the first removal, so Undo is exact.
   if (!state.bgOriginal) state.bgOriginal = state.imageDataUrl;
+
+  // Turn the white halo off.
+  //
+  // It fills the cut shape with white UNDER the artwork, to preview the vinyl
+  // backing a sticker is printed on. That is right for a sticker and actively
+  // misleading here: it paints white back into the transparency the user just
+  // asked for, so a clean cutout looks like it grew a white outline around
+  // every shape — which is what "the background wasn't removed" looked like
+  // on screen even though the alpha channel was perfect.
+  if (state.halo) {
+    state.halo = false;
+    const haloBox = $('#in-halo') as HTMLInputElement | null;
+    if (haloBox) haloBox.checked = false;
+    redrawCheckboxes();
+  }
   state.bgMatte = matte;
   state.bgStrokes = [];
   state.bgReviewing = true;
@@ -1324,14 +1339,12 @@ function applyBackgroundPreview(): void {
 }
 
 function syncBackgroundUi(): void {
-  const panel = $('#panel-bg');
-  if (panel) panel.hidden = state.imageEl === null;
-  const review = $('#bg-review');
+  const host = $('#ct-bg');
+  if (host) host.hidden = state.imageEl === null;
+  const review = $('#ct-bg-review');
   if (review) review.hidden = !state.bgReviewing;
-  const label = $('#out-bg-state');
-  if (label) label.textContent = state.bgOriginal ? 'removed' : 'original';
-  const btn = $('#btn-remove-bg') as HTMLButtonElement | null;
-  if (btn) btn.textContent = state.bgOriginal ? 'Remove again' : 'Remove background';
+  const label = $('#bg-btn-label');
+  if (label) label.textContent = state.bgOriginal ? 'Remove again' : 'Remove background';
   for (const b of document.querySelectorAll<HTMLButtonElement>('.bg-mode')) {
     b.classList.toggle('active', b.dataset.mode === state.bgMode);
   }
