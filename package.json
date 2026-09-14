@@ -33,7 +33,8 @@
     "verify:reset": "tsx test/verify-reset.ts",
     "verify:credits-dialog": "tsx test/verify-credits-dialog.ts",
     "whop:plans": "tsx scripts/whop-plans.mjs",
-    "verify:boot": "tsx test/verify-boot-cover.ts"
+    "verify:boot": "tsx test/verify-boot-cover.ts",
+    "verify:tour": "tsx test/verify-tour.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",

@@ -16,6 +16,13 @@
  *
  * Creating is idempotent: a pack whose plan already exists is skipped, so
  * re-running never produces duplicate plans.
+ *
+ * Note on keys: this reads (and with --create, writes) plans, which the
+ * server's checkout key deliberately cannot do — that one is scoped to
+ * creating checkout sessions and nothing else. So run this with an
+ * admin-scoped key via WHOP_API_KEY in the environment, not with the value
+ * deployed to production. A 403 here means the key is the narrow one, which
+ * is the correct key to be running the site with.
  */
 import { readFileSync } from 'node:fs';
 import { PACKS } from '../src/lib/packs.ts';

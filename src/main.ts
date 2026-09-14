@@ -11,6 +11,7 @@ import { chooseExport, defaultFormat } from './ui/export-dialog';
 import { jobStart, jobStage, jobEnd } from './ui/job';
 import { showLoading } from './ui/loading';
 import { createSplash, splashSeen } from './ui/splash';
+import { createTour, tourSeen } from './ui/tour';
 import { mountCutSlider, mountValueSlider, mountCheckbox, mountSelect } from './ui/controls';
 import { promptSignIn } from './ui/signin';
 import { openCredits } from './ui/credits';
@@ -1154,6 +1155,15 @@ $('#tab-advanced').addEventListener('click', () => setMode('advanced'));
 
 $('#btn-reset').addEventListener('click', () => resetAllSettings());
 
+// Replaying the tour switches to Simple first: every step points at a Simple
+// control, and running it from Advanced would highlight things that are not
+// on screen — which the step filter would then drop, leaving a shorter and
+// more confusing tour than the one the button promises.
+$('#btn-help').addEventListener('click', () => {
+  setMode('simple');
+  void createTour().run();
+});
+
 // Advanced is four sections deep and most jobs touch one of them. Each
 // heading collapses its own body so the rail can be narrowed to the section
 // in hand. Toggling `hidden` on the body rather than a class keeps the
@@ -1291,6 +1301,18 @@ function renderBalance() {
       clearTimeout(grace);
       close?.();
     });
+  });
+
+  // The tour waits for both the splash and the balance: starting it while the
+  // loading overlay is still up would put a bubble on top of a screen that is
+  // about to change, and the last step points at the credit pill, which is
+  // still showing a placeholder until the balance lands.
+  void Promise.all([intro, balance.catch(() => {})]).then(() => {
+    if (tourSeen()) return;
+    // A first-time visitor has no artwork open, so the steps that need one
+    // are filtered out by the tour itself. What is left is the shape of the
+    // job, which is exactly what someone arriving cold needs.
+    void createTour().run();
   });
 }
 
