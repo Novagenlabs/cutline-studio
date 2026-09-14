@@ -102,6 +102,10 @@ export async function requestExport(
       spotName: ctx.spotName,
       halo: ctx.halo,
       filenameBase: safeFilenameBase(ctx.fileBase),
+      // The name as the user knows it. The server puts this in the RFC 6266
+      // `filename*=` parameter so the download keeps its accents and spaces,
+      // with filenameBase above as the ASCII fallback.
+      filenameDisplay: `${ctx.fileBase}-cut`.slice(0, 200),
       imageDataUrl: needsArtwork ? ctx.imageDataUrl : undefined,
     }),
   });
@@ -144,10 +148,28 @@ export async function requestExport(
   return { filename, creditsRemaining: remaining === null ? null : Number(remaining) };
 }
 
+/**
+ * Read the filename the server chose, preferring the UTF-8 form.
+ *
+ * RFC 6266 sends both: `filename=` for old clients and `filename*=UTF-8''…`
+ * with the real name percent-encoded. Reading only the first would throw away
+ * the accents the second exists to carry — the browser itself prefers
+ * `filename*`, so parsing only `filename=` here would also mean the name in
+ * the download bar and the name this function reports disagree.
+ */
 function filenameFrom(header: string | null): string | null {
   if (!header) return null;
-  const m = /filename="([^"]+)"/.exec(header);
-  return m ? m[1] : null;
+  const star = /filename\*=UTF-8''([^;]+)/i.exec(header);
+  if (star) {
+    try {
+      return decodeURIComponent(star[1].trim());
+    } catch {
+      // A malformed encoding is not worth failing a paid download over; fall
+      // through to the ASCII parameter.
+    }
+  }
+  const plain = /filename="([^"]+)"/.exec(header);
+  return plain ? plain[1] : null;
 }
 
 /** Credits a new account is given, as reported by the server. */

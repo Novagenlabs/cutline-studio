@@ -43,7 +43,21 @@ const Body = z.object({
   dpi: z.number().int().min(72).max(2400),
   spotName: z.string().min(1).max(64).regex(/^[\w -]+$/),
   halo: z.boolean(),
+  /**
+   * ASCII-safe name, used verbatim in the `filename=` parameter of
+   * Content-Disposition. The regex is what keeps a quote or a newline out of
+   * a response header, so it stays strict; the client sanitises to match.
+   */
   filenameBase: z.string().min(1).max(120).regex(/^[\w. -]+$/),
+  /**
+   * The name as the user actually knows it, accents and all.
+   *
+   * RFC 6266 exists for exactly this: `filename*=UTF-8''…` carries the real
+   * name while `filename=` stays ASCII for clients too old to read it. Every
+   * character is percent-encoded on the way into the header, so this does not
+   * need — and must not have — the strict regex above.
+   */
+  filenameDisplay: z.string().min(1).max(200).optional(),
   /**
    * Source artwork, needed only by the formats that embed a raster (PDF, PNG).
    * Held in memory for the render and never written to disk or logged, so the
@@ -126,6 +140,30 @@ export async function POST(req: Request) {
 
   const filename = `${body.filenameBase}.${file.ext}`;
 
+  /**
+   * Content-Disposition, per RFC 6266.
+   *
+   * Two parameters, deliberately: `filename=` is the ASCII fallback and
+   * `filename*=` is the real name, percent-encoded as UTF-8. Browsers that
+   * understand the second prefer it, which is how "Müller.svg" arrives in the
+   * Downloads folder spelled the way its owner spells it rather than as
+   * "M-ller.svg".
+   *
+   * encodeURIComponent leaves !'()* alone and those are not valid in the
+   * ext-value grammar, so they are escaped too. Everything reaching the
+   * header is therefore percent-encoded or an unreserved ASCII character —
+   * there is no input that can close the quote or inject a newline.
+   */
+  const displayName = body.filenameDisplay
+    ? `${body.filenameDisplay}.${file.ext}`
+    : filename;
+  const encoded = encodeURIComponent(displayName).replace(
+    /['()!*]/g,
+    (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase()
+  );
+  const disposition =
+    `attachment; filename="${filename}"; filename*=UTF-8''${encoded}`;
+
   let downloadId: string;
   let balance: number;
   try {
@@ -171,7 +209,7 @@ export async function POST(req: Request) {
     status: 200,
     headers: {
       'Content-Type': file.mime,
-      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Disposition': disposition,
       'Content-Length': String(delivered.byteLength),
       'Cache-Control': 'no-store',
       'X-Credits-Remaining': String(balance),
