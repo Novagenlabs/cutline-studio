@@ -1,6 +1,7 @@
 import { CutlineEngine, DEFAULT_PARAMS } from './pipeline';
 import type { CutlineParams, CutlineResult, RasterImage, RegionOverride, ShapeMode } from './pipeline';
 import { computeAiMatte, matteToImage } from './ai/matte';
+import { upsampleMatte, applyStrokes, cutout, floodMatte, coverage, type Stroke } from './ai/cutout';
 import { buildRaster } from './export/png';
 import { makeSampleImage } from './ui/sample';
 import { requestExport, fetchBalance, signupGrant, ExportError } from './paid-export';
@@ -47,6 +48,21 @@ interface AppState {
   useAi: boolean;
   /** Credits left, or null when signed out / the account server is unreachable. */
   balance: number | null;
+
+  /**
+   * Background removal state.
+   *
+   * `bgMatte` is at SOURCE resolution, not working resolution: it has to cut
+   * out the artwork the user exports, and the model runs on the downscaled
+   * copy. `bgOriginal` keeps the untouched artwork so Undo is exact and a
+   * restore stroke still has colour to bring back.
+   */
+  bgMatte: Float32Array | null;
+  bgOriginal: string | null;
+  bgStrokes: Stroke[];
+  bgMode: 'drop' | 'keep';
+  bgBrush: number;
+  bgReviewing: boolean;
 }
 
 const state: AppState = {
@@ -67,6 +83,12 @@ const state: AppState = {
   aiEngine: null,
   useAi: false,
   balance: null,
+  bgMatte: null,
+  bgOriginal: null,
+  bgStrokes: [],
+  bgMode: 'drop',
+  bgBrush: 40,
+  bgReviewing: false,
 };
 
 const activeRegion = (): RegionOverride | null =>
@@ -126,6 +148,13 @@ function adoptImage(el: HTMLImageElement | HTMLCanvasElement, w: number, h: numb
   for (const id of ['#btn-svg', '#btn-pdf', '#btn-dxf', '#btn-png', '#btn-jpg', '#btn-export']) {
     ($(id) as HTMLButtonElement).disabled = false;
   }
+  // A new image has no removal history; the panel appears now that there is
+  // something for it to act on.
+  state.bgMatte = null;
+  state.bgOriginal = null;
+  state.bgStrokes = [];
+  state.bgReviewing = false;
+  syncBackgroundUi();
   // Reveals the Elements section now that there is artwork to detect within.
   renderElementList();
   // The baseline for "edited" is whatever this image opened with, so opening
@@ -333,6 +362,17 @@ const marqueeEl = $('#marquee') as unknown as SVGRectElement;
 
 previewSvg.addEventListener('pointerdown', (e) => {
   previewSvg.setPointerCapture(e.pointerId);
+
+  // Refining a background removal takes the click before panning does: while
+  // the review panel is up, the canvas is a correction surface. Panning stays
+  // available on the scroll wheel and on a two-finger trackpad drag.
+  if (state.bgReviewing && state.bgMatte) {
+    const p = screenToImg(e);
+    state.bgStrokes.push({ x: p.x, y: p.y, r: state.bgBrush, mode: state.bgMode });
+    applyBackgroundPreview();
+    return;
+  }
+
   if (marqueeArmed) {
     marqueeFrom = screenToImg(e);
     return;
@@ -1172,6 +1212,205 @@ $('.mode-tabs').addEventListener('keydown', (e) => {
 
 $('#tab-simple').addEventListener('click', () => setMode('simple'));
 $('#tab-advanced').addEventListener('click', () => setMode('advanced'));
+
+/* ---------------- background removal ---------------- */
+
+/**
+ * Cut the artwork out of its background.
+ *
+ * The neural matte already existed but only ever positioned the cut line, so
+ * a logo on a white card got a perfect outline drawn over still-white pixels
+ * — and exported that white with it. This does the thing the name implies.
+ *
+ * Two engines, chosen by what the image needs rather than by a setting:
+ * the model for photographs and busy backgrounds, and the border-vote flood
+ * fill for flat studio backgrounds, where it is as good and finishes in
+ * milliseconds instead of minutes. The flood runs first precisely because it
+ * is instant: if it produces a sane result there is no reason to download
+ * ~98MB to do better.
+ */
+async function removeBackground(): Promise<void> {
+  if (!state.imageEl || !state.workImg) {
+    toast('Open an image first.', 'error');
+    return;
+  }
+  const btn = $('#btn-remove-bg') as HTMLButtonElement;
+  btn.disabled = true;
+
+  // Full-resolution copy: the matte has to cut out what gets exported, and
+  // the working image is downscaled.
+  const src = document.createElement('canvas');
+  src.width = state.srcW;
+  src.height = state.srcH;
+  src.getContext('2d')!.drawImage(state.imageEl, 0, 0, state.srcW, state.srcH);
+  const full = src.getContext('2d')!.getImageData(0, 0, state.srcW, state.srcH);
+
+  let matte = floodMatte(full, state.params.bgTolerance);
+  let kept = coverage(matte);
+
+  // A flood that kept almost everything found no background it could reach;
+  // one that kept almost nothing ate the artwork. Either way the image is not
+  // the flat-background kind, so it is worth the model.
+  const floodFailed = kept > 0.92 || kept < 0.02;
+
+  if (floodFailed) {
+    const close = showLoading('Removing the background');
+    try {
+      const aiMatte = await computeAiMatte(state.workImg, (m) => console.info('[matte]', m));
+      matte = upsampleMatte(
+        aiMatte,
+        state.workImg.width,
+        state.workImg.height,
+        state.srcW,
+        state.srcH
+      );
+      kept = coverage(matte);
+    } catch (err) {
+      console.error('Neural background removal failed', err);
+      // Keep the flood result rather than nothing: on some images it is
+      // still better than leaving the background in.
+      toast('Used a simpler background removal — this device cannot run the better one.', 'info', 6000);
+    } finally {
+      close();
+    }
+  }
+
+  if (kept > 0.985) {
+    btn.disabled = false;
+    toast('No background found to remove.', 'info', 5000);
+    return;
+  }
+
+  // Remember the original before the first removal, so Undo is exact.
+  if (!state.bgOriginal) state.bgOriginal = state.imageDataUrl;
+  state.bgMatte = matte;
+  state.bgStrokes = [];
+  state.bgReviewing = true;
+  applyBackgroundPreview();
+  btn.disabled = false;
+}
+
+/** Redraw the canvas from the current matte plus whatever strokes exist. */
+function applyBackgroundPreview(): void {
+  if (!state.bgMatte || !state.imageEl) return;
+
+  const src = document.createElement('canvas');
+  src.width = state.srcW;
+  src.height = state.srcH;
+  const sctx = src.getContext('2d')!;
+  // From the ORIGINAL element, never from the current canvas: compounding a
+  // removal onto an already-cut image would erode the artwork a little more
+  // with every stroke, and a restore stroke would have no colour to bring
+  // back.
+  sctx.drawImage(state.imageEl, 0, 0, state.srcW, state.srcH);
+  const full = sctx.getImageData(0, 0, state.srcW, state.srcH);
+
+  const withStrokes = applyStrokes(state.bgMatte, full, state.bgStrokes);
+  const cut = cutout(full, withStrokes);
+
+  const out = document.createElement('canvas');
+  out.width = state.srcW;
+  out.height = state.srcH;
+  const octx = out.getContext('2d')!;
+  const id = octx.createImageData(state.srcW, state.srcH);
+  id.data.set(cut.data);
+  octx.putImageData(id, 0, 0);
+
+  const url = out.toDataURL('image/png');
+  ($('#art') as unknown as SVGImageElement).setAttribute('href', url);
+  state.imageDataUrl = url;
+
+  syncBackgroundUi();
+}
+
+function syncBackgroundUi(): void {
+  const panel = $('#panel-bg');
+  if (panel) panel.hidden = state.imageEl === null;
+  const review = $('#bg-review');
+  if (review) review.hidden = !state.bgReviewing;
+  const label = $('#out-bg-state');
+  if (label) label.textContent = state.bgOriginal ? 'removed' : 'original';
+  const btn = $('#btn-remove-bg') as HTMLButtonElement | null;
+  if (btn) btn.textContent = state.bgOriginal ? 'Remove again' : 'Remove background';
+  for (const b of document.querySelectorAll<HTMLButtonElement>('.bg-mode')) {
+    b.classList.toggle('active', b.dataset.mode === state.bgMode);
+  }
+  document.body.classList.toggle('is-refining-bg', state.bgReviewing);
+}
+
+/** Put the artwork back exactly as it was opened. */
+function undoBackground(): void {
+  if (!state.bgOriginal) return;
+  ($('#art') as unknown as SVGImageElement).setAttribute('href', state.bgOriginal);
+  state.imageDataUrl = state.bgOriginal;
+  state.bgOriginal = null;
+  state.bgMatte = null;
+  state.bgStrokes = [];
+  state.bgReviewing = false;
+  syncBackgroundUi();
+  rebuildEngineFromCanvas();
+  toast('Background restored.', 'info', 3000);
+}
+
+/**
+ * Rebuild the tracer from the artwork currently on the canvas.
+ *
+ * A cutout has a real alpha channel, so the mask builder takes its alpha
+ * path and traces the cutout edge — which is the whole point: the cut now
+ * follows what the user can see rather than a guess about colour.
+ */
+function rebuildEngineFromCanvas(): void {
+  if (!state.imageEl) return;
+  const img = new Image();
+  img.onload = () => {
+    const w = state.srcW;
+    const h = state.srcH;
+    const workScale = Math.min(1, Math.sqrt(WORK_MAX_PIXELS / (w * h)));
+    const ww = Math.max(1, Math.round(w * workScale));
+    const wh = Math.max(1, Math.round(h * workScale));
+    const c = document.createElement('canvas');
+    c.width = ww;
+    c.height = wh;
+    const ctx = c.getContext('2d')!;
+    ctx.clearRect(0, 0, ww, wh);
+    ctx.drawImage(img, 0, 0, ww, wh);
+    const work = ctx.getImageData(0, 0, ww, wh);
+    state.engine = new CutlineEngine(work, ww / w);
+    state.workImg = work;
+    state.workScale = ww / w;
+    // The neural engine was built from the pre-cutout image; it no longer
+    // describes what is on screen.
+    state.aiEngine = null;
+    state.useAi = false;
+    const aiCheck = $('#in-ai') as HTMLInputElement | null;
+    if (aiCheck) aiCheck.checked = false;
+    redrawCheckboxes();
+    recompute(true);
+  };
+  img.src = state.imageDataUrl;
+}
+
+$('#btn-remove-bg').addEventListener('click', () => void removeBackground());
+
+$('#btn-bg-keep').addEventListener('click', () => {
+  state.bgReviewing = false;
+  syncBackgroundUi();
+  rebuildEngineFromCanvas();
+  toast('Background removed.', 'success', 3000);
+});
+
+$('#btn-bg-undo').addEventListener('click', undoBackground);
+
+for (const b of document.querySelectorAll<HTMLButtonElement>('.bg-mode')) {
+  b.addEventListener('click', () => {
+    state.bgMode = (b.dataset.mode as 'drop' | 'keep') ?? 'drop';
+    syncBackgroundUi();
+  });
+}
+
+bindSlider('#in-bg-brush', '#out-bg-brush', (v) => `${v} px`, (v) => {
+  state.bgBrush = v;
+});
 
 $('#btn-reset').addEventListener('click', () => resetAllSettings());
 

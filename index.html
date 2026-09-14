@@ -134,6 +134,51 @@
           <button id="tab-advanced" class="mode-tab" type="button" role="tab" aria-selected="false">Advanced</button>
         </div>
 
+        <!-- First thing you do to an image, so it sits above the cut style.
+             Hidden until there is artwork: a background button with nothing
+             to act on is just a dead control. -->
+        <section class="group always-on" id="panel-bg" hidden>
+          <div class="group-head">
+            <h2>Background</h2>
+            <output class="group-value" id="out-bg-state">original</output>
+          </div>
+
+          <button id="btn-remove-bg" class="btn wide accent" type="button">
+            <!-- Phosphor Scissors-adjacent: MagicWand (MIT), inlined. -->
+            <svg viewBox="0 0 256 256" aria-hidden="true" width="14" height="14">
+              <path d="M248 152a8 8 0 0 1-8 8h-24v24a8 8 0 0 1-16 0v-24h-24a8 8 0 0 1 0-16h24v-24a8 8 0 0 1 16 0v24h24a8 8 0 0 1 8 8ZM56 72h16v16a8 8 0 0 0 16 0V72h16a8 8 0 0 0 0-16H88V40a8 8 0 0 0-16 0v16H56a8 8 0 0 0 0 16Zm144 0h-8v8a8 8 0 0 1-16 0v-8h-8a8 8 0 0 1 0-16h8v-8a8 8 0 0 1 16 0v8h8a8 8 0 0 1 0 16Zm-20.69 89.37-107.3-107.3a16 16 0 0 0-22.63 0L33.07 77.38a16 16 0 0 0 0 22.63l107.3 107.3a16 16 0 0 0 22.63 0l16.31-16.31a16 16 0 0 0 0-22.63ZM151.68 196 44.38 88.69 60.69 72.38 168 179.69Z"/>
+            </svg>
+            Remove background
+          </button>
+
+          <p class="hint" id="hint-bg">
+            Cuts the artwork out of its background so the export has real
+            transparency, not just a cut line drawn over white.
+          </p>
+
+          <!-- Shown after a removal, while the user decides. -->
+          <div id="bg-review" hidden>
+            <div class="bg-actions">
+              <button id="btn-bg-keep" class="btn solid" type="button">Keep</button>
+              <button id="btn-bg-undo" class="btn ghost" type="button">Undo</button>
+            </div>
+
+            <div class="sub-setting">
+              <p class="hint sub-setting-hint" id="bg-refine-hint">
+                Missed something? Click the canvas to fix it.
+              </p>
+              <div class="bg-modes" role="group" aria-label="Refine mode">
+                <button type="button" class="bg-mode active" data-mode="drop">Remove</button>
+                <button type="button" class="bg-mode" data-mode="keep">Restore</button>
+              </div>
+              <div class="row slider">
+                <label for="in-bg-brush">Brush <output id="out-bg-brush">40 px</output></label>
+                <input id="in-bg-brush" type="range" min="8" max="200" step="4" value="40" />
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section class="group" id="panel-simple">
           <div class="group-head">
             <h2>Cut style</h2>

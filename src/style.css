@@ -2850,3 +2850,65 @@ body.is-tracing #cut-shadow {
 body.is-tracing #st-time {
   color: var(--accent);
 }
+
+/* ---------------- background removal ---------------- */
+
+.btn.wide {
+  width: 100%;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.bg-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 12px 0 4px;
+}
+
+.bg-actions .btn {
+  width: 100%;
+  justify-content: center;
+}
+
+/* Two states of one choice, so they read as a pair rather than two buttons
+   that happen to sit together. */
+.bg-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 3px;
+  margin: 8px 0 12px;
+  background: var(--line-soft);
+  border-radius: 8px;
+}
+
+.bg-mode {
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font-family: var(--display);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.bg-mode.active {
+  background: var(--rail);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.bg-mode:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* A crosshair says "this click does something to the pixel under it", which
+   a pan cursor actively contradicts. */
+body.is-refining-bg #stage {
+  cursor: crosshair;
+}
+
