@@ -169,6 +169,44 @@ export async function promptSignIn(grant?: number): Promise<SigninOutcome> {
  * popup is handed a generated form rather than a bare URL.
  */
 /**
+ * Sign out, for real.
+ *
+ * Auth.js requires a CSRF token on POST /api/auth/signout. Without one it
+ * still answers 302 — so a bare fetch looks like it worked — but it does not
+ * clear the cookie and does not delete the session row, and /api/me keeps
+ * reporting signedIn: true. Verified against production both ways: no token
+ * leaves all three untouched, with a token all three flip.
+ *
+ * That is what made "sign out" appear to do nothing: the page reloaded, the
+ * browser presented the same cookie, and the session was still live.
+ *
+ * Submitting a form rather than fetching, so the browser performs the
+ * navigation and applies the Set-Cookie that clears the session — a fetch
+ * would apply it too, but then the page has to reload anyway and a
+ * half-finished fetch on unload is a race this does not need.
+ */
+export async function signOutNow(): Promise<void> {
+  const res = await fetch('/api/auth/csrf', { credentials: 'include' });
+  const { csrfToken } = (await res.json()) as { csrfToken: string };
+
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = '/api/auth/signout';
+  for (const [name, value] of [
+    ['csrfToken', csrfToken],
+    ['callbackUrl', '/'],
+  ]) {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = name;
+    input.value = value;
+    form.appendChild(input);
+  }
+  document.body.appendChild(form);
+  form.submit();
+}
+
+/**
  * Sign in in this tab, for when a popup is refused.
  *
  * Auth.js accepts sign-in only as a POST carrying a CSRF token — a plain

@@ -13,7 +13,7 @@ import { showLoading } from './ui/loading';
 import { createSplash, splashSeen } from './ui/splash';
 import { createTour, tourSeen } from './ui/tour';
 import { mountCutSlider, mountValueSlider, mountCheckbox, mountSelect } from './ui/controls';
-import { promptSignIn } from './ui/signin';
+import { promptSignIn, signOutNow } from './ui/signin';
 import { openCredits } from './ui/credits';
 import type { PresetId } from './presets';
 import type { PaidFormat } from './paid-export';
@@ -1408,9 +1408,11 @@ $('#st-credits').addEventListener('click', (e) => {
     // Signing out from the dialog: reflect it here without a reload.
     state.balance = null;
     renderBalance();
-    void fetch('/api/auth/signout', { method: 'POST', credentials: 'include' })
-      .catch(() => {})
-      .then(() => { window.location.reload(); });
+    // A bare POST here answered 302 and changed nothing: Auth.js needs a CSRF
+    // token to actually clear the cookie and delete the session row, so the
+    // reload simply re-presented the same live session and the user stayed
+    // signed in. signOutNow() submits a real form and navigates.
+    void signOutNow();
   }).then((balance) => {
     state.balance = balance;
     renderBalance();
