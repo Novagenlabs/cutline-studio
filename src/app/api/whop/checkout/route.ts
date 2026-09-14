@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
-import { PACKS } from '@/lib/packs';
+import { PACKS, SUBSCRIPTION } from '@/lib/packs';
 import { createCheckoutSession } from '@/lib/whop-api';
 
 /**
@@ -18,7 +18,9 @@ import { createCheckoutSession } from '@/lib/whop-api';
  * payment and an account: it is set server-side, so a buyer cannot redirect
  * someone else's credits to themselves by editing a request.
  */
-const Body = z.object({ pack: z.enum(['starter', 'pro', 'studio']) });
+const Body = z.object({
+  pack: z.enum(['single', 'starter', 'pro', 'studio', 'subscription']),
+});
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -41,22 +43,30 @@ export async function POST(req: Request) {
     );
   }
 
-  const packId = parsed.data.pack;
-  const pack = PACKS[packId];
+  const choice = parsed.data.pack;
+
+  // The subscription is a renewal plan, so it deliberately does NOT carry
+  // pack metadata: the webhook tells a pack purchase from a subscription
+  // payment by exactly that, and tagging this one as a pack would pay out the
+  // pack credits on every renewal instead of the subscription allowance.
+  const isSubscription = choice === 'subscription';
+  const planId = isSubscription ? SUBSCRIPTION.whopPlanId : PACKS[choice].whopPlanId;
 
   try {
     const checkout = await createCheckoutSession({
-      planId: pack.whopPlanId,
+      planId,
       redirectUrl: `${process.env.APP_URL}/account?purchase=success`,
       // Read back by the webhook to know who to credit and how much. Strings
       // throughout: Whop returns metadata as it was sent, and a number that
       // survives one round trip as a string and another as a number is a bug
       // waiting for the day someone buys the 200 pack.
-      metadata: {
-        userId: session.user.id,
-        pack: packId,
-        credits: String(pack.credits),
-      },
+      metadata: isSubscription
+        ? { userId: session.user.id, kind: 'subscription' }
+        : {
+            userId: session.user.id,
+            pack: choice,
+            credits: String(PACKS[choice].credits),
+          },
     });
     return NextResponse.json({ url: checkout.purchaseUrl });
   } catch (err) {

@@ -56,7 +56,13 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   check(bal.includes('20'), 'the balance is shown');
   const packs = Number(await p.evaluate(`document.querySelectorAll('#credits-packs .pack').length`));
   console.log(`  packs offered: ${packs}`);
-  check(packs === 3, 'all three packs are offered');
+  // Counted from the API rather than hardcoded: this asserted 3 and broke the
+  // day pay-as-you-go was added, which is a test failing for the wrong reason
+  // — the point is that the dialog offers what the server offers.
+  const offered = Number(await p.evaluate(
+    `fetch('/api/me', { credentials: 'include' }).then(r => r.json()).then(b => Object.keys(b.packs ?? {}).length)`
+  ));
+  check(packs === offered, `every pack the server offers is shown (${packs}/${offered})`);
   const prices = String(await p.evaluate(
     `Array.from(document.querySelectorAll('#credits-packs .pack-price')).map(e => e.textContent).join(' ')`
   ));

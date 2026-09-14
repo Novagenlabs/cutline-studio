@@ -408,14 +408,47 @@
                  no balance and no download count, and the old single sentence
                  rendered as "Not signed in left · 0 downloaded". render()
                  swaps which one is shown. -->
-            <p class="sheet-text" id="credits-line-in">
-              <strong id="credits-balance">—</strong> left ·
-              <span id="credits-downloads">—</span> downloaded. One credit per
-              cut file.
-            </p>
+            <!-- Signed in, the balance is the headline: the number, what it
+                 is measured against, and the plan it came from. The old
+                 single sentence made the balance a clause in the middle of
+                 prose, which is the least readable place for the one figure
+                 people open this dialog to check. -->
+            <div class="credits-status" id="credits-line-in">
+              <div class="credits-status-head">
+                <div>
+                  <span class="credits-big" id="credits-balance">—</span>
+                  <span class="credits-unit">credits left</span>
+                </div>
+                <span class="plan-badge" id="credits-plan-badge">Free</span>
+              </div>
+              <!-- Base UI Meter mounts here. -->
+              <div class="credit-meter" id="mount-credit-meter"></div>
+              <p class="credits-sub">
+                <span id="credits-downloads">—</span> downloaded · one credit
+                per cut file
+              </p>
+              <p class="credits-sub" id="credits-renewal" hidden></p>
+            </div>
             <p class="sheet-text" id="credits-line-out" hidden>
               Sign in to buy credits. One credit per cut file.
             </p>
+
+            <!-- Above the packs, because it is the better deal for anyone
+                 downloading regularly and the packs read as the fallback
+                 rather than the default. Hidden for existing subscribers,
+                 who are already on it. -->
+            <button type="button" class="plan-offer" id="credits-plan-offer" hidden>
+              <span class="plan-offer-main">
+                <span class="plan-offer-name" id="plan-offer-name">Starter</span>
+                <span class="plan-offer-credits" id="plan-offer-credits">200 credits a month</span>
+              </span>
+              <span class="plan-offer-price">
+                <span id="plan-offer-amount">$39.99</span>
+                <span class="plan-offer-per">per month</span>
+              </span>
+            </button>
+
+            <p class="pack-heading" id="credits-pack-heading">Or buy credits once</p>
             <div id="credits-packs" class="pack-grid"></div>
             <p class="sheet-text sheet-note" id="credits-note">
               Payment is handled by Whop. You will come straight back here.

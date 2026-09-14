@@ -39,7 +39,7 @@ const {
   SUBSCRIPTION_CREDITS,
   PAYING_EVENTS,
 } = await import('../src/lib/subscription');
-const { PACKS } = await import('../src/lib/packs');
+const { PACKS, SUBSCRIPTION } = await import('../src/lib/packs');
 
 /** What Prisma throws when a unique index rejects a duplicate insert. */
 function uniqueViolation() {
@@ -163,6 +163,56 @@ describe('buying a credit pack', () => {
     create.mockResolvedValue({});
     await grantPackCredits('evt_shared', { userId: 'u', pack: 'pro' });
     expect(create.mock.calls[0][0].data.whopEventId).toBe('evt_shared');
+  });
+});
+
+describe('the single-download pack', () => {
+  it('grants exactly one credit', async () => {
+    create.mockResolvedValue({});
+    await grantPackCredits('evt_1', { userId: 'u', pack: 'single' });
+    expect(create.mock.calls[0][0].data.amount).toBe(1);
+  });
+
+  it('is priced as a one-off, not a rate', () => {
+    // $1.99 for 1. The fixed processing fee makes this the worst margin of
+    // the four, which is the price of having something someone will buy
+    // without thinking about it.
+    expect(PACKS.single.amount).toBe(199);
+    expect(PACKS.single.credits).toBe(1);
+  });
+
+  it('is the cheapest way in and the worst value per credit', () => {
+    const rate = (p: { amount: number; credits: number }) => p.amount / p.credits;
+    // The ladder has to point upward or the packs above it are pointless.
+    expect(PACKS.single.amount).toBeLessThan(PACKS.starter.amount);
+    expect(rate(PACKS.single)).toBeGreaterThan(rate(PACKS.starter));
+    expect(rate(PACKS.starter)).toBeGreaterThan(rate(PACKS.pro));
+    expect(rate(PACKS.pro)).toBeGreaterThan(rate(PACKS.studio));
+  });
+});
+
+describe('the subscription offer', () => {
+  it('promises exactly what the webhook grants', () => {
+    // Two constants in two files describing one number: the UI's promise and
+    // the webhook's payout. If they drift, a subscriber is shortchanged or
+    // overpaid and nothing in the app notices.
+    expect(SUBSCRIPTION.credits).toBe(SUBSCRIPTION_CREDITS);
+  });
+
+  it('is a recurring plan distinct from every pack', () => {
+    expect(SUBSCRIPTION.perMonth).toBe(true);
+    const packPlanIds = Object.values(PACKS).map((p) => p.whopPlanId);
+    // Sharing a plan id with a pack would mean a renewal paying out pack
+    // credits, or a pack purchase creating a membership.
+    expect(packPlanIds).not.toContain(SUBSCRIPTION.whopPlanId);
+  });
+
+  it('is not mistaken for a pack purchase by the grant logic', async () => {
+    // A subscription payment carries no `pack` in its metadata, which is
+    // exactly how the webhook routes it to the subscription grant instead.
+    const r = await grantPackCredits('evt_1', { userId: 'u', kind: 'subscription' });
+    expect(r.granted).toBe(false);
+    expect(r.reason).toBe('not a pack purchase');
   });
 });
 

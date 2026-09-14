@@ -23,6 +23,7 @@ import { Switch } from '@base-ui-components/react/switch';
 import { Checkbox } from '@base-ui-components/react/checkbox';
 import { Select } from '@base-ui-components/react/select';
 import { Button } from '@base-ui-components/react/button';
+import { Meter } from '@base-ui-components/react/meter';
 
 const roots = new WeakMap<Element, Root>();
 
@@ -305,5 +306,55 @@ export function mountButton(host: Element, opts: ButtonOptions): void {
       ) : null}
       <span className="bui-btn-label">{opts.label}</span>
     </Button>
+  );
+}
+
+/* ---------------- credit meter ---------------- */
+
+export interface CreditMeterOptions {
+  /** Credits left. */
+  value: number;
+  /**
+   * The top of the bar. Not a hard ceiling — a balance can exceed it by
+   * buying packs on top of a subscription — so the caller passes whatever
+   * makes the number legible and the component clamps the fill.
+   */
+  max: number;
+  /** Shown above the bar, e.g. "200 credits". */
+  label?: string;
+}
+
+/**
+ * The balance as a bar, not just a number.
+ *
+ * A Meter rather than a Progress: this is a measurement of something that
+ * exists, not the progress of a task that is running, and the two carry
+ * different semantics for assistive tech. Base UI's Meter renders the right
+ * role and value attributes without us restating them.
+ *
+ * The fill is clamped rather than the value: a subscriber who also buys a
+ * pack legitimately holds more than one period's allowance, and a bar that
+ * overflows its track looks broken while reporting the truth.
+ */
+export function mountCreditMeter(host: Element, opts: CreditMeterOptions): void {
+  const max = Math.max(1, opts.max);
+  const shown = Math.min(opts.value, max);
+  const low = opts.value <= 3;
+  mount(
+    host,
+    <Meter.Root
+      value={shown}
+      max={max}
+      className={`bui-meter${low ? ' is-low' : ''}`}
+      // The visible number is the real balance, which may exceed `max`; the
+      // bar is the clamped one. Announcing the clamped figure would quietly
+      // under-report what the user actually has.
+      getAriaValueText={() => `${opts.value} credits remaining`}
+    >
+      {opts.label ? <Meter.Label className="bui-meter-label">{opts.label}</Meter.Label> : null}
+      <Meter.Track className="bui-meter-track">
+        <Meter.Indicator className="bui-meter-indicator" />
+      </Meter.Track>
+    </Meter.Root>
   );
 }

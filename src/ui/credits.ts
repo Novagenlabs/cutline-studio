@@ -15,11 +15,31 @@ export interface Pack {
   label: string;
 }
 
+export interface PlanOffer {
+  credits: number;
+  amount: number;
+  label: string;
+  perMonth?: boolean;
+  trialDays?: number;
+}
+
+export interface SubscriptionState {
+  status: string;
+  active: boolean;
+  renewsAt: string | null;
+  cancelAtPeriodEnd: boolean;
+  manageUrl: string | null;
+}
+
 export interface AccountInfo {
   signedIn: boolean;
   balance: number | null;
   downloads: number;
   packs: Record<string, Pack>;
+  /** What a subscription would give you. Always present. */
+  plan: PlanOffer | null;
+  /** What you actually have, or null if you are not a subscriber. */
+  subscription: SubscriptionState | null;
 }
 
 export async function fetchAccount(): Promise<AccountInfo> {
@@ -31,9 +51,18 @@ export async function fetchAccount(): Promise<AccountInfo> {
       balance: typeof body.balance === 'number' ? body.balance : null,
       downloads: typeof body.downloads === 'number' ? body.downloads : 0,
       packs: (body.packs ?? {}) as Record<string, Pack>,
+      plan: (body.plan ?? null) as PlanOffer | null,
+      subscription: (body.subscription ?? null) as SubscriptionState | null,
     };
   } catch {
-    return { signedIn: false, balance: null, downloads: 0, packs: {} };
+    return {
+      signedIn: false,
+      balance: null,
+      downloads: 0,
+      packs: {},
+      plan: null,
+      subscription: null,
+    };
   }
 }
 
@@ -64,6 +93,9 @@ export async function openCredits(
       close.removeEventListener('click', onClose);
       signout.removeEventListener('click', onSignOutClick);
       signin?.removeEventListener('click', onSignInClick);
+      document
+        .getElementById('credits-plan-offer')
+        ?.removeEventListener('click', onBuy);
       packButtons().forEach((b) => b.removeEventListener('click', onBuy));
     };
 
@@ -84,7 +116,10 @@ export async function openCredits(
 
     const onBuy = async (ev: Event) => {
       const btn = ev.currentTarget as HTMLButtonElement;
-      const pack = btn.dataset.pack;
+      // The subscription tile and the pack tiles go through one path: the
+      // server decides which plan and what metadata, so the only difference
+      // here is the id sent.
+      const pack = btn.dataset.pack ?? (btn.id === 'credits-plan-offer' ? 'subscription' : null);
       if (!pack) return;
       btn.disabled = true;
       const note = document.getElementById('credits-note');
@@ -134,9 +169,12 @@ export async function openCredits(
       }
     };
 
+    const offer = document.getElementById('credits-plan-offer') as HTMLButtonElement | null;
+
     close.addEventListener('click', onClose);
     signout.addEventListener('click', onSignOutClick);
     signin?.addEventListener('click', onSignInClick);
+    offer?.addEventListener('click', onBuy);
     packButtons().forEach((b) => b.addEventListener('click', onBuy));
 
     dlg.addEventListener(
@@ -154,6 +192,101 @@ function packButtons(): HTMLButtonElement[] {
   return Array.from(document.querySelectorAll<HTMLButtonElement>('#credits-packs .pack'));
 }
 
+/** Money, from cents, without a trailing .00 on round amounts. */
+function price(cents: number): string {
+  return cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`;
+}
+
+/**
+ * The plan header: what you are on, how much is left, and when it renews.
+ *
+ * The bar is scaled to the subscription allowance for a subscriber and to the
+ * largest pack otherwise, so "how full am I" means something in both cases.
+ * It is a scale, not a cap — buying a pack on top of a subscription is
+ * allowed and the number above the bar is always the real balance.
+ */
+function renderPlan(info: AccountInfo): void {
+  const subscribed = info.subscription?.active === true;
+
+  const badge = document.getElementById('credits-plan-badge');
+  if (badge) {
+    badge.textContent = subscribed ? (info.plan?.label ?? 'Subscribed') : 'Free';
+    badge.classList.toggle('is-paid', subscribed);
+  }
+
+  const host = document.getElementById('mount-credit-meter');
+  if (host) {
+    const balance = info.balance ?? 0;
+    // A subscriber's frame of reference is their monthly allowance. Everyone
+    // else's is the biggest thing they could buy — otherwise the bar has no
+    // meaningful full, and a full bar at 10 credits would be a lie the first
+    // time they bought 200.
+    const scale = subscribed && info.plan ? info.plan.credits : largestPack(info);
+    void mountMeter(host, balance, Math.max(scale, balance > 0 ? 1 : 1));
+  }
+
+  const renewal = document.getElementById('credits-renewal');
+  if (renewal) {
+    const at = info.subscription?.renewsAt;
+    if (subscribed && at) {
+      const when = new Date(at).toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+      });
+      // "Ends" rather than "renews" when it is set to cancel: the date is the
+      // same, what happens on it is the opposite, and getting that backwards
+      // is how someone misses the last day to change their mind.
+      renewal.textContent = info.subscription?.cancelAtPeriodEnd
+        ? `Ends ${when} — credits stay on your balance`
+        : `Renews ${when} · +${info.plan?.credits ?? 0} credits`;
+      renewal.hidden = false;
+    } else {
+      renewal.hidden = true;
+    }
+  }
+
+  // The offer only makes sense to someone who is not already on it.
+  const offer = document.getElementById('credits-plan-offer') as HTMLButtonElement | null;
+  if (offer) {
+    offer.hidden = !info.signedIn || subscribed || !info.plan;
+    if (info.plan) {
+      setText('plan-offer-name', info.plan.label);
+      setText(
+        'plan-offer-credits',
+        `${info.plan.credits} credits a month` +
+          (info.plan.trialDays ? ` · ${info.plan.trialDays}-day free trial` : '')
+      );
+      setText('plan-offer-amount', price(info.plan.amount));
+    }
+  }
+
+  const heading = document.getElementById('credits-pack-heading');
+  if (heading) {
+    heading.textContent = subscribed ? 'Top up with more credits' : 'Or buy credits once';
+    heading.hidden = !info.signedIn;
+  }
+}
+
+function largestPack(info: AccountInfo): number {
+  const counts = Object.values(info.packs).map((p) => p.credits);
+  return counts.length ? Math.max(...counts) : 200;
+}
+
+function setText(id: string, text: string): void {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
+}
+
+/**
+ * The meter is a React island, and React is not in the cutter's initial
+ * bundle path for this dialog — imported lazily so opening the studio does
+ * not pay for a control only the credits dialog uses.
+ */
+async function mountMeter(host: Element, value: number, max: number): Promise<void> {
+  const { mountCreditMeter } = await import('./controls');
+  mountCreditMeter(host, { value, max });
+}
+
 function render(info: AccountInfo): void {
   // Signed out, the balance sentence has nothing to say — its numbers do not
   // exist yet — so the whole sentence is swapped rather than filled with a
@@ -168,6 +301,8 @@ function render(info: AccountInfo): void {
   const dls = document.getElementById('credits-downloads');
   if (bal) bal.textContent = info.balance === null ? '0' : String(info.balance);
   if (dls) dls.textContent = String(info.downloads);
+
+  renderPlan(info);
 
   // Exactly one of these is ever offered, and which one is the whole point:
   // signed out, every pack is disabled, so Sign in is the only thing left to
@@ -195,7 +330,15 @@ function render(info: AccountInfo): void {
     l.textContent = `$${(pack.amount / 100).toFixed(2)}`;
     const per = document.createElement('span');
     per.className = 'pack-per';
-    per.textContent = `${(pack.amount / pack.credits / 100).toFixed(2)} each`;
+    // "1.99 each" under a $1.99 single credit says nothing twice. The
+    // per-credit rate is there to make the packs comparable, and a pack of
+    // one has nothing to compare against itself.
+    // "one-off" rather than "pay as you go": the longer phrase wrapped to two
+    // lines and made this tile taller than its neighbours, breaking the row.
+    per.textContent =
+      pack.credits === 1
+        ? 'one-off'
+        : `${(pack.amount / pack.credits / 100).toFixed(2)} each`;
     btn.append(n, l, per);
     host.appendChild(btn);
   }

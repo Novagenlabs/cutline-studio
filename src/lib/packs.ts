@@ -14,6 +14,16 @@
  * for what is displayed, and scripts/whop-plans.mjs re-checks both.
  */
 export const PACKS = {
+  // Pay as you go: one download, no commitment. The worst margin of the four
+  // — Whop's fixed $0.30 is ~15% of $1.99, against ~5% on the 200 pack — but
+  // it is the only price someone will pay without thinking, and the per-credit
+  // rate makes every pack above it look like the better deal, which it is.
+  single: {
+    credits: 1,
+    amount: 199,
+    label: '1 download',
+    whopPlanId: 'plan_kZfiKaRGgRKLK',
+  },
   starter: {
     credits: 10,
     amount: 900,
@@ -39,3 +49,26 @@ export type PackId = keyof typeof PACKS;
 export function isPackId(v: unknown): v is PackId {
   return typeof v === 'string' && v in PACKS;
 }
+
+/**
+ * The Starter subscription.
+ *
+ * A renewal plan rather than a one-time one, and the only visible product on
+ * the Whop storefront — the packs are hidden because they are sold from our
+ * own dialog. Credits from a renewal top up the same balance packs do and do
+ * not lapse at the period boundary, which is a deliberate departure from how
+ * ElevenLabs and most metered products work: taking credits away that someone
+ * has already been told they have is a support ticket, and the generosity
+ * costs little while the numbers are this small.
+ *
+ * `credits` must agree with SUBSCRIPTION_CREDITS in subscription.ts — that is
+ * what the webhook actually grants; this is only what the UI promises.
+ */
+export const SUBSCRIPTION = {
+  credits: 200,
+  amount: 3999,
+  label: 'Starter',
+  perMonth: true,
+  trialDays: 3,
+  whopPlanId: 'plan_4kYzeHJQQHZex',
+} as const;

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getBalance, getDownloadCount, SIGNUP_GRANT } from '@/lib/credits';
-import { PACKS } from '@/lib/packs';
+import { PACKS, SUBSCRIPTION } from '@/lib/packs';
 import { describeSubscription } from '@/lib/subscription';
 
 /**
@@ -20,7 +20,7 @@ export async function GET() {
     // The grant is reported so the sign-in prompt can state the real offer
     // without the browser bundle importing server code to learn it.
     return NextResponse.json(
-      { signedIn: false, signupGrant: SIGNUP_GRANT, packs: PACKS },
+      { signedIn: false, signupGrant: SIGNUP_GRANT, packs: PACKS, plan: SUBSCRIPTION },
       { headers: NO_STORE }
     );
   }
@@ -38,6 +38,7 @@ export async function GET() {
       balance,
       downloads,
       packs: PACKS,
+      plan: SUBSCRIPTION,
       subscription,
     },
     { headers: NO_STORE }
