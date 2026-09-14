@@ -227,6 +227,11 @@ export function createSplash(motion: SplashMotion = DEFAULT_SPLASH): Splash {
       // happens between now and the wait below comes out of the same budget.
       const startedAt = performance.now();
       document.body.append(el);
+      // The static cover in index.html has done its job the moment the real
+      // splash is in the DOM: it exists only to hold the screen through the
+      // gap between first paint and this line, which on a cold load is long
+      // enough to see the studio flash past.
+      document.documentElement.classList.remove('is-booting');
       mark.start();
 
       // The flare is imported lazily: it pulls in vgpu, the WGSL sources and a

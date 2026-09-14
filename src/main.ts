@@ -1266,6 +1266,13 @@ function renderBalance() {
   // people who use this all day.
   const intro = splashSeen() ? Promise.resolve() : createSplash().play();
 
+  // The boot cover is a black square with no way out of its own: if the
+  // splash never appends (seen already, an exception on the way there), it
+  // would sit over a working studio forever. Clearing it here means the only
+  // way to be stuck behind it is for this module never to run at all — at
+  // which point there is no studio underneath to be stuck in front of.
+  document.documentElement.classList.remove('is-booting');
+
   void intro.then(() => {
     // Usually the answer arrived while the light was crossing the wordmark,
     // and there is nothing left to wait for.

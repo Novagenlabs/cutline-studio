@@ -14,6 +14,40 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/cutline/app.css" />
+    <!-- Paints before anything else, so a cold load never shows the studio
+         first. The splash element itself is built in JS and cannot be
+         appended until the bundle has downloaded, parsed and run — which on a
+         new browser is long enough to see the workspace flash past. This is
+         the same flat background the splash sits on, so the handover is
+         invisible; app.js removes it.
+
+         Inline and synchronous on purpose: a deferred script or a stylesheet
+         rule keyed off a class would both land after the first paint, which
+         is the exact frame being fixed. Skipped when the splash has already
+         been seen this session, or the repeat visit would gain a black flash
+         it does not need. -->
+    <style>
+      /* Only drawn on a cold load; the class below is what switches it on. */
+      html.is-booting::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        z-index: 9998;
+        background: #0a0a0b;
+      }
+    </style>
+    <script>
+      (function () {
+        var seen = false;
+        try {
+          // Must match SEEN_KEY in src/ui/splash.ts.
+          seen = sessionStorage.getItem('cutline.splashSeen') === '1';
+        } catch (e) {
+          /* private browsing: treat as unseen, same as splashSeen() does */
+        }
+        if (!seen) document.documentElement.classList.add('is-booting');
+      })();
+    </script>
   </head>
   <body>
     <div id="app">
