@@ -66,6 +66,12 @@ interface AppState {
   bgMode: 'drop' | 'keep';
   bgBrush: number;
   bgReviewing: boolean;
+  /**
+   * The halo setting as it was before a removal turned it off, so Undo can
+   * put it back. Without this, undoing a removal restored the artwork but
+   * silently kept the user's halo preference destroyed.
+   */
+  haloBeforeBg: boolean | null;
 }
 
 const state: AppState = {
@@ -92,6 +98,7 @@ const state: AppState = {
   bgMode: 'drop',
   bgBrush: 40,
   bgReviewing: false,
+  haloBeforeBg: null,
 };
 
 const activeRegion = (): RegionOverride | null =>
@@ -123,6 +130,34 @@ function adoptImage(el: HTMLImageElement | HTMLCanvasElement, w: number, h: numb
   const wctx = workCanvas.getContext('2d')!;
   wctx.drawImage(el, 0, 0, ww, wh);
   const workData = wctx.getImageData(0, 0, ww, wh);
+
+  // Turn the white halo off for artwork that arrives transparent.
+  //
+  // The halo fills the whole cut path with opaque white UNDER the artwork to
+  // preview the vinyl a sticker is printed on. On a transparent PNG that
+  // paints white into every gap the transparency created — most visibly the
+  // band behind a wordmark, where a tight cut spans the space between two
+  // bars and the halo fills it solid.
+  //
+  // Changed as a DEFAULT, not enforced on every render: the checkbox stays
+  // live, so someone who genuinely wants a white backing can tick it and see
+  // it. Scanned on the downscaled working copy, which is already in hand —
+  // a second pass over the full-resolution image would cost up to 7M reads
+  // for a boolean.
+  {
+    let transparent = false;
+    const d = workData.data;
+    for (let i = 3; i < d.length; i += 4) {
+      if (d[i] < 250) { transparent = true; break; }
+    }
+    // Set both ways, not just off. Only clearing it meant the setting leaked
+    // between files: open a transparent PNG, then a flat JPG, and the JPG
+    // lost its halo because nothing ever turned it back on. A default that
+    // depends on the artwork has to be recomputed for every image.
+    state.halo = !transparent;
+    const haloBox = $('#in-halo') as HTMLInputElement | null;
+    if (haloBox) haloBox.checked = state.halo;
+  }
 
   state.engine = new CutlineEngine(workData, ww / w);
   state.workImg = workData;
@@ -157,6 +192,13 @@ function adoptImage(el: HTMLImageElement | HTMLCanvasElement, w: number, h: numb
   state.bgOriginal = null;
   state.bgStrokes = [];
   state.bgReviewing = false;
+  state.bgMode = 'drop';
+  // Per-image, all of it: leaving these set meant a new file inherited the
+  // previous one's refine mode, its "inside too" choice, and a halo
+  // preference recorded for artwork that is no longer open.
+  state.haloBeforeBg = null;
+  const insideBox = $('#in-bg-all') as HTMLInputElement | null;
+  if (insideBox) insideBox.checked = false;
   syncBackgroundUi();
   // Reveals the Elements section now that there is artwork to detect within.
   renderElementList();
@@ -276,19 +318,13 @@ function renderResult(r: CutlineResult, ms: number) {
   ($('#cut-path') as unknown as SVGPathElement).setAttribute('d', r.svgPath);
   ($('#cut-shadow') as unknown as SVGPathElement).setAttribute('d', r.svgPath);
   const halo = $('#halo-path') as unknown as SVGPathElement;
-  // The halo fills the whole cut path with opaque white UNDER the artwork, to
-  // preview the vinyl a sticker is printed on. On artwork that already has
-  // transparency that is never what the user wants: it paints white into
-  // every gap the transparency created — most visibly the band behind a
-  // wordmark, where a tight cut spans the space between two bars and the
-  // halo fills it solid. Reported as "a weird white distorted section in the
-  // centre", and it is not distortion, it is the backing being drawn.
-  //
-  // Suppressed by the artwork's own alpha rather than by a flag the user has
-  // to find: a transparent PNG opened directly never goes through our
-  // removal button, so keying off that alone left this on.
-  const showHalo = state.halo && !r.usedAlpha;
-  halo.setAttribute('d', showHalo ? r.svgPath : '');
+  // Purely the user's setting. An earlier version forced this off whenever
+  // the artwork had alpha, which fixed the reported white band by overriding
+  // a checkbox the user could still see and tick — so ticking it did nothing
+  // and said nothing. The default is now cleared once, when transparent
+  // artwork is adopted (see adoptImage), which leaves the control honest:
+  // it is off because the app turned it off, and turning it back on works.
+  halo.setAttribute('d', state.halo ? r.svgPath : '');
 
   const mm = (px: number) => ((px / state.params.dpi) * 25.4).toFixed(1);
   $('#st-dims').textContent =
@@ -1066,6 +1102,27 @@ function resetAllSettings() {
   state.activeRegion = -1;
   state.halo = true;
   state.compareV1 = false;
+
+  // End any background-removal review.
+  //
+  // Leaving bgReviewing set was the worst of these: the canvas pointerdown
+  // handler treats every click as a correction stroke while it is true, so
+  // pressing Reset silently stopped the canvas panning with nothing on
+  // screen to explain it. bgOriginal kept the button reading "Remove again"
+  // and left a source-resolution Float32Array alive for nothing.
+  //
+  // The artwork itself is deliberately NOT restored: a removal is an edit to
+  // the image, like opening a different file, and this resets settings.
+  state.bgReviewing = false;
+  state.bgMatte = null;
+  state.bgStrokes = [];
+  state.bgMode = 'drop';
+  syncBackgroundUi();
+
+  // The neural engine describes the artwork as it was when the model ran.
+  // useAi was already cleared here; leaving aiEngine set meant re-ticking the
+  // box reused a stale engine, because the handler short-circuits on it.
+  state.aiEngine = null;
   state.spotName = 'CutContour';
   state.useAi = false;
 
@@ -1395,6 +1452,9 @@ async function removeBackground(): Promise<void> {
   // every shape — which is what "the background wasn't removed" looked like
   // on screen even though the alpha channel was perfect.
   if (state.halo) {
+    // Remembered so undoBackground() can restore it; only on the FIRST
+    // removal, or a second pass would record the already-false value.
+    if (state.haloBeforeBg === null) state.haloBeforeBg = state.halo;
     state.halo = false;
     const haloBox = $('#in-halo') as HTMLInputElement | null;
     if (haloBox) haloBox.checked = false;
@@ -1462,6 +1522,16 @@ function undoBackground(): void {
   state.bgMatte = null;
   state.bgStrokes = [];
   state.bgReviewing = false;
+  // Undo means undo: the removal turned the halo off, so undoing it puts the
+  // user's setting back rather than leaving a preference they never changed
+  // silently altered.
+  if (state.haloBeforeBg !== null) {
+    state.halo = state.haloBeforeBg;
+    const haloBox = $('#in-halo') as HTMLInputElement | null;
+    if (haloBox) haloBox.checked = state.halo;
+    redrawCheckboxes();
+    state.haloBeforeBg = null;
+  }
   syncBackgroundUi();
   rebuildEngineFromCanvas();
   toast('Background restored.', 'info', 3000);
