@@ -38,6 +38,7 @@
     "verify:tracing": "tsx test/verify-tracing.ts",
     "verify:preview": "tsx test/verify-preview.ts",
     "verify:signin-safari": "tsx test/verify-signin-safari.ts",
+    "verify:cursor": "tsx test/verify-cursor.ts",
     "brand:assets": "node scripts/make-brand-assets.mjs"
   },
   "dependencies": {
