@@ -276,7 +276,19 @@ function renderResult(r: CutlineResult, ms: number) {
   ($('#cut-path') as unknown as SVGPathElement).setAttribute('d', r.svgPath);
   ($('#cut-shadow') as unknown as SVGPathElement).setAttribute('d', r.svgPath);
   const halo = $('#halo-path') as unknown as SVGPathElement;
-  halo.setAttribute('d', state.halo ? r.svgPath : '');
+  // The halo fills the whole cut path with opaque white UNDER the artwork, to
+  // preview the vinyl a sticker is printed on. On artwork that already has
+  // transparency that is never what the user wants: it paints white into
+  // every gap the transparency created — most visibly the band behind a
+  // wordmark, where a tight cut spans the space between two bars and the
+  // halo fills it solid. Reported as "a weird white distorted section in the
+  // centre", and it is not distortion, it is the backing being drawn.
+  //
+  // Suppressed by the artwork's own alpha rather than by a flag the user has
+  // to find: a transparent PNG opened directly never goes through our
+  // removal button, so keying off that alone left this on.
+  const showHalo = state.halo && !r.usedAlpha;
+  halo.setAttribute('d', showHalo ? r.svgPath : '');
 
   const mm = (px: number) => ((px / state.params.dpi) * 25.4).toFixed(1);
   $('#st-dims').textContent =
