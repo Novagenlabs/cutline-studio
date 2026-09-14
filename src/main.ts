@@ -72,6 +72,27 @@ interface AppState {
    * silently kept the user's halo preference destroyed.
    */
   haloBeforeBg: boolean | null;
+
+  /**
+   * Source pixels, held for the duration of a refine session.
+   *
+   * Every correction stroke used to redraw the full-resolution artwork onto a
+   * fresh canvas and call getImageData again — two 7-megapixel operations to
+   * read data that had not changed since the last click. Reading it once when
+   * the session opens is the same data and none of the work.
+   */
+  bgSource: RasterImage | null;
+  /**
+   * The matte with every stroke SO FAR already applied.
+   *
+   * applyStrokes replayed the whole list on each click, so the Nth correction
+   * cost N floods — ten corrections meant 55 flood passes. Keeping the running
+   * result makes each stroke cost exactly one, and undo recomputes from the
+   * base matte, which is the only place the replay is actually needed.
+   */
+  bgAccum: Float32Array | null;
+  /** Object URL of the current preview, revoked when replaced. */
+  bgPreviewUrl: string | null;
 }
 
 const state: AppState = {
@@ -99,6 +120,9 @@ const state: AppState = {
   bgBrush: 40,
   bgReviewing: false,
   haloBeforeBg: null,
+  bgSource: null,
+  bgAccum: null,
+  bgPreviewUrl: null,
 };
 
 const activeRegion = (): RegionOverride | null =>
@@ -422,7 +446,7 @@ previewSvg.addEventListener('pointerdown', (e) => {
   if (state.bgReviewing && state.bgMatte) {
     const p = screenToImg(e);
     state.bgStrokes.push({ x: p.x, y: p.y, r: state.bgBrush, mode: state.bgMode });
-    applyBackgroundPreview();
+    applyBackgroundPreview(true);
     return;
   }
 
@@ -1462,28 +1486,39 @@ async function removeBackground(): Promise<void> {
   }
   state.bgMatte = matte;
   state.bgStrokes = [];
+  state.bgAccum = null;
+  // Held for the session so each stroke does not re-read 7 megapixels that
+  // have not changed. `full` was already built above for the removal itself.
+  state.bgSource = full;
   state.bgReviewing = true;
-  applyBackgroundPreview();
+  applyBackgroundPreview(false);
   btn.disabled = false;
 }
 
 /** Redraw the canvas from the current matte plus whatever strokes exist. */
-function applyBackgroundPreview(): void {
-  if (!state.bgMatte || !state.imageEl) return;
+/**
+ * Redraw the canvas from the current matte.
+ *
+ * `incremental` applies only the newest stroke to the running result, which
+ * is the common case: a correction click does not change any earlier stroke,
+ * so replaying them all is pure waste. Undo passes false, because removing a
+ * stroke from the middle genuinely does require rebuilding from the base.
+ */
+function applyBackgroundPreview(incremental = false): void {
+  if (!state.bgMatte || !state.imageEl || !state.bgSource) return;
 
-  const src = document.createElement('canvas');
-  src.width = state.srcW;
-  src.height = state.srcH;
-  const sctx = src.getContext('2d')!;
-  // From the ORIGINAL element, never from the current canvas: compounding a
-  // removal onto an already-cut image would erode the artwork a little more
-  // with every stroke, and a restore stroke would have no colour to bring
-  // back.
-  sctx.drawImage(state.imageEl, 0, 0, state.srcW, state.srcH);
-  const full = sctx.getImageData(0, 0, state.srcW, state.srcH);
+  const full = state.bgSource;
 
-  const withStrokes = applyStrokes(state.bgMatte, full, state.bgStrokes);
-  const cut = cutout(full, withStrokes);
+  if (incremental && state.bgAccum && state.bgStrokes.length > 0) {
+    // One stroke against the running result.
+    state.bgAccum = applyStrokes(state.bgAccum, full, [
+      state.bgStrokes[state.bgStrokes.length - 1],
+    ]);
+  } else {
+    state.bgAccum = applyStrokes(state.bgMatte, full, state.bgStrokes);
+  }
+
+  const cut = cutout(full, state.bgAccum);
 
   const out = document.createElement('canvas');
   out.width = state.srcW;
@@ -1493,10 +1528,36 @@ function applyBackgroundPreview(): void {
   id.data.set(cut.data);
   octx.putImageData(id, 0, 0);
 
-  const url = out.toDataURL('image/png');
-  ($('#art') as unknown as SVGImageElement).setAttribute('href', url);
-  state.imageDataUrl = url;
+  // A blob URL rather than toDataURL. Encoding a 7-megapixel PNG to base64
+  // synchronously blocks the main thread for the best part of a second and
+  // produces a ~30MB string; a blob is the same PNG without the base64
+  // inflation or the string allocation. Revoked as it is replaced so a long
+  // refine session does not accumulate them.
+  out.toBlob((blob) => {
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
+    if (state.bgPreviewUrl) URL.revokeObjectURL(state.bgPreviewUrl);
+    state.bgPreviewUrl = url;
+    ($('#art') as unknown as SVGImageElement).setAttribute('href', url);
+    state.imageDataUrl = url;
+  }, 'image/png');
 
+  syncBackgroundUi();
+}
+
+/**
+ * Undo one correction stroke.
+ *
+ * The stroke list is the history: dropping the last entry and rebuilding is
+ * exact, because applyStrokes never mutates the base matte. Rebuilding is the
+ * one case where the full replay is necessary — the removed stroke may have
+ * overwritten pixels an earlier one had set.
+ */
+function undoStroke(): void {
+  if (state.bgStrokes.length === 0) return;
+  state.bgStrokes.pop();
+  state.bgAccum = null;
+  applyBackgroundPreview(false);
   syncBackgroundUi();
 }
 
@@ -1510,6 +1571,14 @@ function syncBackgroundUi(): void {
   for (const b of document.querySelectorAll<HTMLButtonElement>('.bg-mode')) {
     b.classList.toggle('active', b.dataset.mode === state.bgMode);
   }
+  // Disabled with nothing to undo, and counted so the user can see there is
+  // history behind the button rather than guessing.
+  const undoBtn = $('#btn-bg-undo-stroke') as HTMLButtonElement | null;
+  if (undoBtn) {
+    const n = state.bgStrokes.length;
+    undoBtn.disabled = n === 0;
+    undoBtn.textContent = n > 0 ? `Undo click (${n})` : 'Undo click';
+  }
   document.body.classList.toggle('is-refining-bg', state.bgReviewing);
 }
 
@@ -1521,6 +1590,8 @@ function undoBackground(): void {
   state.bgOriginal = null;
   state.bgMatte = null;
   state.bgStrokes = [];
+  state.bgAccum = null;
+  state.bgSource = null;
   state.bgReviewing = false;
   // Undo means undo: the removal turned the halo off, so undoing it puts the
   // user's setting back rather than leaving a preference they never changed
@@ -1615,12 +1686,27 @@ document.addEventListener('keydown', (e) => {
 $('#btn-bg-keep').addEventListener('click', () => {
   setRefineOpen(false);
   state.bgReviewing = false;
+  // The session is over; a 28MB source buffer and a 28MB matte have no
+  // reason to outlive it.
+  state.bgSource = null;
+  state.bgAccum = null;
   syncBackgroundUi();
   rebuildEngineFromCanvas();
   toast('Background removed.', 'success', 3000);
 });
 
 $('#btn-bg-undo').addEventListener('click', undoBackground);
+$('#btn-bg-undo-stroke').addEventListener('click', undoStroke);
+
+// Ctrl/Cmd+Z during a refine session steps back a correction. Scoped to the
+// session so it cannot surprise anyone outside it.
+document.addEventListener('keydown', (e) => {
+  if (!state.bgReviewing) return;
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+    e.preventDefault();
+    undoStroke();
+  }
+});
 
 for (const b of document.querySelectorAll<HTMLButtonElement>('.bg-mode')) {
   b.addEventListener('click', () => {

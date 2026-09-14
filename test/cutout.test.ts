@@ -304,3 +304,62 @@ describe('eroding a matte', () => {
     expect(m[0]).toBe(255);
   });
 });
+
+describe('stepping back through corrections', () => {
+  const img = scene(40, 40, [255, 255, 255], { x: 10, y: 10, w: 20, h: 20 }, [20, 20, 20]);
+
+  it('applying one stroke to a running result matches replaying them all', () => {
+    // This equivalence is what makes the incremental path safe: the preview
+    // keeps a running matte and applies only the newest stroke, which must be
+    // indistinguishable from rebuilding from the base every time.
+    const base = new Float32Array(1600).fill(255);
+    const strokes = [
+      { x: 2, y: 2, r: 20, mode: 'drop' as const },
+      { x: 20, y: 20, r: 20, mode: 'keep' as const },
+      { x: 37, y: 37, r: 20, mode: 'drop' as const },
+    ];
+    const replayed = applyStrokes(base, img, strokes);
+    let running = base;
+    for (const s of strokes) running = applyStrokes(running, img, [s]);
+    expect(Array.from(running)).toEqual(Array.from(replayed));
+  });
+
+  it('dropping the last stroke restores the previous state exactly', () => {
+    // Undo is "pop the list and rebuild", which only works because
+    // applyStrokes never mutates its input.
+    const base = new Float32Array(1600).fill(255);
+    // Both strokes must actually CHANGE something, or "after two" and "after
+    // one" are legitimately identical and the test proves nothing. The first
+    // version used a keep-stroke on already-kept pixels and failed for that
+    // reason rather than finding a bug.
+    const two = [
+      { x: 2, y: 2, r: 20, mode: 'drop' as const },
+      { x: 20, y: 20, r: 20, mode: 'drop' as const },
+    ];
+    const afterTwo = applyStrokes(base, img, two);
+    const afterUndo = applyStrokes(base, img, two.slice(0, 1));
+    const afterOne = applyStrokes(base, img, [two[0]]);
+    expect(Array.from(afterUndo)).toEqual(Array.from(afterOne));
+    expect(Array.from(afterUndo)).not.toEqual(Array.from(afterTwo));
+  });
+
+  it('undoing every stroke returns the base matte', () => {
+    const base = new Float32Array(1600).fill(255);
+    base[0] = 0; // something distinctive to prove it is the ORIGINAL base
+    const out = applyStrokes(base, img, []);
+    expect(Array.from(out)).toEqual(Array.from(base));
+  });
+
+  it('rebuilding is required after a middle stroke is removed', () => {
+    // A later stroke can overwrite pixels an earlier one set, so removing one
+    // from the middle cannot be undone incrementally — hence undo rebuilds.
+    const base = new Float32Array(1600).fill(255);
+    const a = { x: 2, y: 2, r: 20, mode: 'drop' as const };
+    const b = { x: 2, y: 2, r: 20, mode: 'keep' as const };
+    const both = applyStrokes(base, img, [a, b]);
+    const onlyA = applyStrokes(base, img, [a]);
+    // b overwrote a, so removing b must not leave b's result behind.
+    expect(both[2 * 40 + 2]).toBe(255);
+    expect(onlyA[2 * 40 + 2]).toBe(0);
+  });
+});

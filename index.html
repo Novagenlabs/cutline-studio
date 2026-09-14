@@ -478,7 +478,12 @@
                     </label>
                   </div>
                   <div class="ct-pop-row end">
-                    <button id="btn-bg-undo" class="btn ghost sm" type="button">Undo removal</button>
+                    <!-- Two different undos, deliberately labelled apart: one
+                         steps back through corrections, the other abandons
+                         the whole removal. Conflating them would make a
+                         mis-click on the second one expensive. -->
+                    <button id="btn-bg-undo-stroke" class="btn ghost sm" type="button" disabled>Undo click</button>
+                    <button id="btn-bg-undo" class="btn ghost sm" type="button">Undo all</button>
                   </div>
                 </div>
               </div>
