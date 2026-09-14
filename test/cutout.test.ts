@@ -4,6 +4,8 @@ import {
   applyStrokes,
   cutout,
   floodMatte,
+  allColourMatte,
+  erodeMatte,
   coverage,
 } from '../src/ai/cutout';
 import type { RasterImage } from '../src/pipeline/types';
@@ -167,5 +169,76 @@ describe('the cutout itself', () => {
     const out = cutout(img, new Float32Array([-40, 300, 128, 0]));
     expect(out.data[3]).toBe(0);
     expect(out.data[7]).toBe(255);
+  });
+});
+
+describe('removing the background INSIDE shapes too', () => {
+  /** A ring: dark donut with a background-coloured hole in the middle. */
+  const ring = (() => {
+    const w = 60, h = 60;
+    const data = new Uint8ClampedArray(w * h * 4);
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const dx = x - 30, dy = y - 30;
+        const r = Math.sqrt(dx * dx + dy * dy);
+        const ink = r < 22 && r > 10;
+        const i = (y * w + x) * 4;
+        const c = ink ? 20 : 255;
+        data[i] = data[i + 1] = data[i + 2] = c;
+        data[i + 3] = 255;
+      }
+    return { data, width: w, height: h };
+  })();
+
+  it('the connected flood keeps the hole, as a sticker should', () => {
+    // This is the behaviour that is right by default: the counter of an 'o'
+    // is part of the design, not background.
+    const m = floodMatte(ring);
+    expect(m[30 * 60 + 30]).toBe(255);
+  });
+
+  it('and "inside too" removes it', () => {
+    // Which is what "remove the white inside the letters" asks for.
+    const m = allColourMatte(ring);
+    expect(m[30 * 60 + 30]).toBe(0);
+  });
+
+  it('both agree about the outside', () => {
+    expect(floodMatte(ring)[1]).toBe(0);
+    expect(allColourMatte(ring)[1]).toBe(0);
+  });
+
+  it('both keep the ink', () => {
+    // A point on the donut itself: 16px from centre, between r=10 and r=22.
+    const p = (30 + 16) + 30 * 60;
+    expect(floodMatte(ring)[p]).toBe(255);
+    expect(allColourMatte(ring)[p]).toBe(255);
+  });
+});
+
+describe('eroding a matte', () => {
+  it('peels one pixel off the edge', () => {
+    const w = 10, h = 10;
+    const m = new Float32Array(w * h).fill(0);
+    for (let y = 3; y < 7; y++) for (let x = 3; x < 7; x++) m[y * w + x] = 255;
+    const e = erodeMatte(m, w, h, 1);
+    expect(e[3 * w + 3]).toBe(0); // corner: was edge
+    expect(e[4 * w + 4]).toBe(255); // interior: survives
+  });
+
+  it('repeats for a wider erode', () => {
+    const w = 12, h = 12;
+    const m = new Float32Array(w * h).fill(0);
+    for (let y = 2; y < 10; y++) for (let x = 2; x < 10; x++) m[y * w + x] = 255;
+    const e = erodeMatte(m, w, h, 2);
+    expect(e[3 * w + 3]).toBe(0);
+    expect(e[6 * w + 6]).toBe(255);
+  });
+
+  it('leaves the input alone', () => {
+    const w = 8, h = 8;
+    const m = new Float32Array(w * h).fill(255);
+    erodeMatte(m, w, h, 1);
+    expect(m[0]).toBe(255);
   });
 });

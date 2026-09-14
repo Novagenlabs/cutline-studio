@@ -227,6 +227,101 @@ export function floodMatte(img: RasterImage, tolerance = 32): Float32Array {
   return matte;
 }
 
+/**
+ * Remove EVERY pixel matching the background colour, connected or not.
+ *
+ * floodMatte only removes background the border can reach, which keeps the
+ * counter of an 'o', the middle of a '0' and the soccer ball's white panels
+ * as opaque artwork. That is the right default for a sticker — those areas
+ * are part of the design — but it is not what "remove all the white including
+ * inside the letters" means, and on this crest it leaves 21 white blobs
+ * totalling 39,259 pixels.
+ *
+ * Colour match rather than a second flood: an enclosed region is by
+ * definition unreachable from the border, so reachability cannot be the test.
+ * The tolerance is the same one the flood uses, so the two modes agree about
+ * what counts as background.
+ *
+ * The cost is real and worth stating: a design that deliberately uses the
+ * background colour as ink — white text on a white-backed badge — loses that
+ * ink. That is why this is a mode and not the default.
+ */
+export function allColourMatte(img: RasterImage, tolerance = 32): Float32Array {
+  const { width: w, height: h, data } = img;
+  const matte = new Float32Array(w * h).fill(255);
+
+  const votes = new Map<number, number>();
+  const vote = (x: number, y: number) => {
+    const i = (y * w + x) * 4;
+    const key = ((data[i] >> 4) << 8) | ((data[i + 1] >> 4) << 4) | (data[i + 2] >> 4);
+    votes.set(key, (votes.get(key) ?? 0) + 1);
+  };
+  for (let x = 0; x < w; x++) {
+    for (let y = 0; y < Math.min(2, h); y++) {
+      vote(x, y);
+      vote(x, h - 1 - y);
+    }
+  }
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < Math.min(2, w); x++) {
+      vote(x, y);
+      vote(w - 1 - x, y);
+    }
+  }
+  let best = 0;
+  let bestN = -1;
+  for (const [k, n] of votes) {
+    if (n > bestN) {
+      bestN = n;
+      best = k;
+    }
+  }
+  const br = ((best >> 8) & 0xf) * 17;
+  const bg = ((best >> 4) & 0xf) * 17;
+  const bb = (best & 0xf) * 17;
+  const tol2 = tolerance * tolerance * 3;
+
+  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+    const dr = data[i] - br;
+    const dg = data[i + 1] - bg;
+    const db = data[i + 2] - bb;
+    if (dr * dr + dg * dg + db * db <= tol2) matte[p] = 0;
+  }
+  return matte;
+}
+
+/**
+ * Shrink a matte by one pixel of coverage.
+ *
+ * JPEG artwork has an anti-aliased edge: between solid ink and solid
+ * background sits a ramp of intermediate pixels. A hard threshold puts the
+ * cut somewhere in that ramp, which leaves a one-pixel rind of near-background
+ * colour attached to every shape — visible as a pale outline once the rest is
+ * transparent. Eroding by the same amount removes the rind and lands the edge
+ * on the ink.
+ */
+export function erodeMatte(matte: Float32Array, w: number, h: number, px = 1): Float32Array {
+  let src = matte;
+  for (let pass = 0; pass < px; pass++) {
+    const out = Float32Array.from(src);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const p = y * w + x;
+        if (src[p] < 128) continue;
+        // Any transparent 4-neighbour makes this an edge pixel.
+        if (
+          (x > 0 && src[p - 1] < 128) ||
+          (x < w - 1 && src[p + 1] < 128) ||
+          (y > 0 && src[p - w] < 128) ||
+          (y < h - 1 && src[p + w] < 128)
+        ) out[p] = 0;
+      }
+    }
+    src = out;
+  }
+  return src;
+}
+
 /** How much of the image a matte keeps, 0..1. Used to sanity-check a result. */
 export function coverage(matte: Float32Array): number {
   let kept = 0;

@@ -438,6 +438,17 @@
                 <span id="bg-btn-label">Remove background</span>
               </button>
 
+              <!-- Whether enclosed white counts as background.
+                   Off, only background the border can reach is removed, so a
+                   letter counter and the ball's white panels stay — right for
+                   a sticker, where those are part of the design. On, every
+                   pixel matching the background colour goes, which is what
+                   "remove the white inside the letters too" means. -->
+              <label class="ct-toggle" title="Also remove white inside letters and shapes">
+                <input id="in-bg-all" type="checkbox" />
+                <span>Inside too</span>
+              </label>
+
               <!-- Only while a removal is being reviewed. -->
               <span class="ct-bg-review" id="ct-bg-review" hidden>
                 <span class="ct-sep" aria-hidden="true"></span>

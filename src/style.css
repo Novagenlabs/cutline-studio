@@ -2907,6 +2907,25 @@ body.is-tracing #st-time {
   min-width: 42px;
 }
 
+.ct-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--display);
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.ct-toggle:hover {
+  color: var(--ink-2);
+}
+
+.ct-toggle input {
+  margin: 0;
+}
+
 /* A crosshair says "this click does something to the pixel under it", which
    a pan cursor actively contradicts. */
 body.is-refining-bg #stage {

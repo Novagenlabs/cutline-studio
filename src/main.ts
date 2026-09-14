@@ -1,7 +1,10 @@
 import { CutlineEngine, DEFAULT_PARAMS } from './pipeline';
 import type { CutlineParams, CutlineResult, RasterImage, RegionOverride, ShapeMode } from './pipeline';
 import { computeAiMatte, matteToImage } from './ai/matte';
-import { upsampleMatte, applyStrokes, cutout, floodMatte, coverage, type Stroke } from './ai/cutout';
+import {
+  upsampleMatte, applyStrokes, cutout, floodMatte, allColourMatte, coverage,
+  type Stroke,
+} from './ai/cutout';
 import { buildRaster } from './export/png';
 import { makeSampleImage } from './ui/sample';
 import { requestExport, fetchBalance, signupGrant, ExportError } from './paid-export';
@@ -1245,13 +1248,22 @@ async function removeBackground(): Promise<void> {
   src.getContext('2d')!.drawImage(state.imageEl, 0, 0, state.srcW, state.srcH);
   const full = src.getContext('2d')!.getImageData(0, 0, state.srcW, state.srcH);
 
-  let matte = floodMatte(full, state.params.bgTolerance);
+  // "Inside too" removes every pixel matching the background colour rather
+  // than only what the border can reach, so enclosed white — a letter
+  // counter, the middle of a 0, the ball's white panels — goes as well.
+  const insideToo = ($('#in-bg-all') as HTMLInputElement | null)?.checked ?? false;
+  let matte = insideToo
+    ? allColourMatte(full, state.params.bgTolerance)
+    : floodMatte(full, state.params.bgTolerance);
   let kept = coverage(matte);
 
   // A flood that kept almost everything found no background it could reach;
   // one that kept almost nothing ate the artwork. Either way the image is not
   // the flat-background kind, so it is worth the model.
-  const floodFailed = kept > 0.92 || kept < 0.02;
+  // Only the colour-based pass can honour "inside too": the model segments a
+  // subject and has no notion of which colour counts as background, so
+  // falling through to it would silently ignore the toggle.
+  const floodFailed = !insideToo && (kept > 0.92 || kept < 0.02);
 
   if (floodFailed) {
     const close = showLoading('Removing the background');
@@ -1404,6 +1416,14 @@ function rebuildEngineFromCanvas(): void {
 }
 
 $('#btn-remove-bg').addEventListener('click', () => void removeBackground());
+
+// Changing the mode re-runs the removal rather than waiting to be asked: the
+// toggle is only ever flipped because the current result is wrong, and making
+// the user press the button again to see the difference is a step with no
+// decision in it.
+$('#in-bg-all').addEventListener('change', () => {
+  if (state.bgOriginal) void removeBackground();
+});
 
 $('#btn-bg-keep').addEventListener('click', () => {
   state.bgReviewing = false;
