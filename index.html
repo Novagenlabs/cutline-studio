@@ -7,6 +7,36 @@
     <!-- The brand mark itself, not a stock emoji: the tab should carry the
          same blades as the top bar and the loading state. -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'><path d='M4 4 L20 20 M4 20 L20 4' stroke='%23ff9f0a' stroke-width='2' stroke-linecap='round'/><circle cx='5.4' cy='5.4' r='2.4' stroke='%23ff9f0a' stroke-width='1.8'/><circle cx='5.4' cy='18.6' r='2.4' stroke='%23ff9f0a' stroke-width='1.8'/></svg>" />
+    <!-- Link previews.
+         WhatsApp, iMessage, Slack and Discord all read Open Graph; Twitter
+         reads its own tags but falls back to OG for everything except the
+         card type. Absolute URLs are required — every one of these fetches
+         the image from its own servers, with no page context to resolve a
+         relative path against. PNG rather than the SVG favicon because most
+         of them will not render SVG at all. -->
+    <meta name="description" content="Turn artwork into plotter-ready contour cut lines. Exports SVG, PDF and DXF with a CutContour spot colour. Runs in your browser." />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Cutline Studio" />
+    <meta property="og:title" content="Cutline Studio" />
+    <meta property="og:description" content="Print-and-cut contour lines, straight from your artwork. SVG, PDF and DXF with a CutContour spot colour." />
+    <meta property="og:url" content="https://cutlinestudio.space/" />
+    <meta property="og:image" content="https://cutlinestudio.space/brand/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Cutline Studio — print-and-cut contour lines" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Cutline Studio" />
+    <meta name="twitter:description" content="Print-and-cut contour lines, straight from your artwork." />
+    <meta name="twitter:image" content="https://cutlinestudio.space/brand/og.png" />
+    <meta name="theme-color" content="#0a0a0b" />
+
+    <!-- The inline SVG below stays as the modern favicon: it is sharp at any
+         size and costs no request. The PNGs are for the places that ignore
+         SVG — Safari's touch icon, Android's home screen, older browsers. -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/brand/icon-180.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/brand/icon-32.png" />
+    <link rel="manifest" href="/brand/site.webmanifest" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

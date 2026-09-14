@@ -35,7 +35,9 @@
     "whop:plans": "tsx scripts/whop-plans.mjs",
     "verify:boot": "tsx test/verify-boot-cover.ts",
     "verify:tour": "tsx test/verify-tour.ts",
-    "verify:tracing": "tsx test/verify-tracing.ts"
+    "verify:tracing": "tsx test/verify-tracing.ts",
+    "verify:preview": "tsx test/verify-preview.ts",
+    "brand:assets": "node scripts/make-brand-assets.mjs"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
