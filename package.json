@@ -39,6 +39,7 @@
     "verify:preview": "tsx test/verify-preview.ts",
     "verify:signin-safari": "tsx test/verify-signin-safari.ts",
     "verify:cursor": "tsx test/verify-cursor.ts",
+    "verify:history": "tsx test/verify-history.ts",
     "brand:assets": "node scripts/make-brand-assets.mjs"
   },
   "dependencies": {

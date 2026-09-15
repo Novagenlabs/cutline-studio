@@ -63,6 +63,15 @@ interface AppState {
   bgMatte: Float32Array | null;
   bgOriginal: string | null;
   bgStrokes: Stroke[];
+  /**
+   * Strokes that have been undone, newest last.
+   *
+   * Kept rather than discarded so Redo can push them back. Cleared whenever a
+   * NEW stroke is made: once the user has taken a different branch, the
+   * redo trail describes a history that no longer happened, and offering it
+   * would silently re-apply work they had already rejected.
+   */
+  bgRedo: Stroke[];
   bgMode: 'drop' | 'keep';
   bgBrush: number;
   bgReviewing: boolean;
@@ -116,6 +125,7 @@ const state: AppState = {
   bgMatte: null,
   bgOriginal: null,
   bgStrokes: [],
+  bgRedo: [],
   bgMode: 'drop',
   bgBrush: 40,
   bgReviewing: false,
@@ -215,6 +225,7 @@ function adoptImage(el: HTMLImageElement | HTMLCanvasElement, w: number, h: numb
   state.bgMatte = null;
   state.bgOriginal = null;
   state.bgStrokes = [];
+  state.bgRedo = [];
   state.bgReviewing = false;
   state.bgMode = 'drop';
   // Per-image, all of it: leaving these set meant a new file inherited the
@@ -446,6 +457,9 @@ previewSvg.addEventListener('pointerdown', (e) => {
   if (state.bgReviewing && state.bgMatte) {
     const p = screenToImg(e);
     state.bgStrokes.push({ x: p.x, y: p.y, r: state.bgBrush, mode: state.bgMode });
+    // A new correction after undoing takes a different branch, so anything
+    // that was undone is no longer reachable history.
+    state.bgRedo = [];
     applyBackgroundPreview(true);
     return;
   }
@@ -1140,6 +1154,7 @@ function resetAllSettings() {
   state.bgReviewing = false;
   state.bgMatte = null;
   state.bgStrokes = [];
+  state.bgRedo = [];
   state.bgMode = 'drop';
   syncBackgroundUi();
 
@@ -1486,6 +1501,7 @@ async function removeBackground(): Promise<void> {
   }
   state.bgMatte = matte;
   state.bgStrokes = [];
+  state.bgRedo = [];
   state.bgAccum = null;
   // Held for the session so each stroke does not re-read 7 megapixels that
   // have not changed. `full` was already built above for the removal itself.
@@ -1555,9 +1571,27 @@ function applyBackgroundPreview(incremental = false): void {
  */
 function undoStroke(): void {
   if (state.bgStrokes.length === 0) return;
-  state.bgStrokes.pop();
+  const undone = state.bgStrokes.pop()!;
+  state.bgRedo.push(undone);
+  // Rebuilt rather than stepped back: a later stroke can overwrite pixels an
+  // earlier one set, so the running matte cannot be reversed in place.
   state.bgAccum = null;
   applyBackgroundPreview(false);
+  syncBackgroundUi();
+}
+
+/**
+ * Re-apply the most recently undone stroke.
+ *
+ * Incremental, unlike undo — putting a stroke back on the end is exactly what
+ * the running matte already does for a new stroke, so there is nothing to
+ * rebuild.
+ */
+function redoStroke(): void {
+  const s = state.bgRedo.pop();
+  if (!s) return;
+  state.bgStrokes.push(s);
+  applyBackgroundPreview(true);
   syncBackgroundUi();
 }
 
@@ -1571,14 +1605,15 @@ function syncBackgroundUi(): void {
   for (const b of document.querySelectorAll<HTMLButtonElement>('.bg-mode')) {
     b.classList.toggle('active', b.dataset.mode === state.bgMode);
   }
-  // Disabled with nothing to undo, and counted so the user can see there is
-  // history behind the button rather than guessing.
+  // Each arrow disabled when its stack is empty, and the number between them
+  // is how many corrections are currently applied — so the pair reads as one
+  // position in a history rather than two independent buttons.
   const undoBtn = $('#btn-bg-undo-stroke') as HTMLButtonElement | null;
-  if (undoBtn) {
-    const n = state.bgStrokes.length;
-    undoBtn.disabled = n === 0;
-    undoBtn.textContent = n > 0 ? `Undo click (${n})` : 'Undo click';
-  }
+  if (undoBtn) undoBtn.disabled = state.bgStrokes.length === 0;
+  const redoBtn = $('#btn-bg-redo-stroke') as HTMLButtonElement | null;
+  if (redoBtn) redoBtn.disabled = state.bgRedo.length === 0;
+  const count = $('#bg-history-count');
+  if (count) count.textContent = String(state.bgStrokes.length);
   document.body.classList.toggle('is-refining-bg', state.bgReviewing);
 }
 
@@ -1590,6 +1625,7 @@ function undoBackground(): void {
   state.bgOriginal = null;
   state.bgMatte = null;
   state.bgStrokes = [];
+  state.bgRedo = [];
   state.bgAccum = null;
   state.bgSource = null;
   state.bgReviewing = false;
@@ -1672,10 +1708,17 @@ bgRefineBtn.addEventListener('click', (e) => {
 
 // Clicking the canvas is how corrections are made, so the popover must not
 // eat that click — but it should close when the user is plainly done with it.
+//
+// The canvas is explicitly excluded. Undo and redo live in this popover, and
+// a correction is the single most likely thing to want undone: closing on the
+// very click that creates the mistake would hide the fix behind reopening the
+// menu every time. Everything else outside still dismisses it, and Escape and
+// the two session-ending buttons close it as before.
 document.addEventListener('click', (e) => {
   if (bgPop.hidden) return;
   const t = e.target as Node;
   if (bgPop.contains(t) || bgRefineBtn.contains(t)) return;
+  if (state.bgReviewing && previewSvg.contains(t)) return;
   setRefineOpen(false);
 });
 
@@ -1697,14 +1740,18 @@ $('#btn-bg-keep').addEventListener('click', () => {
 
 $('#btn-bg-undo').addEventListener('click', undoBackground);
 $('#btn-bg-undo-stroke').addEventListener('click', undoStroke);
+$('#btn-bg-redo-stroke').addEventListener('click', redoStroke);
 
 // Ctrl/Cmd+Z during a refine session steps back a correction. Scoped to the
 // session so it cannot surprise anyone outside it.
 document.addEventListener('keydown', (e) => {
   if (!state.bgReviewing) return;
-  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
     e.preventDefault();
-    undoStroke();
+    // Shift+Z is the redo convention everywhere this app is likely to be
+    // used alongside — Illustrator, Figma, Photoshop all agree.
+    if (e.shiftKey) redoStroke();
+    else undoStroke();
   }
 });
 

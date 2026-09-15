@@ -2950,6 +2950,49 @@ body.is-tracing #st-time {
   text-align: right;
 }
 
+/* Undo and redo are one control: hairline-joined, with the number of applied
+   corrections between them. Pushed to the left of the row so the destructive
+   "Undo all" keeps the far edge to itself and is harder to hit by accident. */
+.ct-history {
+  display: inline-flex;
+  align-items: stretch;
+  margin-right: auto;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.ct-history .btn {
+  border: 0;
+  border-radius: 0;
+  padding: 4px 8px;
+  min-height: 24px;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Overrides .ct-pop-row output, which is right-aligned and 40px wide for the
+   slider readouts — wrong for a single digit sitting between two arrows. */
+.ct-history-count {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  padding: 0 2px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  text-align: center;
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  user-select: none;
+}
+
+.ct-history .btn svg {
+  fill: currentColor;
+  display: block;
+}
+
 /* The two mode buttons share the row equally, so neither reads as primary. */
 .ct-pop-row .bg-mode {
   flex: 1;

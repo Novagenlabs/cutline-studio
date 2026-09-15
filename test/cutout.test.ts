@@ -315,11 +315,11 @@ describe('stepping back through corrections', () => {
     const base = new Float32Array(1600).fill(255);
     const strokes = [
       { x: 2, y: 2, r: 20, mode: 'drop' as const },
-      { x: 20, y: 20, r: 20, mode: 'keep' as const },
-      { x: 37, y: 37, r: 20, mode: 'drop' as const },
+      { x: 20, y: 20, r: 20, mode: 'drop' as const },
+      { x: 15, y: 15, r: 6, mode: 'keep' as const },
     ];
     const replayed = applyStrokes(base, img, strokes);
-    let running = base;
+    let running: Float32Array<ArrayBufferLike> = base;
     for (const s of strokes) running = applyStrokes(running, img, [s]);
     expect(Array.from(running)).toEqual(Array.from(replayed));
   });
@@ -341,6 +341,65 @@ describe('stepping back through corrections', () => {
     const afterOne = applyStrokes(base, img, [two[0]]);
     expect(Array.from(afterUndo)).toEqual(Array.from(afterOne));
     expect(Array.from(afterUndo)).not.toEqual(Array.from(afterTwo));
+  });
+
+  it('redo lands on the same state the stroke originally produced', () => {
+    // redoStroke() takes the INCREMENTAL path — it appends to bgAccum rather
+    // than replaying — on the argument that re-adding to the end of the list
+    // is exactly what a fresh stroke does. That is only true if appending to
+    // the undone state equals the full replay, so prove it rather than assume.
+    const base = new Float32Array(1600).fill(255);
+    // Each stroke must change something or the assertions pass vacuously.
+    // Measured on this fixture: drop at (2,2) clears the 1200 white pixels,
+    // drop at (20,20) the 400 dark ones, and the keep restores those 400.
+    // A third DROP here changes nothing — there is nothing left to drop.
+    const strokes = [
+      { x: 2, y: 2, r: 20, mode: 'drop' as const },
+      { x: 20, y: 20, r: 20, mode: 'drop' as const },
+      { x: 15, y: 15, r: 6, mode: 'keep' as const },
+    ];
+    const original = applyStrokes(base, img, strokes);
+
+    // Undo: rebuild without the last stroke. Redo: append it back.
+    const undone = applyStrokes(base, img, strokes.slice(0, -1));
+    const redone = applyStrokes(undone, img, [strokes[2]]);
+
+    expect(Array.from(redone)).toEqual(Array.from(original));
+    expect(Array.from(undone)).not.toEqual(Array.from(original));
+  });
+
+  it('redo survives walking the whole history back and forward', () => {
+    // The button lets the user hold it down, so the round trip has to be
+    // stable over every step, not just one.
+    const base = new Float32Array(1600).fill(255);
+    // Each stroke must change something or the assertions pass vacuously.
+    // Measured on this fixture: drop at (2,2) clears the 1200 white pixels,
+    // drop at (20,20) the 400 dark ones, and the keep restores those 400.
+    // A third DROP here changes nothing — there is nothing left to drop.
+    const strokes = [
+      { x: 2, y: 2, r: 20, mode: 'drop' as const },
+      { x: 20, y: 20, r: 20, mode: 'drop' as const },
+      { x: 15, y: 15, r: 6, mode: 'keep' as const },
+    ];
+    const original = Array.from(applyStrokes(base, img, strokes));
+
+    // Walk all the way back, keeping the undone strokes in a redo stack.
+    const undoStack = [...strokes];
+    const redoStack: typeof strokes = [];
+    while (undoStack.length) redoStack.push(undoStack.pop()!);
+    expect(Array.from(applyStrokes(base, img, undoStack))).toEqual(
+      Array.from(base),
+    );
+
+    // Walk forward again, appending incrementally the way redoStroke does.
+    let running: Float32Array<ArrayBufferLike> = base;
+    while (redoStack.length) {
+      const s = redoStack.pop()!;
+      undoStack.push(s);
+      running = applyStrokes(running, img, [s]);
+    }
+    expect(undoStack).toEqual(strokes);
+    expect(Array.from(running)).toEqual(original);
   });
 
   it('undoing every stroke returns the base matte', () => {

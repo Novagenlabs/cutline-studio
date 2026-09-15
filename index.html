@@ -482,7 +482,22 @@
                          steps back through corrections, the other abandons
                          the whole removal. Conflating them would make a
                          mis-click on the second one expensive. -->
-                    <button id="btn-bg-undo-stroke" class="btn ghost sm" type="button" disabled>Undo click</button>
+                    <!-- A paired control: arrows read as one history rather
+                         than two unrelated actions, and the count sits
+                         between them so it belongs to both. -->
+                    <span class="ct-history">
+                      <button id="btn-bg-undo-stroke" class="btn ghost sm" type="button" disabled title="Undo the last correction (Cmd/Ctrl+Z)" aria-label="Undo">
+                        <svg viewBox="0 0 256 256" aria-hidden="true" width="13" height="13">
+                          <path d="M224 128a96 96 0 0 1-96 96 8 8 0 0 1 0-16 80 80 0 1 0-56.6-136.6L44.7 96H88a8 8 0 0 1 0 16H32a8 8 0 0 1-8-8V48a8 8 0 0 1 16 0v33.6l25.4-24.9A96 96 0 0 1 224 128Z"/>
+                        </svg>
+                      </button>
+                      <output id="bg-history-count" class="ct-history-count">0</output>
+                      <button id="btn-bg-redo-stroke" class="btn ghost sm" type="button" disabled title="Redo (Cmd/Ctrl+Shift+Z)" aria-label="Redo">
+                        <svg viewBox="0 0 256 256" aria-hidden="true" width="13" height="13">
+                          <path d="M232 48v56a8 8 0 0 1-8 8h-56a8 8 0 0 1 0-16h43.3l-26.7-24.6A80 80 0 1 0 128 208a8 8 0 0 1 0 16 96 96 0 1 1 67.6-163.3L216 81.6V48a8 8 0 0 1 16 0Z"/>
+                        </svg>
+                      </button>
+                    </span>
                     <button id="btn-bg-undo" class="btn ghost sm" type="button">Undo all</button>
                   </div>
                 </div>
