@@ -13,7 +13,7 @@ import { toast } from './ui/toast';
 import { confirmSpend } from './ui/confirm';
 import { chooseExport, defaultFormat } from './ui/export-dialog';
 import { jobStart, jobStage, jobEnd } from './ui/job';
-import { showLoading } from './ui/loading';
+import { showLoading, loadingText, humaneProgress } from './ui/loading';
 import { createSplash, splashSeen } from './ui/splash';
 import { createTour, tourSeen } from './ui/tour';
 import { mountCutSlider, mountValueSlider, mountCheckbox, mountSelect } from './ui/controls';
@@ -990,15 +990,18 @@ aiCheckbox.addEventListener('change', async () => {
   // The first run can take minutes while the model downloads, so the wait
   // gets the full overlay rather than a toast in the corner.
   //
-  // The progress messages are deliberately NOT shown. They name the model and
-  // its size, which is implementation detail the user did not ask about and
-  // cannot act on — "Preparing your workspace" is the whole of what they need
-  // to know. The messages still reach the console, where they are useful to
-  // whoever is debugging a slow first run.
-  const closeLoading = showLoading('Preparing your workspace');
+  // The raw progress messages are still not shown — they name the execution
+  // backend, which the user did not ask about. But the download percentage
+  // is, because a multi-minute wait with no sign of movement reads as a hang.
+  // humaneProgress decides which is which; the raw text stays in the console
+  // for whoever is debugging a slow first run.
+  const BASE = 'Preparing your workspace';
+  const closeLoading = showLoading(BASE);
   try {
     const matte = await computeAiMatte(state.workImg, (msg) => {
       console.info('[matte]', msg);
+      const shown = humaneProgress(msg, BASE);
+      if (shown) loadingText(shown);
     });
     state.aiEngine = new CutlineEngine(matteToImage(state.workImg, matte), state.workScale);
     hint.textContent = 'Smart edges active — threshold, denoise and regions now shape them.';
@@ -1465,9 +1468,18 @@ async function removeBackground(fromOriginal = true): Promise<void> {
   const floodFailed = !insideToo && (kept > 0.92 || kept < 0.02);
 
   if (floodFailed) {
-    const close = showLoading('Removing the background');
+    // Same overlay, same translation. This is the path most users hit first,
+    // and the one where the silence was reported: the model download happens
+    // behind a caption that only says "Removing the background", so a 40MB
+    // fetch on a slow connection looks like the app has stopped.
+    const BASE_BG = 'Removing the background';
+    const close = showLoading(BASE_BG);
     try {
-      const aiMatte = await computeAiMatte(state.workImg, (m) => console.info('[matte]', m));
+      const aiMatte = await computeAiMatte(state.workImg, (m) => {
+        console.info('[matte]', m);
+        const shown = humaneProgress(m, BASE_BG);
+        if (shown) loadingText(shown);
+      });
       matte = upsampleMatte(
         aiMatte,
         state.workImg.width,

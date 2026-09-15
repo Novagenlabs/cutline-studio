@@ -42,6 +42,7 @@
     "verify:history": "tsx test/verify-history.ts",
     "verify:retrace": "tsx test/verify-retrace.ts",
     "verify:bgmenu": "tsx test/verify-bgmenu.ts",
+    "verify:progress": "tsx test/verify-progress.ts",
     "brand:assets": "node scripts/make-brand-assets.mjs"
   },
   "dependencies": {

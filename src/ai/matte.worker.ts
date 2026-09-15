@@ -49,6 +49,11 @@ async function fetchModel(parts: string[]): Promise<Uint8Array> {
         loaded += value.byteLength;
         if (total > 0) {
           progress(`Downloading AI model (one-time)… ${Math.round((loaded / total) * 100)}%`);
+        } else {
+          // No Content-Length — a gzipped or proxied response. Report the
+          // megabytes instead of nothing: the user's question is "is this
+          // moving", and a rising number answers it without a denominator.
+          progress(`Downloading AI model (one-time)… ${(loaded / 1048576).toFixed(1)} MB`);
         }
       }
     })
