@@ -2988,8 +2988,9 @@ body.is-tracing #st-time {
   user-select: none;
 }
 
+/* Stroked, like every other icon in the app. A fill here would flood the
+   open curve of the arrow solid. */
 .ct-history .btn svg {
-  fill: currentColor;
   display: block;
 }
 
