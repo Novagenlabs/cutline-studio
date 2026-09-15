@@ -1556,6 +1556,9 @@ function applyBackgroundPreview(incremental = false): void {
     state.bgPreviewUrl = url;
     ($('#art') as unknown as SVGImageElement).setAttribute('href', url);
     state.imageDataUrl = url;
+    // The artwork under the cutline just changed, so the tracer is now
+    // describing an image that is no longer on screen. Retrace it.
+    scheduleEngineRebuild();
   }, 'image/png');
 
   syncBackgroundUi();
@@ -1642,6 +1645,32 @@ function undoBackground(): void {
   syncBackgroundUi();
   rebuildEngineFromCanvas();
   toast('Background restored.', 'info', 3000);
+}
+
+/**
+ * Retrace the artwork after a correction, once the user pauses.
+ *
+ * The cutline is generated from the tracer's copy of the image, so until that
+ * copy is rebuilt the cut follows the ORIGINAL artwork — background and all —
+ * while the canvas shows the cutout. Every advanced setting then operates on
+ * the wrong picture, which is exactly as broken as it sounds and was reported
+ * as the settings "not working as good" until Done was pressed.
+ *
+ * Debounced rather than immediate because the two costs are three orders
+ * apart: a correction repaints the preview in ~7ms, a full retrace takes
+ * ~457ms measured on a 7-megapixel photo. Running it per click would turn a
+ * fluid brush into a half-second stutter. So corrections stay instant and the
+ * cut catches up shortly after the user stops clicking — which is when they
+ * look at it anyway.
+ */
+let engineRebuildTimer: number | null = null;
+
+function scheduleEngineRebuild(): void {
+  if (engineRebuildTimer !== null) clearTimeout(engineRebuildTimer);
+  engineRebuildTimer = window.setTimeout(() => {
+    engineRebuildTimer = null;
+    rebuildEngineFromCanvas();
+  }, 420);
 }
 
 /**
@@ -1734,6 +1763,13 @@ $('#btn-bg-keep').addEventListener('click', () => {
   state.bgSource = null;
   state.bgAccum = null;
   syncBackgroundUi();
+  // Done is the one moment the user is definitely waiting for the cut, so
+  // take the pending retrace now rather than after the debounce — and cancel
+  // it, or the same 457ms of work runs twice.
+  if (engineRebuildTimer !== null) {
+    clearTimeout(engineRebuildTimer);
+    engineRebuildTimer = null;
+  }
   rebuildEngineFromCanvas();
   toast('Background removed.', 'success', 3000);
 });
