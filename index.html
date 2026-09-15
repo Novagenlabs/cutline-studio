@@ -444,7 +444,30 @@
                   <path d="M248 152a8 8 0 0 1-8 8h-24v24a8 8 0 0 1-16 0v-24h-24a8 8 0 0 1 0-16h24v-24a8 8 0 0 1 16 0v24h24a8 8 0 0 1 8 8ZM56 72h16v16a8 8 0 0 0 16 0V72h16a8 8 0 0 0 0-16H88V40a8 8 0 0 0-16 0v16H56a8 8 0 0 0 0 16Zm144 0h-8v8a8 8 0 0 1-16 0v-8h-8a8 8 0 0 1 0-16h8v-8a8 8 0 0 1 16 0v8h8a8 8 0 0 1 0 16Zm-20.69 89.37-107.3-107.3a16 16 0 0 0-22.63 0L33.07 77.38a16 16 0 0 0 0 22.63l107.3 107.3a16 16 0 0 0 22.63 0l16.31-16.31a16 16 0 0 0 0-22.63ZM151.68 196 44.38 88.69 60.69 72.38 168 179.69Z"/>
                 </svg>
                 <span id="bg-btn-label">Remove background</span>
+                <!-- Only once a removal exists, since before that the button
+                     has nothing to offer a choice between. -->
+                <svg id="bg-caret" class="ct-caret" viewBox="0 0 256 256" aria-hidden="true" width="10" height="10" hidden>
+                  <path d="M213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80A8 8 0 0 1 53.66 90.34L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32Z"/>
+                </svg>
               </button>
+
+              <!-- What to do about a background that is already removed.
+                   Running the pass again and undoing it are opposite actions,
+                   so they must not share one button. -->
+              <div class="ct-pop ct-menu" id="bg-menu" hidden>
+                <button id="btn-bg-again" class="ct-menu-item" type="button">
+                  <span class="ct-menu-title">Remove again</span>
+                  <span class="ct-menu-sub">Run another pass on the image as it is now</span>
+                </button>
+                <button id="btn-bg-restart" class="ct-menu-item" type="button">
+                  <span class="ct-menu-title">Start over</span>
+                  <span class="ct-menu-sub">Remove from the original upload, discarding corrections</span>
+                </button>
+                <button id="btn-bg-undo-all" class="ct-menu-item" type="button">
+                  <span class="ct-menu-title">Undo removal</span>
+                  <span class="ct-menu-sub">Put the original image back</span>
+                </button>
+              </div>
 
               <!-- The refine controls live in a popover rather than inline.
                    Seven controls in a row crowded the zoom cluster off the

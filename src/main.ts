@@ -1418,7 +1418,7 @@ $('#tab-advanced').addEventListener('click', () => setMode('advanced'));
  * is instant: if it produces a sane result there is no reason to download
  * ~98MB to do better.
  */
-async function removeBackground(): Promise<void> {
+async function removeBackground(fromOriginal = true): Promise<void> {
   if (!state.imageEl || !state.workImg) {
     toast('Open an image first.', 'error');
     return;
@@ -1426,13 +1426,26 @@ async function removeBackground(): Promise<void> {
   const btn = $('#btn-remove-bg') as HTMLButtonElement;
   btn.disabled = true;
 
+  // Which picture to run the pass over.
+  //
+  // `state.imageEl` is the file as opened and is never updated by a removal,
+  // so reading it always restarts from the original upload. That is right for
+  // "Start over" and wrong for "Remove again", which must see what the last
+  // pass and the user's corrections actually left behind — otherwise pressing
+  // it silently discards them and looks like an undo.
+  const source = fromOriginal ? state.imageEl : await currentArtwork();
+
   // Full-resolution copy: the matte has to cut out what gets exported, and
   // the working image is downscaled.
   const src = document.createElement('canvas');
   src.width = state.srcW;
   src.height = state.srcH;
-  src.getContext('2d')!.drawImage(state.imageEl, 0, 0, state.srcW, state.srcH);
-  const full = src.getContext('2d')!.getImageData(0, 0, state.srcW, state.srcH);
+  const sctx = src.getContext('2d')!;
+  // Cleared first: a second pass draws artwork that already has holes in it,
+  // and without this the previous contents show through them.
+  sctx.clearRect(0, 0, state.srcW, state.srcH);
+  sctx.drawImage(source, 0, 0, state.srcW, state.srcH);
+  const full = sctx.getImageData(0, 0, state.srcW, state.srcH);
 
   // "Inside too" removes every pixel matching the background colour rather
   // than only what the border can reach, so enclosed white — a letter
@@ -1603,8 +1616,17 @@ function syncBackgroundUi(): void {
   if (host) host.hidden = state.imageEl === null;
   const review = $('#ct-bg-review');
   if (review) review.hidden = !state.bgReviewing;
+  // The button is a menu only once a removal exists, so the label says
+  // "Background" rather than naming one of the three things the menu offers.
   const label = $('#bg-btn-label');
-  if (label) label.textContent = state.bgOriginal ? 'Remove again' : 'Remove background';
+  if (label) label.textContent = state.bgOriginal ? 'Background' : 'Remove background';
+  const caret = $('#bg-caret');
+  if (caret) caret.hidden = !state.bgOriginal;
+  const menu = $('#bg-menu');
+  if (menu && !state.bgOriginal) {
+    menu.hidden = true;
+    $('#btn-remove-bg')?.setAttribute('aria-expanded', 'false');
+  }
   for (const b of document.querySelectorAll<HTMLButtonElement>('.bg-mode')) {
     b.classList.toggle('active', b.dataset.mode === state.bgMode);
   }
@@ -1673,6 +1695,16 @@ function scheduleEngineRebuild(): void {
   }, 420);
 }
 
+/** The artwork as it is on the canvas right now, decoded and ready to draw. */
+function currentArtwork(): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('could not read the current artwork'));
+    img.src = state.imageDataUrl;
+  });
+}
+
 /**
  * Rebuild the tracer from the artwork currently on the canvas.
  *
@@ -1711,14 +1743,69 @@ function rebuildEngineFromCanvas(): void {
   img.src = state.imageDataUrl;
 }
 
-$('#btn-remove-bg').addEventListener('click', () => void removeBackground());
+/* The background button: a plain action before anything is removed, and a
+   menu afterwards. Running the pass again, restarting from the upload and
+   undoing it are three different intentions that used to share one button —
+   which is why pressing "Remove again" appeared to undo the previous
+   removal. It did not undo it; it re-ran from the original upload and threw
+   the corrections away. */
+const bgMenu = $('#bg-menu');
+const bgBtn = $('#btn-remove-bg') as HTMLButtonElement;
+
+function setBgMenuOpen(open: boolean): void {
+  bgMenu.hidden = !open;
+  bgBtn.setAttribute('aria-expanded', String(open));
+}
+
+bgBtn.addEventListener('click', (e) => {
+  // Nothing removed yet: there is no choice to offer, so just do it.
+  if (!state.bgOriginal) {
+    void removeBackground(true);
+    return;
+  }
+  e.stopPropagation();
+  setBgMenuOpen(bgMenu.hidden);
+});
+
+document.addEventListener('click', (e) => {
+  if (bgMenu.hidden) return;
+  const t = e.target as Node;
+  if (bgMenu.contains(t) || bgBtn.contains(t)) return;
+  setBgMenuOpen(false);
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !bgMenu.hidden) setBgMenuOpen(false);
+});
+
+// Another pass over what is on the canvas now, so the last result and the
+// user's corrections survive it.
+$('#btn-bg-again').addEventListener('click', () => {
+  setBgMenuOpen(false);
+  void removeBackground(false);
+});
+
+// Back to the original upload and remove from there — the old behaviour,
+// now named for what it does.
+$('#btn-bg-restart').addEventListener('click', () => {
+  setBgMenuOpen(false);
+  void removeBackground(true);
+});
+
+$('#btn-bg-undo-all').addEventListener('click', () => {
+  setBgMenuOpen(false);
+  undoBackground();
+});
 
 // Changing the mode re-runs the removal rather than waiting to be asked: the
 // toggle is only ever flipped because the current result is wrong, and making
 // the user press the button again to see the difference is a step with no
 // decision in it.
 $('#in-bg-all').addEventListener('change', () => {
-  if (state.bgOriginal) void removeBackground();
+  // From the original upload: the toggle changes HOW the background is found,
+  // so it has to re-decide over the whole image. Run over the current cutout
+  // it would only look at what the last pass already left.
+  if (state.bgOriginal) void removeBackground(true);
 });
 
 /* The refine popover. */

@@ -241,6 +241,39 @@ body {
   color: var(--bg);
 }
 
+/* Done is green.
+   It is the way out of the refine session, and a user who has finished
+   correcting needs to see where to go next — against a bar of grey ghost
+   buttons the white solid did not stand out enough to read as the exit.
+   Green rather than the amber, which is reserved for paid work below. */
+#btn-bg-keep.btn.solid {
+  background: var(--ok);
+  color: #06230f;
+}
+
+#btn-bg-keep.btn.solid:hover:not(:disabled) {
+  background: #4ae070;
+  color: #06230f;
+}
+
+/* A quiet pulse for the first few seconds of a session, so the exit is
+   noticed without it flashing for as long as the user is working. */
+@keyframes bg-done-attention {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(48, 209, 88, 0); }
+  50% { box-shadow: 0 0 0 4px rgba(48, 209, 88, 0.28); }
+}
+
+body.is-refining-bg #btn-bg-keep.btn.solid {
+  animation: bg-done-attention 1.8s ease-in-out 3;
+}
+
+/* Someone who has asked for less motion still gets the colour. */
+@media (prefers-reduced-motion: reduce) {
+  body.is-refining-bg #btn-bg-keep.btn.solid {
+    animation: none;
+  }
+}
+
 /* The amber fill is reserved for the one button that starts paid work. */
 .btn.accent {
   background: var(--accent);
@@ -2862,6 +2895,8 @@ body.is-tracing #st-time {
    collided. A toolbar's job here is quiet view controls; anything that needs
    four inputs needs a surface of its own. */
 .ct-bg {
+  /* The positioning context for #bg-menu, which hangs off this button. */
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -2884,8 +2919,50 @@ body.is-tracing #st-time {
   transition: transform 140ms ease;
 }
 
-#btn-bg-refine[aria-expanded='true'] .ct-caret {
+#btn-bg-refine[aria-expanded='true'] .ct-caret,
+#btn-remove-bg[aria-expanded='true'] .ct-caret {
   transform: rotate(180deg);
+}
+
+/* The background menu. Wider than the refine popover because each row
+   carries a line explaining what it acts on — the whole point of splitting
+   the button is that "again" and "start over" are not obviously different
+   until you say so. */
+.ct-menu {
+  left: 0;
+  right: auto;
+  width: 270px;
+  padding: 6px;
+}
+
+.ct-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  background: none;
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+  color: var(--ink);
+  font: inherit;
+}
+
+.ct-menu-item:hover {
+  background: var(--hover, rgba(255, 255, 255, 0.06));
+}
+
+.ct-menu-title {
+  display: block;
+  font-size: 12px;
+}
+
+.ct-menu-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: var(--muted);
 }
 
 .ct-pop {

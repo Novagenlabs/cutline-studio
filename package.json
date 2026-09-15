@@ -41,6 +41,7 @@
     "verify:cursor": "tsx test/verify-cursor.ts",
     "verify:history": "tsx test/verify-history.ts",
     "verify:retrace": "tsx test/verify-retrace.ts",
+    "verify:bgmenu": "tsx test/verify-bgmenu.ts",
     "brand:assets": "node scripts/make-brand-assets.mjs"
   },
   "dependencies": {
