@@ -18,6 +18,6 @@ export default defineConfig({
     fileParallelism: false,
     // Only the server-side suites run under vitest; the cutter's own checks
     // are plain tsx scripts (npm run smoke / verify:*).
-    include: ['test/{credits,hash,render,raster-framing,e2e-export,signup-grant,same-origin,render-timing,whop,subscription-credits,filename,disposition,signout,cutout,guards,progress}.test.ts'],
+    include: ['test/{credits,hash,render,raster-framing,e2e-export,signup-grant,same-origin,render-timing,whop,subscription-credits,filename,disposition,signout,cutout,guards,progress,export-schema}.test.ts'],
   },
 });

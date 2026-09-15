@@ -86,7 +86,27 @@ export async function POST(req: Request) {
 
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Malformed export request.' }, { status: 400 });
+    // Which field, and what was wrong with it.
+    //
+    // A bare "Malformed export request" is unactionable for everyone: the
+    // user cannot fix it, and neither can whoever is debugging it, because
+    // the one fact that identifies the bug — the field — was computed and
+    // then thrown away. A 400 here is always OUR bug (the browser builds
+    // this body itself), so the detail costs nothing and is the difference
+    // between a reproducible report and a shrug.
+    //
+    // Only the path and the zod message go out. No values: the body carries
+    // the artwork, and echoing a rejected field could put pixels, or a
+    // filename the user did not choose to share, into a log.
+    const fields = parsed.error.issues.slice(0, 8).map((i) => ({
+      field: i.path.join('.') || '(root)',
+      problem: i.message,
+    }));
+    console.error('[export] rejected by schema', JSON.stringify(fields));
+    return NextResponse.json(
+      { error: 'Malformed export request.', fields },
+      { status: 400 }
+    );
   }
   const body = parsed.data;
 

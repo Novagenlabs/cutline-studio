@@ -84,6 +84,24 @@ export async function requestExport(
   // is why it alone keeps the artwork on the user's machine.
   const needsArtwork = format !== 'DXF';
 
+  // Refuse an empty cut here rather than at the server.
+  //
+  // The tracer skips rings that fit no curves (pipeline/index.ts), so a cut
+  // can legitimately come back with nothing in it — a threshold that found no
+  // edges, artwork that vanished under a background removal. The server's
+  // schema requires at least one ring and a positive bounding box, so such an
+  // export was answered with a bare 400 the user could do nothing with, after
+  // a round trip that may have carried the whole artwork with it.
+  //
+  // Nothing is charged for a 400, so this changes no billing: it replaces an
+  // unactionable failure with a sentence naming the cause.
+  if (!ctx.result.beziers.length || !ctx.result.rings.length) {
+    throw new ExportError(
+      'There is no cut to export yet — adjust the cut style or threshold until a cutline appears.',
+      'server'
+    );
+  }
+
   const res = await fetch(`${API}/api/export`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -124,7 +142,23 @@ export async function requestExport(
     // Saying "malformed request" to someone who just clicked Export tells
     // them nothing they can act on, and nothing was charged either way.
     if (res.status === 400) {
-      console.error('Export request rejected by the server schema', body);
+      // The server names the offending fields; print them plainly rather than
+      // as a collapsed object, so a screenshot of the console is enough to
+      // identify the bug without anyone having to expand a disclosure arrow.
+      const fields = Array.isArray(body.fields) ? body.fields : null;
+      if (fields) {
+        console.error(
+          'Export request rejected by the server schema:\n' +
+            fields
+              .map((f: unknown) => {
+                const r = f as { field?: unknown; problem?: unknown };
+                return `  ${String(r.field)}: ${String(r.problem)}`;
+              })
+              .join('\n')
+        );
+      } else {
+        console.error('Export request rejected by the server schema', body);
+      }
       throw new ExportError(
         'Something went wrong preparing that export. Nothing was charged — please try again.',
         'server'
