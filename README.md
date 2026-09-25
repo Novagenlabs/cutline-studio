@@ -29,6 +29,27 @@ moment of a paid download, held in memory and never written to disk.
 
 See BACKEND.md for the credit ledger and payment design.
 
+## The previous version, at `/v1`
+
+The studio as it was just before the UI overhaul (commit `1760aaa`) is served
+frozen at `/v1`, beside the current one, for users who prefer it while the
+current version's tracing is being fixed. It shares the same accounts, credits
+and API.
+
+`public/v1/` is a **committed build output**, not something `npm run build`
+produces: the container has no git history to build an old commit from.
+Rebuild it only to change the pinned commit or the compatibility patch:
+
+```sh
+npm run build:v1     # git archive 1760aaa -> its own npm ci -> build -> public/v1/
+npm run verify:v1    # against a running dev server
+```
+
+`scripts/v1/compat.patch` is the only change to the old source — it sanitises
+the download name to the server's rule and posts credit purchases to the Whop
+route instead of the retired Stripe one. `public/v1/SNAPSHOT` records which
+commit the served copy was built from.
+
 ## What it does
 
 Drop in a PNG (transparent) or JPG (flat or gradient background) and it:

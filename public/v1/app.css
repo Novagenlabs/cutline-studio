@@ -1,0 +1,951 @@
+:root {
+  --bg: #0d0d0f;
+  --panel: #141417;
+  --panel-2: #191920;
+  --line: #26262e;
+  --ink: #ecebe6;
+  --muted: #8e8e99;
+  --accent: #ec008c;
+  --accent-soft: rgba(236, 0, 140, 0.14);
+  --mono: 'Spline Sans Mono', ui-monospace, monospace;
+  --display: 'Bricolage Grotesque', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 13px;
+  overflow: hidden;
+}
+
+#app {
+  display: grid;
+  grid-template:
+    'topbar topbar' 58px
+    'rail stage' 1fr
+    'status status' 32px
+    / 304px 1fr;
+}
+
+/* ---------- top bar ---------- */
+.topbar {
+  grid-area: topbar;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--line);
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      transparent 0 22px,
+      rgba(236, 0, 140, 0.05) 22px 24px
+    ),
+    var(--panel);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-mark {
+  width: 26px;
+  height: 26px;
+  color: var(--accent);
+}
+
+.brand h1 {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 21px;
+  letter-spacing: 0.01em;
+}
+
+.brand h1 em {
+  font-style: normal;
+  color: var(--accent);
+  font-weight: 500;
+  margin-left: 2px;
+}
+
+.tagline {
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.top-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 10px;
+}
+
+/* ---------- buttons ---------- */
+.btn {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: border-color 120ms, background 120ms, color 120ms;
+  user-select: none;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.btn.solid {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  display: inline-block;
+}
+
+.btn.solid:hover {
+  background: #ff2ea6;
+}
+
+.btn.solid input[type='file'] {
+  display: none;
+}
+
+.btn.ghost {
+  background: transparent;
+}
+
+.btn.sm {
+  padding: 4px 10px;
+  font-size: 11px;
+}
+
+/* ---------- rail ---------- */
+.rail {
+  grid-area: rail;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+  overflow-y: auto;
+  padding: 6px 0 24px;
+}
+
+.group {
+  padding: 16px 18px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.group h2 {
+  font-family: var(--display);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--accent);
+  margin-bottom: 14px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.row:last-child {
+  margin-bottom: 0;
+}
+
+.row label {
+  color: var(--muted);
+}
+
+.row.readout output {
+  color: var(--ink);
+}
+
+.row.slider {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.row.slider label {
+  display: flex;
+  justify-content: space-between;
+}
+
+.row.slider output {
+  color: var(--ink);
+}
+
+.row.check {
+  justify-content: flex-start;
+}
+
+.row.check label {
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+  margin-top: 10px;
+}
+
+input[type='number'],
+input[type='text'],
+select {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  padding: 6px 8px;
+  width: 150px;
+}
+
+input[type='number'] {
+  width: 80px;
+}
+
+input:focus,
+select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 3px;
+  background: var(--line);
+  cursor: pointer;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background: var(--accent);
+  border: 2px solid var(--bg);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+input[type='checkbox'] {
+  accent-color: var(--accent);
+  width: 14px;
+  height: 14px;
+}
+
+.shape-picker {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.shape {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  padding: 8px 0;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: border-color 120ms, color 120ms, background 120ms;
+}
+
+.shape svg {
+  width: 26px;
+  height: 26px;
+}
+
+.shape:hover {
+  color: var(--ink);
+  border-color: var(--muted);
+}
+
+.shape.active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.export-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.btn.export {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 9px 12px;
+  font-weight: 700;
+}
+
+.btn.export span {
+  font-weight: 400;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.btn.export:hover:not(:disabled) span {
+  color: var(--accent);
+}
+
+/* ---------- stage ---------- */
+.stage {
+  grid-area: stage;
+  position: relative;
+  overflow: hidden;
+  /* dark checkerboard: reads transparency without glare */
+  --check: #1a1a1e;
+  background-image:
+    linear-gradient(45deg, var(--check) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--check) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--check) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--check) 75%);
+  background-size: 24px 24px;
+  background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+  background-color: #121215;
+}
+
+#preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  touch-action: none;
+}
+
+#preview.panning {
+  cursor: grabbing;
+}
+
+#cut-path {
+  stroke: var(--accent);
+  stroke-width: 1.6;
+  stroke-dasharray: 7 5;
+  vector-effect: non-scaling-stroke;
+  animation: ants 0.9s linear infinite;
+}
+
+#cut-shadow {
+  stroke: rgba(236, 0, 140, 0.28);
+  stroke-width: 5;
+  vector-effect: non-scaling-stroke;
+}
+
+@keyframes ants {
+  to {
+    stroke-dashoffset: -12;
+  }
+}
+
+.dropzone {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  color: var(--muted);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.dropzone .drop-ico {
+  width: 44px;
+  height: 44px;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.dropzone strong {
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.dropzone .sub {
+  max-width: 380px;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.dropzone.hidden {
+  display: none;
+}
+
+#app.dragover .stage {
+  outline: 2px dashed var(--accent);
+  outline-offset: -8px;
+}
+
+.stage-tools {
+  position: absolute;
+  right: 14px;
+  top: 12px;
+  z-index: 3;
+}
+
+/* ---------- status bar ---------- */
+.status {
+  grid-area: status;
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  padding: 0 16px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.status span:first-child {
+  color: var(--ink);
+}
+
+.status #st-zoom {
+  margin-left: auto;
+}
+
+/* ---------- toasts ---------- */
+
+.toasts {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 420px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--muted);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  animation: toast-in 160ms ease-out;
+}
+
+.toast.leaving {
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 160ms ease-in, transform 160ms ease-in;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.toast-icon {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.toast-text { flex: 1 1 auto; }
+
+.toast-count {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.toast-action {
+  flex: 0 0 auto;
+  font: inherit;
+  font-size: 12px;
+  color: var(--accent);
+  background: none;
+  border: 0;
+  padding: 2px 4px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.toast-close {
+  flex: 0 0 auto;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  padding: 0 2px;
+  cursor: pointer;
+}
+
+.toast-close:hover { color: var(--text); }
+
+.toast-success { border-left-color: #2ecc71; }
+.toast-success .toast-icon { color: #2ecc71; }
+.toast-error { border-left-color: var(--accent); }
+.toast-error .toast-icon { color: var(--accent); }
+.toast-info { border-left-color: #4aa3ff; }
+.toast-info .toast-icon { color: #4aa3ff; }
+
+
+/* ---------- region fix ---------- */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.chip {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 4px 9px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chip.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.chip .x {
+  opacity: 0.6;
+}
+
+.chip .x:hover {
+  opacity: 1;
+  color: #ff4d4d;
+}
+
+#preview.marquee-mode {
+  cursor: crosshair;
+}
+
+#marquee {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.region-rect {
+  fill: none;
+  stroke: rgba(236, 0, 140, 0.45);
+  stroke-width: 1;
+  stroke-dasharray: 5 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.region-rect.active {
+  stroke: var(--accent);
+  stroke-width: 1.6;
+}
+
+#cut-v1 {
+  stroke: #19d3f0;
+  stroke-width: 1.4;
+  stroke-dasharray: 3 5;
+  vector-effect: non-scaling-stroke;
+}
+
+#btn-region.armed {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ---------------- simple / advanced ---------------- */
+
+.mode-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 10px 12px 0;
+  background: var(--panel);
+}
+
+.mode-tab {
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.mode-tab.active {
+  color: var(--accent);
+  background: var(--panel);
+  border-color: var(--accent);
+}
+
+/* Advanced controls are hidden, not duplicated, so both modes read the same
+   state and cannot disagree about what the cut currently is. */
+body.mode-simple .rail > .group:not(#panel-simple):not(.always-on) {
+  display: none;
+}
+
+body:not(.mode-simple) #panel-simple {
+  display: none;
+}
+
+.preset-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.preset {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.preset:hover {
+  border-color: var(--accent);
+}
+
+.preset.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.preset-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.preset-sub {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+#preset-hint {
+  margin-top: 10px;
+  line-height: 1.5;
+}
+
+/* ---------- credit pill ---------- */
+
+.credit-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 6px 12px;
+  margin-right: 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.credit-pill:hover { border-color: var(--accent); }
+
+.credit-count {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.credit-label {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 10px;
+}
+
+/* Running low, or out, should be visible before a download fails. */
+.credit-pill.is-low { border-color: #d9822b; }
+.credit-pill.is-low .credit-count { color: #d9822b; }
+.credit-pill.is-empty { border-color: var(--accent); background: var(--accent-soft); }
+.credit-pill.is-empty .credit-count { color: var(--accent); }
+
+/* ---------- confirm sheet ---------- */
+
+.sheet {
+  /* A modal <dialog> is centred by the UA default margin: auto, which the
+     global reset in this stylesheet zeroes out — without restoring it the
+     sheet pins to the top-left corner. */
+  margin: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  padding: 0;
+  max-width: 380px;
+  width: calc(100vw - 32px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+}
+
+.sheet::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.sheet-body { padding: 20px; }
+
+.sheet h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  letter-spacing: 0.01em;
+}
+
+.sheet-text {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.sheet-facts {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+  font-size: 13px;
+}
+
+.sheet-facts li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 0;
+}
+
+.sheet-facts span { color: var(--muted); }
+
+.sheet-skip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 16px;
+  cursor: pointer;
+}
+
+.sheet-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ---------- on-canvas job status ---------- */
+
+/* `hidden` is only a UA default of display:none, so any author `display` rule
+   beats it — without this the banner is on screen from page load announcing
+   that a file is being prepared before the user has opened one. */
+.job[hidden] { display: none; }
+
+.job {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(20, 20, 23, 0.92);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  font-size: 13px;
+  white-space: nowrap;
+  animation: job-in 160ms ease-out;
+}
+
+@keyframes job-in {
+  from { opacity: 0; transform: translate(-50%, -6px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* Holds the cut mark (src/ui/cutmark.ts). It is a bare slot: the indicator
+   is the brand mark cutting, and a ring drawn around it would read as a
+   second, competing spinner. */
+.job-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--ink);
+}
+
+.job-sub {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Finished states stop cutting — blades still working after the work is done
+   is a lie about what the app is doing. The mark's own stop() cancels the
+   animation; these just recolour the parked blades to carry the outcome. */
+.job.is-done .job-spinner { color: #2ecc71; }
+
+.job.is-error .job-spinner { color: var(--accent); }
+
+.job.is-done .job-sub,
+.job.is-error .job-sub { display: none; }
+
+/* Full-surface loading (src/ui/loading.ts), for waits that block the whole
+   workspace rather than annotating a working one. Kept out of the layout
+   until it is needed: visibility alone would leave it intercepting clicks. */
+.loading {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(13, 13, 15, 0.82);
+  backdrop-filter: blur(8px);
+}
+
+.loading.is-on {
+  display: flex;
+  animation: loading-in 180ms ease-out;
+}
+
+@keyframes loading-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.loading-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  color: var(--ink);
+}
+
+.loading-text {
+  font-size: 13px;
+  color: var(--muted);
+  letter-spacing: 0.01em;
+}
+
+.sheet-note {
+  font-size: 12px;
+  opacity: 0.75;
+  border-left: 2px solid var(--line);
+  padding-left: 10px;
+}
+
+/* ---------- credit packs ---------- */
+
+.pack-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.pack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+  padding: 12px 8px;
+  font: inherit;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.pack:hover:not(:disabled) { border-color: var(--accent); }
+.pack:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.pack-credits { font-size: 18px; font-weight: 700; }
+.pack-price { font-size: 13px; }
+.pack-per { font-size: 10px; color: var(--muted); }

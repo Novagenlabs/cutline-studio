@@ -31,6 +31,11 @@ const config: NextConfig = {
       { source: '/models/:path*', headers: isolation },
       { source: '/ort/:path*', headers: isolation },
       { source: '/', headers: isolation },
+      // The previous studio, frozen at the commit before the UI overhaul and
+      // served beside the current one. Same isolation as the root, so a
+      // popup sign-in behaves identically there (see /signin-done below).
+      { source: '/v1', headers: isolation },
+      { source: '/v1/:path*', headers: isolation },
       // The sign-in popup must land in the SAME browsing-context group as the
       // studio that opened it, or COOP: same-origin severs window.opener and
       // the popup cannot report back. Without this the opener only learns
@@ -43,6 +48,10 @@ const config: NextConfig = {
     return [
       // The cutter is the product; it lives at the root.
       { source: '/', destination: '/cutline/index.html' },
+      // The frozen previous version. public/v1/ is a committed build output
+      // (scripts/build-v1.sh), not something `npm run build` produces — the
+      // container has no checkout of the old commit to build it from.
+      { source: '/v1', destination: '/v1/index.html' },
       // A static directory under public/ is not served at its bare path, so
       // the motion lab needs the same treatment to answer on /motion-lab.
       // Dev-only by intent, but harmless in production: it ships no secrets

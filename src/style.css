@@ -3145,3 +3145,9 @@ body.is-refining-bg #preview.panning {
 .hint.warn[hidden] {
   display: none;
 }
+
+/* A link dressed as a button is still a link to the browser: without this
+   the "Previous version" link in the top bar renders underlined. */
+a.btn {
+  text-decoration: none;
+}

@@ -1,0 +1,58 @@
+--- a/src/paid-export.ts
++++ b/src/paid-export.ts
+@@ -15,6 +15,23 @@
+  */
+ 
+ export type PaidFormat = 'SVG' | 'PDF' | 'DXF' | 'PNG';
++
++/**
++ * [v1 compatibility] The server only accepts `[\w. -]` in the download name,
++ * and this version sent the file's name through untouched — so "logo (1).png"
++ * failed the paid export with a bare 400. Sanitised here exactly as the
++ * current client does, so the frozen v1 keeps exporting.
++ */
++export function safeFilenameBase(base: string): string {
++  const cleaned = base
++    .normalize('NFKD')
++    .replace(/[̀-ͯ]/g, '')
++    .replace(/[^\w. -]+/g, '-')
++    .replace(/[-\s]{2,}/g, '-')
++    .replace(/^[-.\s]+|[-.\s]+$/g, '')
++    .slice(0, 100);
++  return `${cleaned || 'cutline'}-cut`;
++}
+ 
+ export interface ExportContext {
+   result: CutlineResult;
+@@ -71,7 +88,7 @@
+       dpi: ctx.dpi,
+       spotName: ctx.spotName,
+       halo: ctx.halo,
+-      filenameBase: `${ctx.fileBase}-cut`,
++      filenameBase: safeFilenameBase(ctx.fileBase),
+       imageDataUrl: needsArtwork ? ctx.imageDataUrl : undefined,
+     }),
+   });
+--- a/src/ui/credits.ts
++++ b/src/ui/credits.ts
+@@ -75,9 +75,9 @@
+       if (!pack) return;
+       btn.disabled = true;
+       const note = document.getElementById('credits-note');
+-      if (note) note.textContent = 'Opening Stripe…';
++      if (note) note.textContent = 'Opening checkout…';
+       try {
+-        const res = await fetch('/api/stripe/checkout', {
++        const res = await fetch('/api/whop/checkout', {
+           method: 'POST',
+           headers: { 'content-type': 'application/json' },
+           credentials: 'include',
+@@ -91,7 +91,7 @@
+           window.location.href = url;
+           return;
+         }
+-        if (note) note.textContent = 'Complete your purchase in the Stripe window…';
++        if (note) note.textContent = 'Complete your purchase in the checkout window…';
+         // Same reason as sign-in: the studio would otherwise sit silent for
+         // however long checkout takes.
+         jobStart(null, 'signing');
