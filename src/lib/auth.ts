@@ -4,6 +4,7 @@ import Google from 'next-auth/providers/google';
 import { db } from './db';
 import { SIGNUP_GRANT, grantCredits } from './credits';
 import { claimSubscriptions } from './subscription';
+import { describeAuthError, authErrorHint } from './auth-log';
 
 /**
  * Providers are assembled from what is actually configured.
@@ -39,6 +40,52 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
    * which is the worst place to discover it.
    */
   trustHost: true,
+  /**
+   * Both secrets, explicitly, so AUTH_SECRET can be rotated.
+   *
+   * Every sign-in cookie — session, CSRF, and the 15-minute PKCE/state
+   * cookies of an OAuth round trip — is encrypted with the secret. Change
+   * it and every existing cookie stops decrypting: users are signed out, and
+   * anyone mid-sign-in lands on the error page with "pkceCodeVerifier value
+   * could not be parsed". Auth.js can decrypt with several secrets (the
+   * first one encodes), which makes a rotation painless — but under
+   * next-auth the AUTH_SECRET_1..3 environment convention is dead: next-auth
+   * sets `secret` to the bare AUTH_SECRET string before @auth/core ever looks
+   * for the numbered ones. So the array is built here.
+   *
+   * Empty when AUTH_SECRET is unset, which hands the decision back to the
+   * environment defaults exactly as before.
+   */
+  secret: [process.env.AUTH_SECRET, process.env.AUTH_SECRET_PREVIOUS].filter(
+    (s): s is string => typeof s === 'string' && s.length > 0
+  ),
+  /**
+   * Our own error page. Auth.js's default reads "Server error — there is a
+   * problem with the server configuration", which is what users reported,
+   * and it offers no way to try again. Ours does, in place, and says what
+   * actually happened (see app/signin-error/page.tsx).
+   */
+  pages: { error: '/signin-error' },
+  /**
+   * Log the cause, not just the wrapper.
+   *
+   * Auth.js attaches the underlying error as `cause` but its default logger
+   * only prints a cause that carries an `err` property — which the OAuth
+   * checks do not set. The production log therefore showed one line,
+   * "InvalidCheck: pkceCodeVerifier value could not be parsed", for what is
+   * at least three different problems with three different fixes. This
+   * prints the chain and, where the cause is one seen before, what to do.
+   */
+  logger: {
+    error(error) {
+      const lines = describeAuthError(error);
+      console.error(`[auth][error] ${lines[0]}`);
+      for (const line of lines.slice(1)) console.error(`[auth][cause] ${line}`);
+      const hint = authErrorHint(lines);
+      if (hint) console.error(`[auth][hint] ${hint}`);
+      if (error instanceof Error && error.stack) console.error(error.stack);
+    },
+  },
   session: { strategy: 'database' },
   providers,
   callbacks: {

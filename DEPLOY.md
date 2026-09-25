@@ -13,7 +13,7 @@ All of these go in Dokploy's **Environment** tab for the application.
 | Variable | What it is |
 |---|---|
 | `DATABASE_URL` | Neon Postgres connection string. The pooled URL is fine — verified against both endpoints. |
-| `AUTH_SECRET` | Signs session cookies. Generate with `npx auth secret` or `openssl rand -base64 32`. **Must differ from the development value**, and changing it later signs everyone out. |
+| `AUTH_SECRET` | Encrypts every sign-in cookie: the session, and the short-lived PKCE/state cookies of a Google round trip. Generate with `npx auth secret` or `openssl rand -base64 32`. **Must differ from the development value.** To change it, move the old value to `AUTH_SECRET_PREVIOUS` first (below) — replacing it outright signs everyone out and fails any sign-in that was in progress with "pkceCodeVerifier value could not be parsed". |
 | `APP_URL` | The public origin — currently `https://cutlinestudio.space`. Stripe redirects back here after checkout, so a wrong value strands buyers. No trailing slash. |
 | `AUTH_URL` | Same value as `APP_URL`. Auth.js builds its callback URLs from this. (`trustHost` is set in code, so this is belt-and-braces rather than the only thing standing between you and a broken sign-in.) |
 | `AUTH_GOOGLE_ID` | Google OAuth client id. Read by name — the provider is configured as bare `Google`. |
@@ -38,6 +38,7 @@ yet". They are not optional if anyone is meant to pay.
 |---|---|
 | `EMAIL_SERVER` | SMTP URL, only if you want email magic-link sign-in alongside Google. |
 | `EMAIL_FROM` | Sender address for those emails. Both must be set or neither — the provider is skipped unless both are present. |
+| `AUTH_SECRET_PREVIOUS` | The previous `AUTH_SECRET`, during a rotation. Cookies encrypted under it keep working while new ones use the current secret. Remove it a day or two later, once no cookie from before the change can still exist. |
 
 `NODE_ENV=production` is set by the Dockerfile; Dokploy does not need it.
 
@@ -126,6 +127,7 @@ Two things worth knowing about how this behaves:
 
 - `https://<domain>/` — the cutter, with the credit pill in the top bar
 - `https://<domain>/api/me` — should return JSON; `signedIn:false` when logged out
+- `https://<domain>/signin-error?error=Configuration` — the page a failed sign-in lands on, with a working **Try again**
 - Sign in, then buy the smallest pack in Stripe **test** mode first and confirm
   the balance increases. That exercises the one path that cannot be tested
   locally without real keys.
@@ -141,3 +143,10 @@ Two things worth knowing about how this behaves:
   `/signin-done` (so the sign-in popup can talk back), and deliberately not to
   `/api/auth/*`. If you put a CDN or proxy in front that strips or rewrites
   response headers, AI matting loses multithreading and sign-in can break.
+- **A sign-in failure logs its cause.** Look for `[auth][error]`, then the
+  `[auth][cause]` lines under it and, where the cause is a known one, an
+  `[auth][hint]` saying what to do. `"exp" claim timestamp check failed` is a
+  user who took more than 15 minutes on Google's consent screen (trying again
+  works); `no matching decryption secret` means the cookie was made under a
+  different `AUTH_SECRET` than this process has — a rotation without
+  `AUTH_SECRET_PREVIOUS`, or two instances with different environment.
