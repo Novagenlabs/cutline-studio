@@ -11,6 +11,7 @@
 // another pass over the image as it stands, a restart from the upload, and
 // undo. This checks each one acts on what its label claims.
 import puppeteer from 'puppeteer-core';
+import { flatFixture } from './fixture-flat';
 
 const CHROME =
   process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -69,7 +70,9 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
     String(await p.evaluate(`document.getElementById('art').getAttribute('href')`));
 
   const input = await p.$('input[type=file]');
-  await input!.uploadFile(IMAGE);
+  // Flattened: removal on the transparent original is now a no-op, and the
+  // menu only appears once something has been removed.
+  await input!.uploadFile(await flatFixture(IMAGE));
   await wait(4000);
   const onUpload = await opaque();
   const uploadHref = await artHref();

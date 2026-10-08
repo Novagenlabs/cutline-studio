@@ -4,6 +4,8 @@ import { computeAiMatte, matteToImage } from './ai/matte';
 import {
   upsampleMatte, applyStrokes, cutout, floodMatte, allColourMatte, coverage,
   type Stroke,
+  keptOpaque,
+  keptOpaqueStats,
 } from './ai/cutout';
 import { buildRaster } from './export/png';
 import { makeSampleImage } from './ui/sample';
@@ -444,6 +446,19 @@ function screenToImg(e: PointerEvent): { x: number; y: number } {
 }
 
 let panFrom: { x: number; y: number; tx: number; ty: number } | null = null;
+/**
+ * A refine click, held until release.
+ *
+ * While reviewing a background removal the canvas is a correction surface,
+ * but it is still the canvas: a user who drags to pan — as they did before
+ * the feature existed — must get a pan, not a flood-remove of whatever
+ * same-colour area the drag started on. So a press records where it landed
+ * and commits the correction only if the pointer stays put until release;
+ * movement past the slop turns it into the pan it was meant to be.
+ */
+let strokeFrom: { cx: number; cy: number; x: number; y: number } | null = null;
+/** Trackpad and mouse jitter on a click stays well inside this. */
+const CLICK_SLOP_PX = 4;
 let marqueeArmed = false;
 let marqueeFrom: { x: number; y: number } | null = null;
 const marqueeEl = $('#marquee') as unknown as SVGRectElement;
@@ -456,11 +471,9 @@ previewSvg.addEventListener('pointerdown', (e) => {
   // available on the scroll wheel and on a two-finger trackpad drag.
   if (state.bgReviewing && state.bgMatte) {
     const p = screenToImg(e);
-    state.bgStrokes.push({ x: p.x, y: p.y, r: state.bgBrush, mode: state.bgMode });
-    // A new correction after undoing takes a different branch, so anything
-    // that was undone is no longer reachable history.
-    state.bgRedo = [];
-    applyBackgroundPreview(true);
+    strokeFrom = { cx: e.clientX, cy: e.clientY, x: p.x, y: p.y };
+    // Armed as a pan as well; which one it was is settled by movement.
+    panFrom = { x: e.clientX, y: e.clientY, tx: view.tx, ty: view.ty };
     return;
   }
 
@@ -470,6 +483,11 @@ previewSvg.addEventListener('pointerdown', (e) => {
   }
   panFrom = { x: e.clientX, y: e.clientY, tx: view.tx, ty: view.ty };
   previewSvg.classList.add('panning');
+});
+previewSvg.addEventListener('pointercancel', () => {
+  strokeFrom = null;
+  panFrom = null;
+  previewSvg.classList.remove('panning');
 });
 previewSvg.addEventListener('pointermove', (e) => {
   if (marqueeFrom) {
@@ -481,12 +499,29 @@ previewSvg.addEventListener('pointermove', (e) => {
     marqueeEl.removeAttribute('hidden');
     return;
   }
+  if (strokeFrom) {
+    const dx = e.clientX - strokeFrom.cx;
+    const dy = e.clientY - strokeFrom.cy;
+    if (dx * dx + dy * dy <= CLICK_SLOP_PX * CLICK_SLOP_PX) return; // still a click
+    strokeFrom = null; // became a drag: pan instead
+  }
   if (!panFrom) return;
   view.tx = panFrom.tx + (e.clientX - panFrom.x);
   view.ty = panFrom.ty + (e.clientY - panFrom.y);
   applyView();
 });
 previewSvg.addEventListener('pointerup', (e) => {
+  if (strokeFrom) {
+    const s = strokeFrom;
+    strokeFrom = null;
+    panFrom = null;
+    state.bgStrokes.push({ x: s.x, y: s.y, r: state.bgBrush, mode: state.bgMode });
+    // A new correction after undoing takes a different branch, so anything
+    // that was undone is no longer reachable history.
+    state.bgRedo = [];
+    applyBackgroundPreview(true);
+    return;
+  }
   if (marqueeFrom) {
     const p = screenToImg(e);
     const x0 = Math.max(0, Math.min(marqueeFrom.x, p.x));
@@ -554,14 +589,18 @@ $('#btn-detect').addEventListener('click', () => {
   }
   // Inset by a hair so neighbouring boxes never share an edge, which would
   // make the feather blend of one region bleed into the next.
-  // Seed each element with the current global offset so selecting one and
-  // dragging the slider adjusts from what is already on screen.
+  //
+  // No offsetMm seed. A region that carries its own offset switches the
+  // engine to per-element offsets and stops following the global one — so
+  // seeding every element with the current offset froze the cut style:
+  // Detect, then Tight, and the cut stayed at 3 mm with the Tight stop lit.
+  // An element without an offset follows the global value (the engine falls
+  // back to globalOffsetPx per ring), and tuning an element writes its own.
   state.params.regions = groups.map((g) => ({
     x: Math.round(g.bbox.x),
     y: Math.round(g.bbox.y),
     w: Math.round(g.bbox.w),
     h: Math.round(g.bbox.h),
-    offsetMm: state.params.offsetMm,
   }));
   state.activeRegion = 0;
   renderRegions();
@@ -1457,15 +1496,56 @@ async function removeBackground(fromOriginal = true): Promise<void> {
   let matte = insideToo
     ? allColourMatte(full, state.params.bgTolerance)
     : floodMatte(full, state.params.bgTolerance);
-  let kept = coverage(matte);
+
+  // Whether the artwork already carries transparency — the same test the
+  // tracer uses to choose its alpha path (pipeline/mask.ts).
+  let hasAlpha = false;
+  for (let i = 3; i < full.data.length; i += 4) {
+    if (full.data[i] < 250) {
+      hasAlpha = true;
+      break;
+    }
+  }
+
+  // How much of the ARTWORK a matte keeps. On an opaque image that is plain
+  // coverage. On a transparent one, coverage counts the transparency itself
+  // as kept and so cannot tell "found nothing" from "found everything"; the
+  // share over opaque pixels can.
+  const keptShare = (m: Float32Array) => (hasAlpha ? keptOpaque(full, m) : coverage(m));
+  // How many opaque pixels survive, as a count. A share cannot tell small
+  // artwork on a large card (0.3% kept, correct) from an erased image (0 kept);
+  // the count can, and it is what the erase refusal below is keyed to.
+  const keptCount = (m: Float32Array) => keptOpaqueStats(full, m).kept;
+  // Fewer kept pixels than this is not artwork; it is what is left after
+  // the artwork went. An 8x8 block, well under anything a cutter could use.
+  const MIN_KEPT_PX = 64;
+  let kept = keptShare(matte);
+
+  // A transparent PNG is already a cutout: whoever made it decided where the
+  // subject ends. If the colour pass found no opaque background, say so and
+  // leave the artwork exactly as it is — this used to fall through to the
+  // model, whose 512-px matte can only lose detail from an edge that is
+  // already pixel-exact. Dropping parts of the artwork is what Refine is for.
+  if (hasAlpha && kept >= 1) {
+    btn.disabled = false;
+    toast(
+      state.bgOriginal
+        ? 'Nothing more to remove — use Refine to drop parts of the artwork.'
+        : 'This image is already transparent — there is no background to remove. Use Refine to drop parts of the artwork.',
+      'info',
+      7000
+    );
+    return;
+  }
 
   // A flood that kept almost everything found no background it could reach;
   // one that kept almost nothing ate the artwork. Either way the image is not
-  // the flat-background kind, so it is worth the model.
+  // the flat-background kind, so it is worth the model — unless the image
+  // has its own transparency, where the model has nothing to add (above).
   // Only the colour-based pass can honour "inside too": the model segments a
   // subject and has no notion of which colour counts as background, so
   // falling through to it would silently ignore the toggle.
-  const floodFailed = !insideToo && (kept > 0.92 || kept < 0.02);
+  const floodFailed = !insideToo && !hasAlpha && (kept > 0.92 || kept < 0.02);
 
   if (floodFailed) {
     // Same overlay, same translation. This is the path most users hit first,
@@ -1487,17 +1567,33 @@ async function removeBackground(fromOriginal = true): Promise<void> {
         state.srcW,
         state.srcH
       );
-      kept = coverage(matte);
+      kept = keptShare(matte);
     } catch (err) {
       console.error('Neural background removal failed', err);
-      // Keep the flood result rather than nothing: on some images it is
-      // still better than leaving the background in.
+      // Fall back to the flood result only when it is a sane one. The flood
+      // is here BECAUSE it kept almost nothing or almost everything; applying
+      // an empty matte erased the whole artwork — measured on the dark-text
+      // fixtures, where the flood dropped every opaque pixel and the cut came
+      // back with zero rings. "Almost nothing" is judged by count, not share:
+      // small artwork on a big card is a sane 0.3%.
+      if (keptCount(matte) < MIN_KEPT_PX || kept > 0.985) {
+        btn.disabled = false;
+        toast('Could not find the background on this device — nothing was changed.', 'error', 6000);
+        return;
+      }
       toast('Used a simpler background removal — this device cannot run the better one.', 'info', 6000);
     } finally {
       close();
     }
   }
 
+  // Whatever produced it, a matte that keeps next to nothing of the artwork
+  // is not a background removal; it is an erasure.
+  if (keptCount(matte) < MIN_KEPT_PX) {
+    btn.disabled = false;
+    toast('Background removal would erase the artwork — nothing was changed.', 'error', 6000);
+    return;
+  }
   if (kept > 0.985) {
     btn.disabled = false;
     toast('No background found to remove.', 'info', 5000);

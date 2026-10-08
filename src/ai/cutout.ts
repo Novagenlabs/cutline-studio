@@ -161,34 +161,57 @@ export function applyStrokes(
   return out;
 }
 
-/** Splice a matte in as the alpha channel; RGB is left alone. */
+/**
+ * Combine a matte with the image's own alpha: out = src alpha × matte / 255.
+ *
+ * Multiply, never replace. A matte can only take coverage away, so the
+ * artwork's own anti-aliased ramp survives wherever the matte keeps a pixel,
+ * and a pixel that was transparent can never become opaque. On an opaque
+ * image (alpha 255 everywhere) this is exactly the old splice.
+ *
+ * The splice was the single largest cause of "the new version traces worse":
+ * on a transparent PNG — the app's main input — it painted every surviving
+ * pixel alpha 255, so soft edges became pixel staircases and enclosed
+ * transparency became opaque black. Measured on the feelathome fixture:
+ * 23,325 soft-edge pixels hardened, 24,145 pixels of black fill, and a 6.7×
+ * node count at Tight. With multiply the trace is byte-identical to the
+ * untouched artwork.
+ */
 export function cutout(img: RasterImage, matte: Float32Array): RasterImage {
   const out = new Uint8ClampedArray(img.data.length);
   out.set(img.data);
   for (let i = 0; i < matte.length; i++) {
-    out[i * 4 + 3] = Math.max(0, Math.min(255, matte[i]));
+    const m = Math.max(0, Math.min(255, matte[i]));
+    out[i * 4 + 3] = Math.round((img.data[i * 4 + 3] * m) / 255);
   }
   return { data: out, width: img.width, height: img.height };
 }
 
 /**
- * Background removal without a model.
- *
- * The same border-vote flood fill the tracer already uses, lifted out so the
- * button works on a device that cannot run the model — or before the ~98MB
- * download finishes. On a flat studio background it is genuinely as good as
- * the neural matte and instant; it is only photographs and gradients where
- * the difference shows.
+ * Below this source alpha a pixel is already background. The same cut-off
+ * the tracer applies by default (alphaThreshold), so the two agree on what
+ * counts as "already transparent".
  */
-export function floodMatte(img: RasterImage, tolerance = 32): Float32Array {
-  const { width: w, height: h, data } = img;
-  const matte = new Float32Array(w * h).fill(255);
+const TRANSPARENT_BELOW = 128;
 
-  // Most common border colour, quantised so noise in a JPEG does not split
-  // the vote across a hundred near-identical whites.
+/**
+ * The most common colour on the 2px border ring, voted among OPAQUE pixels
+ * only — quantised so JPEG noise does not split the vote across a hundred
+ * near-identical whites.
+ *
+ * Transparent pixels carry an arbitrary RGB (a canvas reads them back as
+ * black) that is not a background colour, so they never vote. Before this
+ * rule, a transparent PNG's border voted "black", and the flood then removed
+ * every connected dark outline in the artwork as if it were background.
+ * Returns null when the border has no opaque pixel at all: there is no
+ * colour background to remove.
+ */
+function borderColour(img: RasterImage): [number, number, number] | null {
+  const { width: w, height: h, data } = img;
   const votes = new Map<number, number>();
   const vote = (x: number, y: number) => {
     const i = (y * w + x) * 4;
+    if (data[i + 3] < TRANSPARENT_BELOW) return;
     const key = ((data[i] >> 4) << 8) | ((data[i + 1] >> 4) << 4) | (data[i + 2] >> 4);
     votes.set(key, (votes.get(key) ?? 0) + 1);
   };
@@ -204,31 +227,104 @@ export function floodMatte(img: RasterImage, tolerance = 32): Float32Array {
       vote(w - 1 - x, y);
     }
   }
-  let best = 0;
-  let bestN = -1;
+  let best = -1;
+  let bestN = 0;
   for (const [k, n] of votes) {
     if (n > bestN) {
       bestN = n;
       best = k;
     }
   }
-  const br = ((best >> 8) & 0xf) * 17;
-  const bg = ((best >> 4) & 0xf) * 17;
-  const bb = (best & 0xf) * 17;
+  if (best < 0) return null;
+  return [((best >> 8) & 0xf) * 17, ((best >> 4) & 0xf) * 17, (best & 0xf) * 17];
+}
+
+/**
+ * The share of the artwork's OPAQUE pixels a matte keeps, 0..1.
+ *
+ * `coverage` counts every pixel, which on a transparent image counts the
+ * transparency itself as "kept" and hides whether anything of the artwork
+ * was touched. This answers the question removal actually has to ask: did
+ * the matte find any opaque background? 1 when there are no opaque pixels.
+ */
+export function keptOpaque(img: RasterImage, matte: Float32Array): number {
+  const { opaque, kept } = keptOpaqueStats(img, matte);
+  return opaque === 0 ? 1 : kept / opaque;
+}
+
+/**
+ * The counts behind keptOpaque: how many opaque pixels there are, and how
+ * many of them the matte keeps.
+ *
+ * The absolute count matters on its own. A share says nothing about size:
+ * small artwork on a large flat card legitimately keeps 0.3% of the image,
+ * while an erased image keeps 0 pixels. Refusing a matte by share blocked
+ * the first to catch the second; refusing by count catches only the second.
+ */
+export function keptOpaqueStats(
+  img: RasterImage,
+  matte: Float32Array
+): { opaque: number; kept: number } {
+  let opaque = 0;
+  let kept = 0;
+  for (let i = 0; i < matte.length; i++) {
+    if (img.data[i * 4 + 3] < TRANSPARENT_BELOW) continue;
+    opaque++;
+    if (matte[i] >= 128) kept++;
+  }
+  return { opaque, kept };
+}
+
+/**
+ * Background removal without a model.
+ *
+ * The same border-vote flood fill the tracer already uses, lifted out so the
+ * button works on a device that cannot run the model — or before the ~98MB
+ * download finishes. On a flat studio background it is genuinely as good as
+ * the neural matte and instant; it is only photographs and gradients where
+ * the difference shows.
+ *
+ * Alpha-aware. Opaque pixels are dropped when they match the colour voted
+ * among opaque border pixels; transparent pixels neither vote nor match.
+ * With no opaque border pixel there is no colour background and nothing is
+ * dropped — a transparent PNG comes back untouched, which is the whole point.
+ *
+ * The tolerance is per-channel here (tol²·3 on the squared distance) where
+ * the tracer's own flood in pipeline/mask.ts is Euclidean (tol²). Measured
+ * against the artwork's true alpha on flat-background inputs, this one lands
+ * equal or closer to the edge in every case — it removes only anti-alias
+ * fringe — so it is kept; the untouched-image trace never comes through here.
+ */
+export function floodMatte(img: RasterImage, tolerance = 32): Float32Array {
+  const { width: w, height: h, data } = img;
+  const matte = new Float32Array(w * h).fill(255);
+
+  const bgc = borderColour(img);
+  if (!bgc) return matte;
+  const [br, bg, bb] = bgc;
   const tol2 = tolerance * tolerance * 3;
 
   // Scanline flood from every border pixel. Only connected background is
   // removed, so a white letter counter inside the artwork survives.
+  //
+  // Alpha rule: a pixel below TRANSPARENT_BELOW is already background. It is
+  // never colour-tested and the flood may pass THROUGH it, so background
+  // reached across transparency still counts as connected — but its matte is
+  // left at 255: cutout multiplies, so its own low alpha already hides it and
+  // the anti-aliased ramp around the artwork stays exactly as drawn. Zeroing
+  // it instead clipped the 1–127 fringe and changed the trace.
   const seen = new Uint8Array(w * h);
   const stack: number[] = [];
   const push = (x: number, y: number) => {
     const p = y * w + x;
     if (seen[p]) return;
     const i = p * 4;
-    const dr = data[i] - br;
-    const dg = data[i + 1] - bg;
-    const db = data[i + 2] - bb;
-    if (dr * dr + dg * dg + db * db > tol2) return;
+    if (data[i + 3] >= TRANSPARENT_BELOW) {
+      const dr = data[i] - br;
+      const dg = data[i + 1] - bg;
+      const db = data[i + 2] - bb;
+      if (dr * dr + dg * dg + db * db > tol2) return;
+    }
     seen[p] = 1;
     stack.push(p);
   };
@@ -242,7 +338,7 @@ export function floodMatte(img: RasterImage, tolerance = 32): Float32Array {
   }
   while (stack.length) {
     const p = stack.pop()!;
-    matte[p] = 0;
+    if (data[p * 4 + 3] >= TRANSPARENT_BELOW) matte[p] = 0;
     const x = p % w;
     const y = (p / w) | 0;
     if (x > 0) push(x - 1, y);
@@ -276,38 +372,14 @@ export function allColourMatte(img: RasterImage, tolerance = 32): Float32Array {
   const { width: w, height: h, data } = img;
   const matte = new Float32Array(w * h).fill(255);
 
-  const votes = new Map<number, number>();
-  const vote = (x: number, y: number) => {
-    const i = (y * w + x) * 4;
-    const key = ((data[i] >> 4) << 8) | ((data[i + 1] >> 4) << 4) | (data[i + 2] >> 4);
-    votes.set(key, (votes.get(key) ?? 0) + 1);
-  };
-  for (let x = 0; x < w; x++) {
-    for (let y = 0; y < Math.min(2, h); y++) {
-      vote(x, y);
-      vote(x, h - 1 - y);
-    }
-  }
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < Math.min(2, w); x++) {
-      vote(x, y);
-      vote(w - 1 - x, y);
-    }
-  }
-  let best = 0;
-  let bestN = -1;
-  for (const [k, n] of votes) {
-    if (n > bestN) {
-      bestN = n;
-      best = k;
-    }
-  }
-  const br = ((best >> 8) & 0xf) * 17;
-  const bg = ((best >> 4) & 0xf) * 17;
-  const bb = (best & 0xf) * 17;
+  const bgc = borderColour(img);
+  if (!bgc) return matte;
+  const [br, bg, bb] = bgc;
   const tol2 = tolerance * tolerance * 3;
 
   for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+    // Same alpha rule as floodMatte: transparent pixels neither vote nor match.
+    if (data[i + 3] < TRANSPARENT_BELOW) continue;
     const dr = data[i] - br;
     const dg = data[i + 1] - bg;
     const db = data[i + 2] - bb;

@@ -9,6 +9,7 @@
 // Checked with getComputedStyle on #preview rather than by reading the
 // stylesheet, because the bug was entirely about which element wins.
 import puppeteer from 'puppeteer-core';
+import { flatFixture } from './fixture-flat';
 
 const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const URL = process.env.APP_URL ?? 'http://localhost:3000/';
@@ -42,7 +43,9 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   check((await cursor()) === 'grab', `grab before anything is opened (got "${await cursor()}")`);
 
   const input = await p.$('input[type=file]');
-  await input!.uploadFile(IMAGE);
+  // Flattened: removal on the transparent original is now a no-op, and this
+  // needs a refine session to look at.
+  await input!.uploadFile(await flatFixture(IMAGE));
   await wait(4000);
   check((await cursor()) === 'grab', 'still grab with artwork open');
 

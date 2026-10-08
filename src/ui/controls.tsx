@@ -17,6 +17,7 @@
  * React 19 is already a dependency (Next serves the account pages with it), so
  * this adds a mount, not a framework.
  */
+import * as React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Slider } from '@base-ui-components/react/slider';
 import { Switch } from '@base-ui-components/react/switch';
@@ -52,18 +53,37 @@ export interface CutSliderOptions {
 }
 
 function CutSlider({ stops, value, onChange }: CutSliderOptions) {
+  // A press that ends on the stop the knob is already parked on never changes
+  // the value, so Base UI never reports it — and with custom Advanced params
+  // the knob is parked on the NEAREST stop, which is exactly when the user
+  // presses it to get that preset back. Re-send the current stop on release
+  // when nothing moved during the gesture. Not onValueCommitted: that reports
+  // a value Base UI caches from its last change, which an outside update
+  // (a stop button, an Advanced edit) leaves stale.
+  const moved = React.useRef(false);
   return (
     <Slider.Root
       value={value}
       min={0}
       max={stops.length - 1}
       step={1}
-      onValueChange={(v) => onChange(Array.isArray(v) ? v[0] : v)}
+      onValueChange={(v) => {
+        moved.current = true;
+        onChange(Array.isArray(v) ? v[0] : v);
+      }}
       aria-label="Cut style"
       // The stop name, not "2" — a screen reader should say "Sticker".
       format={{ style: 'decimal' }}
     >
-      <Slider.Control className="bui-slider-control">
+      <Slider.Control
+        className="bui-slider-control"
+        onPointerDown={() => {
+          moved.current = false;
+        }}
+        onPointerUp={() => {
+          if (!moved.current) onChange(value);
+        }}
+      >
         <Slider.Track className="bui-slider-track">
           {/* Ticks are positioned as a fraction of the track, and the track is
               exactly the thumb's travel range, so they cannot drift out of

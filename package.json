@@ -45,6 +45,7 @@
     "verify:progress": "tsx test/verify-progress.ts",
     "verify:v1": "tsx test/verify-v1.ts",
     "verify:signin-error": "tsx test/verify-signin-error.ts",
+    "verify:regression": "tsx test/verify-regression.ts",
     "build:v1": "bash scripts/build-v1.sh",
     "brand:assets": "node scripts/make-brand-assets.mjs"
   },

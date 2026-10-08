@@ -3117,8 +3117,9 @@ body.is-tracing #st-time {
    Targeted at #preview, not #stage: the SVG sets its own `cursor: grab` and
    sits inside the stage, so a rule on the ancestor never reached the element
    the pointer is actually over — the hand stayed put through the whole refine
-   session. The .panning variant is overridden too, since a drag that starts
-   on the canvas while refining is still a correction, not a pan. */
+   session. The .panning variant is overridden too: while refining, a press
+   is a correction until it moves far enough to become a pan, so the cursor
+   must not flip to the hand on pointer-down. */
 body.is-refining-bg #preview,
 body.is-refining-bg #preview.panning {
   cursor: crosshair;

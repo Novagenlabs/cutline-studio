@@ -11,6 +11,7 @@
 // damaging: a redo that survives a new stroke would re-apply an edit from a
 // history the user has already left.
 import puppeteer from 'puppeteer-core';
+import { flatFixture } from './fixture-flat';
 
 const CHROME =
   process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -54,7 +55,9 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
     })()`)) as { undo: boolean; redo: boolean; count: string | null };
 
   const input = await p.$('input[type=file]');
-  await input!.uploadFile(IMAGE);
+  // Flattened: removal on the transparent original is now a no-op, and this
+  // needs a refine session to step through.
+  await input!.uploadFile(await flatFixture(IMAGE));
   await wait(4000);
 
   await p.click('#btn-remove-bg');

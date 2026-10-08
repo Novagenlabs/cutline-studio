@@ -7,6 +7,8 @@ import {
   allColourMatte,
   erodeMatte,
   coverage,
+  keptOpaque,
+  keptOpaqueStats,
 } from '../src/ai/cutout';
 import type { RasterImage } from '../src/pipeline/types';
 
@@ -420,5 +422,138 @@ describe('stepping back through corrections', () => {
     // b overwrote a, so removing b must not leave b's result behind.
     expect(both[2 * 40 + 2]).toBe(255);
     expect(onlyA[2 * 40 + 2]).toBe(0);
+  });
+});
+
+/**
+ * Removal on artwork that is already transparent.
+ *
+ * The whole regression. A transparent PNG — the app's main input — came back
+ * from Remove background with hardened edges, black fill in every enclosed
+ * gap, and on dark artwork nothing at all: the flood read RGB only, voted the
+ * transparent pixels' black as the background colour, and cutout() then
+ * replaced the real alpha with a binary matte. These pin the rules that make
+ * removal a no-op on such an image and harmless on any other.
+ */
+function transparentScene(
+  w: number,
+  h: number,
+  paint: (x: number, y: number) => [number, number, number, number] | null
+): RasterImage {
+  // Transparent pixels read back as black, as a canvas returns them.
+  const data = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const c = paint(x, y) ?? [0, 0, 0, 0];
+      const i = (y * w + x) * 4;
+      data[i] = c[0];
+      data[i + 1] = c[1];
+      data[i + 2] = c[2];
+      data[i + 3] = c[3];
+    }
+  }
+  return { data, width: w, height: h };
+}
+
+describe('removal on artwork that is already transparent', () => {
+  // A red square on transparency, with a one-pixel soft ramp around it.
+  const soft = transparentScene(30, 30, (x, y) => {
+    const inside = x >= 10 && x < 20 && y >= 10 && y < 20;
+    const ring = !inside && x >= 9 && x < 21 && y >= 9 && y < 21;
+    if (inside) return [200, 30, 30, 255];
+    if (ring) return [200, 30, 30, 100];
+    return null;
+  });
+
+  it('transparent pixels never vote, so a transparent border finds no background', () => {
+    const m = floodMatte(soft, 32);
+    // Nothing opaque was dropped; the transparent fringe is left at 255 too.
+    expect(coverage(m)).toBe(1);
+    expect(keptOpaque(soft, m)).toBe(1);
+  });
+
+  it('leaves the artwork byte-identical, soft ramp included', () => {
+    const out = cutout(soft, floodMatte(soft, 32));
+    expect(Array.from(out.data)).toEqual(Array.from(soft.data));
+  });
+
+  it('never raises alpha: a matte can only take coverage away', () => {
+    const keepAll = new Float32Array(30 * 30).fill(255);
+    const out = cutout(soft, keepAll);
+    for (let i = 3; i < out.data.length; i += 4) {
+      expect(out.data[i]).toBe(soft.data[i]);
+    }
+  });
+
+  it('still drops opaque background that matches the border, reached across transparency', () => {
+    // A white opaque strip along the left edge votes "white"; a white card
+    // floats in the middle, separated from it by transparency. The flood
+    // passes through the transparency and drops the card, keeps the red art,
+    // and leaves the transparent pixels' own alpha alone.
+    const img = transparentScene(40, 20, (x, y) => {
+      if (x < 2) return [255, 255, 255, 255];
+      if (x >= 15 && x < 22 && y >= 5 && y < 15) return [255, 255, 255, 255];
+      if (x >= 28 && x < 36 && y >= 5 && y < 15) return [200, 30, 30, 255];
+      return null;
+    });
+    const m = floodMatte(img, 32);
+    const at = (x: number, y: number) => m[y * 40 + x];
+    expect(at(1, 10)).toBe(0); // the strip
+    expect(at(18, 10)).toBe(0); // the card, across the gap
+    expect(at(30, 10)).toBe(255); // the art
+    expect(at(10, 10)).toBe(255); // transparency is not "dropped"; multiply hides it
+    const out = cutout(img, m);
+    expect(out.data[(10 * 40 + 18) * 4 + 3]).toBe(0);
+    expect(out.data[(10 * 40 + 30) * 4 + 3]).toBe(255);
+    expect(out.data[(10 * 40 + 10) * 4 + 3]).toBe(0);
+    expect(keptOpaque(img, m)).toBeLessThan(1);
+  });
+
+  it('"inside too" matches opaque pixels only', () => {
+    const img = transparentScene(20, 20, (x, y) => {
+      if (y < 2) return [255, 255, 255, 255]; // white top edge votes
+      if (x >= 8 && x < 12 && y >= 8 && y < 12) return [255, 255, 255, 255]; // enclosed white
+      if (x >= 4 && x < 16 && y >= 4 && y < 16) return [20, 20, 20, 255]; // dark ring around it
+      return null;
+    });
+    const m = allColourMatte(img, 32);
+    expect(m[10 * 20 + 10]).toBe(0); // enclosed white goes
+    expect(m[6 * 20 + 6]).toBe(255); // dark art stays
+    expect(m[18 * 20 + 2]).toBe(255); // transparent pixels are not matched
+  });
+
+  it('reports the kept share over opaque pixels, not over the whole image', () => {
+    const img = transparentScene(10, 10, (x, y) =>
+      x < 2 ? [255, 255, 255, 255] : x < 4 ? [200, 30, 30, 255] : null
+    );
+    const m = floodMatte(img, 32);
+    // 40 opaque pixels: 20 white dropped, 20 red kept.
+    expect(keptOpaque(img, m)).toBeCloseTo(0.5, 5);
+    // coverage would say 0.8, which hides what happened to the artwork.
+    expect(coverage(m)).toBeCloseTo(0.8, 5);
+    const none = transparentScene(4, 4, () => null);
+    expect(keptOpaque(none, floodMatte(none, 32))).toBe(1);
+  });
+
+  it('counts kept pixels, so small artwork on a big card is not mistaken for an erasure', () => {
+    // 200x200 white card with a 10x10 mark: the flood correctly keeps 100
+    // of 40,000 opaque pixels, a 0.25% share. Refusing by share would call
+    // that an erasure; the count says 100 pixels of artwork survived.
+    const card = scene(200, 200, [255, 255, 255], { x: 95, y: 95, w: 10, h: 10 }, [20, 20, 20]);
+    const m = floodMatte(card, 32);
+    expect(keptOpaqueStats(card, m)).toEqual({ opaque: 40000, kept: 100 });
+    expect(keptOpaque(card, m)).toBeCloseTo(0.0025, 6);
+    // Whereas an image the flood really did erase keeps zero.
+    const gone = scene(20, 20, [255, 255, 255], { x: 5, y: 5, w: 10, h: 10 }, [250, 250, 250]);
+    expect(keptOpaqueStats(gone, floodMatte(gone, 32)).kept).toBe(0);
+  });
+
+  it('is unchanged on an opaque image: multiply equals replace', () => {
+    const img = scene(40, 40, [255, 255, 255], { x: 10, y: 10, w: 20, h: 20 }, [20, 20, 20]);
+    const m = floodMatte(img, 32);
+    const out = cutout(img, m);
+    for (let i = 0; i < m.length; i++) {
+      expect(out.data[i * 4 + 3]).toBe(Math.max(0, Math.min(255, m[i])));
+    }
   });
 });

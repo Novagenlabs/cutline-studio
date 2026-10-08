@@ -73,6 +73,38 @@ const API = '';
 
 const EXT: Record<PaidFormat, string> = { SVG: 'svg', PDF: 'pdf', DXF: 'dxf', PNG: 'png' };
 
+/** The server's cap on imageDataUrl (api/export/route.ts, zod max). */
+const MAX_DATA_URL = 48_000_000;
+
+/**
+ * The artwork as a data: URL, which is the only form the export route accepts.
+ *
+ * After a background removal the studio holds the artwork as a blob: URL —
+ * deliberately, because a synchronous toDataURL on a 7-megapixel PNG stalled
+ * the page for most of a second on every correction stroke. The export route
+ * never knew that: it was sent the blob: URL verbatim and refused it with a
+ * bare 400, so SVG, PDF and PNG exports failed for exactly the users who had
+ * used the feature. The encoding happens here instead — once, asynchronously,
+ * at the moment the file is actually wanted.
+ */
+async function artworkDataUrl(url: string): Promise<string> {
+  if (url.startsWith('data:')) return url;
+  const blob = await (await fetch(url)).blob();
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error('could not read the artwork'));
+    reader.readAsDataURL(blob);
+  });
+  if (!dataUrl.startsWith('data:image/')) {
+    throw new ExportError(
+      'Could not read the artwork for this export. Nothing was charged.',
+      'server'
+    );
+  }
+  return dataUrl;
+}
+
 export async function requestExport(
   format: PaidFormat,
   ctx: ExportContext
@@ -102,6 +134,19 @@ export async function requestExport(
     );
   }
 
+  // Encoded here, before anything is sent, so an artwork the server would
+  // refuse is refused with a sentence rather than a 400 — and so the cap is
+  // the one the server actually enforces.
+  const imageDataUrl = needsArtwork && ctx.imageDataUrl
+    ? await artworkDataUrl(ctx.imageDataUrl)
+    : undefined;
+  if (imageDataUrl && imageDataUrl.length > MAX_DATA_URL) {
+    throw new ExportError(
+      'This artwork is too large to export with its image. Try a smaller source file. Nothing was charged.',
+      'server'
+    );
+  }
+
   const res = await fetch(`${API}/api/export`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -124,7 +169,7 @@ export async function requestExport(
       // `filename*=` parameter so the download keeps its accents and spaces,
       // with filenameBase above as the ASCII fallback.
       filenameDisplay: `${ctx.fileBase}-cut`.slice(0, 200),
-      imageDataUrl: needsArtwork ? ctx.imageDataUrl : undefined,
+      imageDataUrl,
     }),
   });
 
