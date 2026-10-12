@@ -3152,3 +3152,165 @@ body.is-refining-bg #preview.panning {
 a.btn {
   text-decoration: none;
 }
+
+/* ---------------- the assistant ---------------- */
+
+/* Docked over the stage's right edge, clear of the top bar and the status
+   bar, so the canvas stays in view while the assistant acts on it. */
+.assistant {
+  position: fixed;
+  top: 60px;
+  right: 12px;
+  bottom: 44px;
+  width: min(360px, calc(100vw - 24px));
+  display: flex;
+  flex-direction: column;
+  z-index: 60;
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+
+.assistant[hidden] {
+  display: none;
+}
+
+.asst-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 10px 10px 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.asst-head-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.asst-log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.asst-welcome,
+.asst-note {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.asst-msg {
+  max-width: 92%;
+  padding: 8px 11px;
+  border-radius: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.asst-user {
+  align-self: flex-end;
+  background: var(--ink);
+  color: var(--bg);
+  border-bottom-right-radius: 4px;
+}
+
+.asst-assistant {
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line);
+  border-bottom-left-radius: 4px;
+}
+
+/* A reply still arriving: a caret so a pause reads as thinking, not stuck. */
+.asst-assistant.is-streaming::after {
+  content: '▍';
+  margin-left: 2px;
+  color: var(--accent);
+  animation: asst-caret 1s steps(2) infinite;
+}
+
+@keyframes asst-caret {
+  to {
+    opacity: 0;
+  }
+}
+
+/* An action the assistant took, shown as a chip between messages so the
+   user can see what changed in the studio and when. */
+.asst-action {
+  align-self: flex-start;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  padding: 3px 9px 3px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.asst-action::before {
+  content: '› ';
+  color: var(--accent);
+}
+
+.asst-action.is-done {
+  color: var(--ink);
+}
+
+.asst-action.is-failed {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.asst-form {
+  border-top: 1px solid var(--line);
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.asst-form textarea {
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  resize: none;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 11px;
+}
+
+.asst-form textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.asst-form-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.asst-hint {
+  flex: 1;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .asst-assistant.is-streaming::after {
+    animation: none;
+  }
+}

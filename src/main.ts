@@ -21,6 +21,14 @@ import { createTour, tourSeen } from './ui/tour';
 import { mountCutSlider, mountValueSlider, mountCheckbox, mountSelect } from './ui/controls';
 import { promptSignIn, signOutNow } from './ui/signin';
 import { openCredits } from './ui/credits';
+import { mountAssistant, type StudioApi } from './ui/assistant';
+import {
+  clampParam,
+  describeSnapshot,
+  type ParamName,
+  type StudioSnapshot,
+  type ToolName,
+} from './lib/assistant-tools';
 import type { PresetId } from './presets';
 import type { PaidFormat } from './paid-export';
 
@@ -1207,7 +1215,36 @@ function resetAllSettings() {
   state.spotName = 'CutContour';
   state.useAi = false;
 
-  // Numeric inputs and their mounted sliders.
+  syncAllControls();
+  const p = state.params;
+
+  // Die shape is a button group, not an input: its state is the active class.
+  document.querySelectorAll<HTMLButtonElement>('.shape').forEach((b) => {
+    b.classList.toggle('active', b.dataset.shape === p.shape);
+  });
+
+  // Output.
+  const cutmode = $('#in-cutmode') as HTMLSelectElement | null;
+  if (cutmode) {
+    cutmode.value = 'kiss';
+    cutmode.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  spotInput.value = state.spotName;
+
+  // The Simple tab reads the same params, so it has to follow too.
+  syncPresetSelection();
+  renderElementList();
+  recompute(true);
+  toast('Settings reset to defaults.', 'info', 3000);
+}
+
+/**
+ * Reflect EVERY setting in its control: the sliders, the numeric inputs and
+ * the mirrored checkboxes. For when the params changed without the user
+ * touching a control — a reset, or the assistant acting on their behalf —
+ * so the rail never shows a value that is not the one being cut.
+ */
+function syncAllControls() {
   syncCutControls();
   const p = state.params;
   const setSlider = (sel: string, out: string, v: number, fmt: (n: number) => string) => {
@@ -1232,29 +1269,10 @@ function resetAllSettings() {
   check('#in-holes', p.keepHoles);
   check('#in-holes-simple', p.keepHoles);
   check('#in-body', p.hugBody);
-  check('#in-ai', false);
-  check('#in-halo', true);
-  check('#in-v1', false);
+  check('#in-ai', state.useAi);
+  check('#in-halo', state.halo);
+  check('#in-v1', state.compareV1);
   redrawCheckboxes();
-
-  // Die shape is a button group, not an input: its state is the active class.
-  document.querySelectorAll<HTMLButtonElement>('.shape').forEach((b) => {
-    b.classList.toggle('active', b.dataset.shape === p.shape);
-  });
-
-  // Output.
-  const cutmode = $('#in-cutmode') as HTMLSelectElement | null;
-  if (cutmode) {
-    cutmode.value = 'kiss';
-    cutmode.dispatchEvent(new Event('change', { bubbles: true }));
-  }
-  spotInput.value = state.spotName;
-
-  // The Simple tab reads the same params, so it has to follow too.
-  syncPresetSelection();
-  renderElementList();
-  recompute(true);
-  toast('Settings reset to defaults.', 'info', 3000);
 }
 
 /** Reflect params in the advanced Cut path controls. */
@@ -2445,3 +2463,228 @@ async function exportJpegLocal() {
 }
 
 $('#btn-jpg').addEventListener('click', exportJpegLocal);
+
+/* ---------------- the assistant ---------------- */
+
+/**
+ * What the assistant may do, and how it sees the studio.
+ *
+ * Every action here is one the user can take by clicking; the tools reach
+ * the same handlers the controls do (often by dispatching the control's own
+ * change event), so the assistant cannot put the studio into a state a
+ * person could not. Each returns one line saying what changed — including
+ * the new path and node counts, which is how the model learns whether what
+ * it did helped — and throws a plain sentence when it cannot be done.
+ */
+const settle = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+function setCheckbox(sel: string, on: boolean): void {
+  const el = $(sel) as HTMLInputElement;
+  if (el.checked === on) return;
+  el.checked = on;
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+const assistantApi: StudioApi = {
+  snapshot(): StudioSnapshot {
+    const p = state.params;
+    const r = state.result;
+    const warn = $('#st-nodes-warn') as HTMLElement | null;
+    const overDense = !!warn && !warn.hidden;
+    const notes: string[] = [];
+    const hint = $('#hint-mask')?.textContent?.trim();
+    if (state.imageEl && hint) notes.push(hint);
+    if (overDense && warn?.textContent?.trim()) notes.push(warn.textContent.trim());
+    const toMm = (px: number) => (px / p.dpi) * 25.4;
+    const preset = matchPreset(p);
+    return {
+      image: state.imageEl
+        ? {
+            name: state.fileBase,
+            width: state.srcW,
+            height: state.srcH,
+            hasAlpha: r?.usedAlpha ?? false,
+            backgroundRemoved: !!state.bgOriginal,
+            refining: state.bgReviewing,
+            corrections: state.bgStrokes.length,
+          }
+        : null,
+      mode: document.body.classList.contains('mode-simple') ? 'simple' : 'advanced',
+      cutStyle: preset ?? 'custom',
+      params: {
+        offsetMm: p.offsetMm,
+        alphaThreshold: p.alphaThreshold,
+        bgTolerance: p.bgTolerance,
+        denoisePx: p.denoisePx,
+        precisionMm: p.precisionMm,
+        smoothness: p.smoothness,
+        minCornerRadiusMm: p.minCornerRadiusMm,
+        bridgeMm: p.bridgeMm,
+        holeMinMm2: p.holeMinMm2,
+        dpi: p.dpi,
+        keepHoles: p.keepHoles,
+        hugBody: p.hugBody,
+        engineVersion: p.engineVersion,
+      },
+      options: { halo: state.halo, smartEdges: state.useAi },
+      elements: { count: p.regions.length, selected: state.activeRegion },
+      cut: r
+        ? {
+            rings: r.rings.length,
+            nodes: r.nodeCount,
+            usedAlpha: r.usedAlpha,
+            widthMm: toMm(r.bbox.w),
+            heightMm: toMm(r.bbox.h),
+            overDense,
+          }
+        : null,
+      account: { signedIn: state.balance !== null, balance: state.balance },
+      exportDefault: (defaultFormat() as StudioSnapshot['exportDefault']) ?? null,
+      notes,
+    };
+  },
+
+  async run(name: ToolName, input: unknown): Promise<string> {
+    const args = (input ?? {}) as Record<string, unknown>;
+    const needImage = () => {
+      if (!state.imageEl) throw new Error('No image is open. The user has to open one first.');
+    };
+    const after = (): string => {
+      const s = assistantApi.snapshot();
+      if (!s.cut) return 'No cut yet.';
+      return `Now ${s.cut.rings} path${s.cut.rings === 1 ? '' : 's'}, ${s.cut.nodes} nodes; cut style ${s.cutStyle}.`;
+    };
+
+    switch (name) {
+      case 'set_cut_style': {
+        needImage();
+        applyPreset(args.style as PresetId);
+        await settle(250);
+        return `Cut style set to ${String(args.style)}. ${after()}`;
+      }
+      case 'set_interior_holes': {
+        needImage();
+        setCheckbox('#in-holes', Boolean(args.enabled));
+        await settle(250);
+        return `Interior holes ${args.enabled ? 'are now cut' : 'are now kept filled'}. ${after()}`;
+      }
+      case 'set_param': {
+        needImage();
+        const key = args.name as ParamName;
+        const value = clampParam(key, Number(args.value));
+        if (key === 'dpi') {
+          const el = $('#in-dpi') as HTMLInputElement;
+          el.value = String(value);
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        } else {
+          // Global, not per-element: an element stays selected only while the
+          // user is tuning it by hand.
+          state.activeRegion = -1;
+          (state.params as unknown as Record<string, number>)[key] = value;
+          syncAllControls();
+          syncRegionControls();
+          syncPresetSelection();
+          recompute(true);
+        }
+        await settle(250);
+        return `${key} set to ${value}. ${after()}`;
+      }
+      case 'set_option': {
+        needImage();
+        const on = Boolean(args.enabled);
+        if (args.name === 'hugBody') setCheckbox('#in-body', on);
+        else if (args.name === 'halo') setCheckbox('#in-halo', on);
+        else if (args.name === 'smartEdges') {
+          setCheckbox('#in-ai', on);
+          // The model may still be downloading; the studio shows its own progress.
+          await settle(600);
+          return on
+            ? `Smart edges requested. ${state.useAi ? 'Active.' : 'Still starting, or not available on this device — the studio says which.'} ${after()}`
+            : `Smart edges off. ${after()}`;
+        }
+        await settle(250);
+        return `${String(args.name)} ${on ? 'on' : 'off'}. ${after()}`;
+      }
+      case 'remove_background': {
+        needImage();
+        const mode = String(args.mode);
+        const insideBox = $('#in-bg-all') as HTMLInputElement;
+        insideBox.checked = mode === 'inside_too';
+        redrawCheckboxes();
+        const hadRemoval = !!state.bgOriginal;
+        await removeBackground(true);
+        await settle(800);
+        if (state.bgReviewing) {
+          return `Background removed${mode === 'inside_too' ? ', including enclosed areas' : ''}. A refine session is open: the user can click the canvas to correct; call finish_background_removal when done. ${after()}`;
+        }
+        if (!!state.bgOriginal === hadRemoval) {
+          return 'Nothing was removed: the studio found no background to remove (the image is already transparent, or no flat background colour was found). The artwork is unchanged.';
+        }
+        return `Background removal ran. ${after()}`;
+      }
+      case 'finish_background_removal': {
+        if (!state.bgReviewing) return 'No refine session is open; nothing to finish.';
+        ($('#btn-bg-keep') as HTMLButtonElement).click();
+        await settle(800);
+        return `Refine session finished; the removal is kept. ${after()}`;
+      }
+      case 'undo_background_removal': {
+        if (!state.bgOriginal) return 'There is no background removal to undo.';
+        undoBackground();
+        await settle(800);
+        return `Original artwork restored. ${after()}`;
+      }
+      case 'detect_elements': {
+        needImage();
+        ($('#btn-detect') as HTMLButtonElement).click();
+        await settle(400);
+        const n = state.params.regions.length;
+        return n > 0
+          ? `Detected ${n} element${n === 1 ? '' : 's'}; element 1 is selected for per-element tuning. ${after()}`
+          : 'No separate elements were detected — the artwork reads as a single element.';
+      }
+      case 'clear_elements': {
+        state.params.regions = [];
+        state.activeRegion = -1;
+        renderRegions();
+        syncRegionControls();
+        renderElementList();
+        recompute(true);
+        await settle(250);
+        return `Elements cleared. ${after()}`;
+      }
+      case 'reset_settings': {
+        resetAllSettings();
+        await settle(250);
+        return `Settings reset to defaults. ${after()}`;
+      }
+      case 'set_mode': {
+        setMode(args.mode as 'simple' | 'advanced');
+        return `Showing the ${String(args.mode)} tab.`;
+      }
+      case 'open_export': {
+        if (!state.result || state.result.rings.length === 0) {
+          throw new Error('There is no cut to export yet.');
+        }
+        void openExportDialog();
+        await settle(300);
+        const row = document.querySelector(
+          `#export-sheet .fmt[data-format="${String(args.format)}"]`
+        ) as HTMLElement | null;
+        row?.click();
+        return `The export sheet is open with ${String(args.format)} selected. The user confirms the download there; it costs 1 credit${
+          state.balance === null ? ' and needs sign-in' : ''
+        }.`;
+      }
+      case 'get_state':
+        return describeSnapshot(assistantApi.snapshot());
+    }
+  },
+
+  async signIn() {
+    return (await promptSignIn()) === 'signed-in';
+  },
+};
+
+
+mountAssistant(assistantApi);

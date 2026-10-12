@@ -29,6 +29,24 @@ moment of a paid download, held in memory and never written to disk.
 
 See BACKEND.md for the credit ledger and payment design.
 
+## The assistant
+
+The **Assistant** button in the top bar opens a chat that can drive the
+studio: "make the border tighter", "cut the holes out", "remove the
+background", "why so many nodes?". It is an agent, not a help page — the model
+(Claude, via the API) is given a whitelist of studio actions as tools and a
+text snapshot of the current state, and the browser executes what it asks for
+through the same code the controls use. It never sees the artwork's pixels,
+cannot spend credits (it can open the export sheet; the user confirms), and
+cannot do anything a click could not. Signed-in users only; set
+`ANTHROPIC_API_KEY` to enable it (see DEPLOY.md).
+
+Pieces: `src/lib/assistant-tools.ts` (the tool catalogue and snapshot, shared
+by server and browser), `src/lib/assistant-server.ts` (the request to the
+model), `src/app/api/assistant/route.ts` (auth, limits, the stream),
+`src/ui/assistant.ts` (the panel and the loop), and the `assistantApi` block
+at the end of `src/main.ts` (what each tool does to the studio).
+
 ## The previous version, at `/v1`
 
 The studio as it was just before the UI overhaul (commit `1760aaa`) is served

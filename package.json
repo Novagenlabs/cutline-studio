@@ -46,10 +46,12 @@
     "verify:v1": "tsx test/verify-v1.ts",
     "verify:signin-error": "tsx test/verify-signin-error.ts",
     "verify:regression": "tsx test/verify-regression.ts",
+    "verify:assistant": "tsx test/verify-assistant.ts",
     "build:v1": "bash scripts/build-v1.sh",
     "brand:assets": "node scripts/make-brand-assets.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.133.0",
     "@auth/prisma-adapter": "^2.11.1",
     "@base-ui-components/react": "^1.0.0-rc.0",
     "@napi-rs/canvas": "^1.0.7",

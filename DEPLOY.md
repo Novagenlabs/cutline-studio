@@ -38,6 +38,9 @@ yet". They are not optional if anyone is meant to pay.
 |---|---|
 | `EMAIL_SERVER` | SMTP URL, only if you want email magic-link sign-in alongside Google. |
 | `EMAIL_FROM` | Sender address for those emails. Both must be set or neither — the provider is skipped unless both are present. |
+| `ANTHROPIC_API_KEY` | Enables the in-studio assistant (the **Assistant** button in the top bar). Without it the button still appears and the panel answers "The assistant is not available yet." — the studio itself is unaffected. Signed-in users only; every turn is a model call, so the key's spend limit is the real cap. |
+| `ASSISTANT_MODEL` | Model for the assistant. Default `claude-opus-5-5`. |
+| `ASSISTANT_EFFORT` | `low` (default), `medium`, `high`, `xhigh` or `max`. Depth of reasoning per turn; `low` suits short answers and small tool calls. |
 | `AUTH_SECRET_PREVIOUS` | The previous `AUTH_SECRET`, during a rotation. Cookies encrypted under it keep working while new ones use the current secret. Remove it a day or two later, once no cookie from before the change can still exist. |
 
 `NODE_ENV=production` is set by the Dockerfile; Dokploy does not need it.
@@ -128,6 +131,7 @@ Two things worth knowing about how this behaves:
 - `https://<domain>/` — the cutter, with the credit pill in the top bar
 - `https://<domain>/api/me` — should return JSON; `signedIn:false` when logged out
 - `https://<domain>/signin-error?error=Configuration` — the page a failed sign-in lands on, with a working **Try again**
+- Sign in, open **Assistant** in the top bar, and ask for "a tighter cut" — it should switch the cut style and say so. Each turn logs `[assistant] <model> stop=… in=… cached=… out=…` on the server.
 - Sign in, then buy the smallest pack in Stripe **test** mode first and confirm
   the balance increases. That exercises the one path that cannot be tested
   locally without real keys.
