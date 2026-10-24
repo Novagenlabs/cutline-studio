@@ -66,6 +66,11 @@ async function main(): Promise<void> {
     });
     if (!user) {
       console.error(`no account with the email ${email} — nothing written`);
+      // The size of the database says whether this is the production one
+      // at all: a handful of accounts is a dev branch, and a well-known
+      // account missing here means DATABASE_URL points somewhere else.
+      const total = await db.user.count();
+      console.error(`accounts on this database: ${total}`);
       // Accounts only exist after a first sign-in, and the lookup above is
       // exact. Show what is close, so a capitalisation or a typo is obvious
       // rather than a guess.
