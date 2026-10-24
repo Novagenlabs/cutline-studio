@@ -48,6 +48,7 @@
     "verify:regression": "tsx test/verify-regression.ts",
     "verify:assistant": "tsx test/verify-assistant.ts",
     "build:v1": "bash scripts/build-v1.sh",
+    "credits:grant": "tsx scripts/grant-credits.ts",
     "brand:assets": "node scripts/make-brand-assets.mjs"
   },
   "dependencies": {
